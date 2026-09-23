@@ -46,6 +46,10 @@ name: Publish Rust binaries
         description: Forwarded to ci.yml; see docs/ci.md
         type: boolean
         default: true
+      api-compatibility:
+        description: Forwarded to ci.yml; see docs/ci.md
+        type: boolean
+        default: false
     outputs:
       artifact-id:
         description: Immutable validated release artifact ID
@@ -108,6 +112,7 @@ jobs:
       dependency-audit: ${{ inputs.dependency-audit }}
       unsafe-policy: ${{ inputs.unsafe-policy }}
       unused-dependencies: ${{ inputs.unused-dependencies }}
+      api-compatibility: ${{ inputs.api-compatibility }}
   stage:
     name: Stage the release payload
     needs:

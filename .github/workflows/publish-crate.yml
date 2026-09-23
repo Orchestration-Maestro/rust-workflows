@@ -46,6 +46,10 @@ name: Publish Rust crate
         description: Forwarded to ci.yml; see docs/ci.md
         type: boolean
         default: true
+      api-compatibility:
+        description: Forwarded to ci.yml; see docs/ci.md
+        type: boolean
+        default: false
       semver-check:
         description: >-
           Compare the selected package against its newest published release and
@@ -124,6 +128,7 @@ jobs:
       dependency-audit: ${{ inputs.dependency-audit }}
       unsafe-policy: ${{ inputs.unsafe-policy }}
       unused-dependencies: ${{ inputs.unused-dependencies }}
+      api-compatibility: ${{ inputs.api-compatibility }}
   stage:
     name: Stage the crate package
     needs:

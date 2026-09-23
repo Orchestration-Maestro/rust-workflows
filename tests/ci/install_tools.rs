@@ -219,6 +219,7 @@ fn ci_installs_its_toolbelt_once_and_each_optional_tool_behind_its_gate() {
     assert!(mandatory > 5, "a default run must install its own tools");
     let expected: BTreeMap<String, String> = [
         ("cargo-mutants", "${{ inputs.mutation-test }}"),
+        ("cargo-semver-checks", "${{ inputs.api-compatibility }}"),
         ("clippy-sarif", "${{ inputs.sarif-reports }}"),
         ("cargo-machete", "${{ inputs.unused-dependencies }}"),
         ("cargo-vet", "${{ inputs.dependency-audit }}"),

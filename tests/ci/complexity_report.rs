@@ -81,6 +81,7 @@ printf '%s' "$MESSAGES""#,
         "OUT_MUTANTS",
         "OUT_UNUSED",
         "OUT_STAGE",
+        "OUT_API",
     ] {
         f.set(key, "success");
     }

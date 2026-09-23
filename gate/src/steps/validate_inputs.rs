@@ -16,6 +16,7 @@ pub(crate) const STEPS: &[Step] = &[Step {
     id: "validate",
     summary: "Validate consumer inputs",
     inputs: &[
+        "API_COMPATIBILITY",
         "ARTIFACT_KEY",
         "CLIPPY_LEVEL",
         "COVERAGE",
@@ -56,6 +57,7 @@ fn run() -> Outcome {
     let clippy_level = clippy_level()?;
     let unused_dependencies = flag("UNUSED_DEPENDENCIES")?.to_string();
     let mutation_test = flag("MUTATION_TEST")?.to_string();
+    let api_compatibility = flag("API_COMPATIBILITY")?.to_string();
     let sarif_reports = flag("SARIF_REPORTS")?.to_string();
     let dependency_audit = flag("DEPENDENCY_AUDIT")?.to_string();
     let deny_config = deny_configuration(&project, &root, license_policy)?;
@@ -73,6 +75,7 @@ fn run() -> Outcome {
         ("LICENSE_POLICY", license_policy.as_str()),
         ("DENY_CONFIG", &deny_config),
         ("MUTATION_TEST", &mutation_test),
+        ("API_COMPATIBILITY", &api_compatibility),
         ("SARIF_REPORTS", &sarif_reports),
         ("UNSAFE_POLICY", unsafe_policy.as_str()),
         ("DEPENDENCY_AUDIT", &dependency_audit),

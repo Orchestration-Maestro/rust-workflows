@@ -61,6 +61,7 @@ impl Fixture {
             ("COVERAGE", "80"),
             ("LICENSE_POLICY", "auto"),
             ("MUTATION_TEST", "false"),
+            ("API_COMPATIBILITY", "false"),
             ("SARIF_REPORTS", "false"),
             ("UNUSED_DEPENDENCIES", "false"),
             ("UNSAFE_POLICY", "allow"),
