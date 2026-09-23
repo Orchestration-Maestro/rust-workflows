@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v1.0.1...v1.1.0) (2026-09-23)
+
+
+### Features
+
+* check public API compatibility on pull requests ([#14](https://github.com/Orchestration-Maestro/rust-workflows/issues/14)) ([a064dae](https://github.com/Orchestration-Maestro/rust-workflows/commit/a064dae4efbc2826baf0fb5513cd07eaf1361911))
+* turn the API compatibility gate on by default ([#15](https://github.com/Orchestration-Maestro/rust-workflows/issues/15)) ([9deeaea](https://github.com/Orchestration-Maestro/rust-workflows/commit/9deeaead8f795fed0c81d4f0d312b380b23652bc))
+* upload coverage and test results to Codecov ([#12](https://github.com/Orchestration-Maestro/rust-workflows/issues/12)) ([7528afc](https://github.com/Orchestration-Maestro/rust-workflows/commit/7528afc09e366456b442126803d4619e3d951281))
+
 ## [1.0.1](https://github.com/Orchestration-Maestro/rust-workflows/compare/v1.0.0...v1.0.1) (2026-09-23)
 
 
