@@ -217,14 +217,21 @@ Releases run through `.github/workflows/release-please.yml`, which stays skipped
 until an owner sets it up once:
 
 1. Create a GitHub App owned by the organization, with no webhook and the
-   repository permissions Contents, Issues and Pull requests set to read and
-   write. Install it on this repository only.
-2. Store its client ID as the repository variable `RELEASE_APP_CLIENT_ID` and a
-   private key as the repository secret `RELEASE_APP_PRIVATE_KEY`.
+   repository permissions Contents, Issues, Pull requests and Workflows set to
+   read and write. Install it on the organization's repositories.
+2. Store its client ID as the organization variable `RELEASE_APP_CLIENT_ID` and
+   a private key as the organization secret `RELEASE_APP_PRIVATE_KEY`. Store both
+   again, under the same names, as organization Dependabot secrets: a run
+   Dependabot started reads no other secret.
 
 The workflow then keeps a release pull request open from the conventional
 titles merged to `main`; merging it tags `vMAJOR.MINOR.PATCH` and creates the
 GitHub Release. An App token, not `GITHUB_TOKEN`, opens that pull request: the
 organization forbids `GITHUB_TOKEN` from opening one, and a pull request it
-opened would trigger none of the checks a merge requires. The manifest's `0.0.0`
-is initial bookkeeping, not a release.
+opened would trigger none of the checks a merge requires.
+
+`.github/workflows/dependabot-auto-merge.yml` uses the same App to queue a
+squash merge of each Dependabot patch or minor update; the required checks still
+decide whether it merges. A major update, or one whose type Dependabot did not
+record, waits for a person. The App's Workflows permission is what lets an
+action update, which edits workflow files, merge.

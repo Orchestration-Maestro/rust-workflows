@@ -44,6 +44,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── attest-binaries.yml                 # Isolated signing job; re-verifies before it signs
 │   │   ├── ci-internal.yml                     # Repository quality, the consumer matrix and both dry-run publishers on every pull request
 │   │   ├── ci.yml                              # The reusable Rust CI a consumer calls
+│   │   ├── dependabot-auto-merge.yml           # Queues Dependabot patch and minor updates to merge on the organization's bot token
 │   │   ├── fuzz.yml                            # Bounded fuzz regression on a nightly toolchain
 │   │   ├── publish-binaries.yml                # Protected binary release, dry-run by default
 │   │   ├── publish-crate.yml                   # Protected crate publication explicitly to public crates.io
