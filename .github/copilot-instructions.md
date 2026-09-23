@@ -127,6 +127,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── quality_scorecard/              # rust-gate scorecard: the step and the value it renders
 │   │   │   │   ├── mod.rs                      # rust-gate scorecard: what ran, as JSON, Markdown and a self-contained badge
 │   │   │   │   └── scorecard.rs                # A run's scorecard as a value: its controls, and the JSON, Markdown and badge of them
+│   │   │   ├── api_compatibility.rs            # rust-gate api: cargo-semver-checks against the base branch unless the title declares a break
 │   │   │   ├── attest_binaries.rs              # rust-gate attest-binaries: validate, extract the SBOM, verify, record the outcome
 │   │   │   ├── binary_hardening.rs             # rust-gate hardening: reproducible, PIE, RELRO, no executable stack, auditable
 │   │   │   ├── configure_cargo_registry.rs       # rust-gate registry: private job-local Cargo home for direct crates.io
@@ -163,6 +164,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   └── bootstrap.sh                            # Verified pinned Linux x64 toolbelt and hooks
 ├── tests/                                      # Workflow contract validation
 │   ├── ci/                                     # ci.yml, one module per gate it runs: what each step accepts, refuses, builds and reports
+│   │   ├── api_compatibility.rs                # ci.yml: an undeclared API break fails a pull request; what has no API is not applicable
 │   │   ├── complexity_report.rs                # ci.yml: function and file sizes, reported and never held against the run
 │   │   ├── duplication_report.rs               # ci.yml: duplicated functions, reported and never held against the run
 │   │   ├── feature_combinations.rs             # ci.yml: real per-feature and combined compilation, plus replay coverage

@@ -65,6 +65,14 @@ name: Rust CI
           dependency, or set false.
         type: boolean
         default: true
+      api-compatibility:
+        description: >-
+          Fail a pull request that breaks a library's public API without a `!`
+          after the type in its title, through cargo-semver-checks against the
+          base branch. Opt-in; it needs Rust 1.93 or newer, and a project
+          without a library has no API to check.
+        type: boolean
+        default: false
     outputs:
       artifact-id:
         description: Immutable release artifact ID; available only after required gate
@@ -121,6 +129,7 @@ jobs:
           ARTIFACT_KEY: ${{ inputs.artifact-key }}
           LICENSE_POLICY: ${{ inputs.license-policy }}
           MUTATION_TEST: ${{ inputs.mutation-test }}
+          API_COMPATIBILITY: ${{ inputs.api-compatibility }}
           SARIF_REPORTS: ${{ inputs.sarif-reports }}
           UNUSED_DEPENDENCIES: ${{ inputs.unused-dependencies }}
           UNSAFE_POLICY: ${{ inputs.unsafe-policy }}
@@ -186,6 +195,11 @@ jobs:
         run: rust-gate install-tools
         env:
           TOOLS: cargo-mutants sourcefrog/cargo-mutants/releases/download/v25.3.1/cargo-mutants-x86_64-unknown-linux-gnu.tar.gz be41e6f74b633452fb17ef3b6b6113e180130f7b5693863b400c58b39e476726 cargo-mutants
+      - name: Install the API compatibility checker
+        if: ${{ inputs.api-compatibility }}
+        run: rust-gate install-tools
+        env:
+          TOOLS: cargo-semver-checks obi1kenobi/cargo-semver-checks/releases/download/v0.50.0/cargo-semver-checks-x86_64-unknown-linux-gnu.tar.gz 52a65dc88dc53fa8b57d6087954eb52cda149ca03bcfca78ce3fdecd23f893c4 cargo-semver-checks
       - name: Install the SARIF converter
         if: ${{ inputs.sarif-reports }}
         run: rust-gate install-tools
@@ -229,6 +243,12 @@ jobs:
       - name: Mutation testing
         id: mutants
         run: rust-gate mutants
+      - name: Public API compatibility
+        id: api
+        if: ${{ inputs.api-compatibility }}
+        env:
+          PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
+        run: rust-gate api
       - name: Redacted source secret scan
         id: secrets
         run: rust-gate secrets
@@ -277,6 +297,8 @@ jobs:
           OUT_STAGE: ${{ steps.stage.outcome }}
           FEATURES_APPLIED: ${{ steps.features.outputs.applied }}
           MUTANTS_APPLIED: ${{ steps.mutants.outputs.applied }}
+          OUT_API: ${{ steps.api.outcome }}
+          API_APPLIED: ${{ steps.api.outputs.applied }}
         run: rust-gate scorecard
       - name: Upload diagnostic reports
         if: ${{ always() && steps.validate.outcome == 'success' }}

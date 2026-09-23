@@ -95,6 +95,22 @@ const INACTIVE: &[(&str, &str, &str, &str, &str, &str)] = &[
         "not-run",
     ),
     (
+        "API compatibility",
+        "API_COMPATIBILITY",
+        "false",
+        "OUT_API",
+        "success",
+        "disabled",
+    ),
+    (
+        "API compatibility",
+        "API_APPLIED",
+        "false",
+        "OUT_API",
+        "success",
+        "not-applicable",
+    ),
+    (
         "advisories",
         "MUTATION_TEST",
         "true",
@@ -127,6 +143,7 @@ fn the_scorecard_distinguishes_disabled_inapplicable_failed_and_unrun_controls()
             "OUT_MUTANTS",
             "OUT_UNUSED",
             "OUT_STAGE",
+            "OUT_API",
         ] {
             f.set(key, "success");
         }
@@ -136,6 +153,8 @@ fn the_scorecard_distinguishes_disabled_inapplicable_failed_and_unrun_controls()
             "SARIF_REPORTS",
             "FEATURES_APPLIED",
             "MUTANTS_APPLIED",
+            "API_COMPATIBILITY",
+            "API_APPLIED",
         ] {
             f.set(key, "true");
         }

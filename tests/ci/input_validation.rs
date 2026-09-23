@@ -442,7 +442,12 @@ fn unused_dependencies_is_validated_before_any_export() {
 fn every_boolean_input_is_validated_before_any_export() {
     // validate exports these for the later steps, so a value it did not check
     // would reach GITHUB_ENV as written.
-    for name in ["MUTATION_TEST", "SARIF_REPORTS", "DEPENDENCY_AUDIT"] {
+    for name in [
+        "MUTATION_TEST",
+        "SARIF_REPORTS",
+        "DEPENDENCY_AUDIT",
+        "API_COMPATIBILITY",
+    ] {
         for value in ["", "False", "true\nINJECT=yes"] {
             let mut f = Fixture::new();
             f.set(name, value);

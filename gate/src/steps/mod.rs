@@ -5,6 +5,7 @@
 use crate::runner::{Failure, Outcome, Step, enter};
 use std::fmt::Write as _;
 
+mod api_compatibility;
 mod attest_binaries;
 mod binary_hardening;
 mod configure_cargo_registry;
@@ -48,6 +49,7 @@ const REGISTRY: &[&[Step]] = &[
     vulnerability_audit::STEPS,
     dependency_policy::STEPS,
     mutation_testing::STEPS,
+    api_compatibility::STEPS,
     secret_scan::STEPS,
     declared_msrv::STEPS,
     feature_combinations::STEPS,

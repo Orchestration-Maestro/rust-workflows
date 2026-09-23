@@ -15,11 +15,14 @@ pub(crate) const STEPS: &[Step] = &[Step {
     id: "scorecard",
     summary: "Build quality scorecard",
     inputs: &[
+        "API_APPLIED",
+        "API_COMPATIBILITY",
         "FEATURES_APPLIED",
         "GITHUB_SHA",
         "LICENSE_POLICY",
         "MUTANTS_APPLIED",
         "MUTATION_TEST",
+        "OUT_API",
         "OUT_AUDIT",
         "OUT_COVERAGE",
         "OUT_FEATURES",
@@ -139,6 +142,15 @@ fn controls() -> Result<Vec<Control>, Failure> {
                 "OUT_MUTANTS",
                 flag("MUTATION_TEST")?,
                 &optional("MUTANTS_APPLIED")?,
+            )?,
+        ),
+        (
+            "API compatibility",
+            "optional",
+            state(
+                "OUT_API",
+                flag("API_COMPATIBILITY")?,
+                &optional("API_APPLIED")?,
             )?,
         ),
         (

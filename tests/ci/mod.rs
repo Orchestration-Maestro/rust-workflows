@@ -1,6 +1,7 @@
 //! `ci.yml`: what each of its steps accepts, refuses, builds and reports,
 //! one module per gate.
 
+mod api_compatibility;
 mod complexity_report;
 mod duplication_report;
 mod feature_combinations;

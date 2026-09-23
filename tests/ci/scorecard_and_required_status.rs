@@ -20,6 +20,7 @@ fn the_scorecard_reports_what_ran_and_refuses_to_imply_more() {
         "OUT_MUTANTS",
         "OUT_UNUSED",
         "OUT_STAGE",
+        "OUT_API",
     ];
     let read = |f: &Fixture, key: &str| -> String {
         let text = fs::read_to_string(f.root.join("reports/scorecard.json")).unwrap();
@@ -48,11 +49,16 @@ fn the_scorecard_reports_what_ran_and_refuses_to_imply_more() {
     for key in outcomes {
         full.set(key, "success");
     }
-    for key in ["MUTATION_TEST", "UNUSED_DEPENDENCIES", "SARIF_REPORTS"] {
+    for key in [
+        "MUTATION_TEST",
+        "UNUSED_DEPENDENCIES",
+        "SARIF_REPORTS",
+        "API_COMPATIBILITY",
+    ] {
         full.set(key, "true");
     }
     full.set("UNSAFE_POLICY", "deny");
-    for key in ["FEATURES_APPLIED", "MUTANTS_APPLIED"] {
+    for key in ["FEATURES_APPLIED", "MUTANTS_APPLIED", "API_APPLIED"] {
         full.set(key, "true");
     }
     succeeds(&full.run("ci", "scorecard"));
@@ -113,6 +119,7 @@ fn the_diagram_counts_the_same_controls_the_scorecard_does() {
         "OUT_MUTANTS",
         "OUT_UNUSED",
         "OUT_STAGE",
+        "OUT_API",
     ] {
         f.set(key, "success");
     }

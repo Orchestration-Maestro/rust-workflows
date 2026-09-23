@@ -253,6 +253,7 @@ Each is one input to switch off, documented in [docs/ci.md](docs/ci.md).
 | --- | --- | --- | --- |
 | Recorded dependency audits | `dependency-audit: true`, cargo-vet against your committed audits | SCH-007 | `unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does` |
 | Wider Clippy | `clippy-level: pedantic` or `nursery` | SST-001 | `clippy_denies_leftover_scaffolding_at_every_level` |
+| Public API compatibility | `api-compatibility: true`; a pull request that breaks a library's public API without `!` after the type in its title fails, against the base branch | North Star, Quality | `an_undeclared_break_fails_the_pull_request`, `a_declared_break_and_what_has_no_api_are_not_checked` |
 | Semantic-version compatibility | `semver-check: true` on `publish-crate.yml`; off for a first publication, which has no baseline | North Star, Quality | `semver_check_fails_the_publication_when_cargo_semver_checks_does` |
 | Signed build provenance | `attest-binaries.yml`, see below | SCH-001, SCH-002 | `attestation_signs_only_bytes_it_verified_itself`, `provenance_attestation_is_isolated_and_reverifies_the_payload` |
 | Undefined-behaviour audit | `unsafe-audit.yml`, Miri on nightly, see below | SST-006 | `the_undefined_behaviour_audit_refuses_to_pass_without_running_anything` |
@@ -492,6 +493,7 @@ extracting it. Rust itself comes from the approved platform channel, never from
 | `cargo-mutants` | Mutation testing; a surviving mutant fails the run | Rust |
 | `cargo-nextest` | The tests, one process each, with their results as `JUnit` | Rust |
 | `cargo-machete` | A declared dependency no source file uses | Rust |
+| `cargo-semver-checks` | A pull request's undeclared public API break | Rust |
 | `clippy-sarif` | Clippy findings as SARIF, for code scanning | Rust |
 | `similarity-rs` | Functions whose syntax trees match, reported without failing the run | Rust |
 

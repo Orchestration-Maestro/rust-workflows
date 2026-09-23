@@ -32,6 +32,7 @@ committed `deny.toml` applies the same way to every pull request. See [runner se
 | `mutation-test` | boolean | `true` | Run cargo-mutants and fail on surviving mutants; a pull request mutates its diff, a push or tag its own commit; set `false` when run time exceeds the job |
 | `sarif-reports` | boolean | `true` | Also emit Clippy and secret findings as SARIF, for `upload-sarif.yml` to show in code scanning |
 | `unused-dependencies` | boolean | `true` | Fail when a workspace member declares a dependency it never uses; remove it or set `false` |
+| `api-compatibility` | boolean | `false` | Fail a pull request that breaks a library's public API without `!` after the type in its title; see [public API compatibility](#public-api-compatibility) |
 | `dependency-audit` | boolean | `false` | Require a recorded cargo-vet audit for every dependency; opt-in because it commits the team to reviewing third-party source on each bump |
 | `unsafe-policy` | string | `deny` | Refuses an `unsafe` block in any workspace member; `allow` leaves the decision to a project that needs it |
 | `clippy-level` | string | `default` | `pedantic` or `nursery` also deny those Clippy groups |
@@ -373,6 +374,7 @@ earlier failure. The scorecard identifies controls that never ran.
 | `mutants.json`, `mutants.txt` | Available mutation outcomes, including failures; a text-only skip when no mutants apply | `mutation-test` |
 | `clippy.sarif`, `secrets.sarif` | The same findings as SARIF | `sarif-reports` |
 | `unused-dependencies.txt` | Declared dependencies no source file references | `unused-dependencies` |
+| `api-compatibility.txt` | The cargo-semver-checks comparison with the base branch, or why none applied | `api-compatibility` |
 | `dependency-audit.txt` | cargo-vet result against the committed audit set | `dependency-audit` |
 
 A step that runs and chooses to skip records that decision. A step prevented
@@ -424,6 +426,22 @@ A missing or empty
 outcomes file without that explicit successful no-work result still fails.
 Scope a large workspace with a committed `.cargo/mutants.toml`, keep the job
 timeout in mind, and set `mutation-test: false` when the run outgrows the job.
+
+### Public API compatibility
+
+The `api` step compares a pull request's libraries with its base branch through
+cargo-semver-checks, as a minor release: adding API passes, and removing an
+item or changing it incompatibly fails. The comparison builds the base parent
+the checkout already fetched, so it needs no registry and no published crate.
+
+A breaking change is declared the way release-please reads it, with `!` after
+the type in the pull request title, `feat!:` or `fix(api)!:`; release-please
+then cuts a major release, and the step records that it did not compare. It
+also does not apply to a push or a tag, whose pull request was compared, to a
+project without a library target, or on a toolchain older than Rust 1.93, the
+oldest the pinned cargo-semver-checks runs on. Each of those writes its reason to
+`api-compatibility.txt` and shows as not applicable in the scorecard, never as a
+pass. Set `api-compatibility: true` to switch the gate on.
 
 Outputs are strings, available through the final successful gate:
 
