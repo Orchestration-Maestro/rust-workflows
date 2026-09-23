@@ -102,10 +102,11 @@ fn a_pull_request_checkout_must_keep_the_base_parent() {
 fn ci_reads_the_title_and_reports_the_check_to_the_scorecard() {
     let ci = workflow("ci");
     let input = &ci["on"]["workflow_call"]["inputs"]["api-compatibility"];
-    assert_eq!(input["default"], false);
+    assert_eq!(input["default"], true);
     let steps = ci["jobs"]["checks"]["steps"].as_array().unwrap();
+    // The step always runs, so a switched-off gate still writes its report.
     let api = steps.iter().find(|step| step["id"] == "api").unwrap();
-    assert_eq!(api["if"], "${{ inputs.api-compatibility }}");
+    assert!(api.get("if").is_none());
     assert_eq!(
         api["env"]["PULL_REQUEST_TITLE"],
         "${{ github.event.pull_request.title }}"
