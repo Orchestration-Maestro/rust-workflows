@@ -49,7 +49,7 @@ name: Publish Rust binaries
       api-compatibility:
         description: Forwarded to ci.yml; see docs/ci.md
         type: boolean
-        default: false
+        default: true
     outputs:
       artifact-id:
         description: Immutable validated release artifact ID
@@ -80,7 +80,7 @@ jobs:
       actions: read  # inspect release environment reviewers and tag policies
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@beda4ef938e575971c99c93d683e7b884402462b  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@a064dae4efbc2826baf0fb5513cd07eaf1361911  # rust-workflows: the commit that ships this gate
       - name: Install verified JSON tool
         run: rust-gate install-tools
         env:
@@ -124,7 +124,7 @@ jobs:
       contents: read
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@beda4ef938e575971c99c93d683e7b884402462b  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@a064dae4efbc2826baf0fb5513cd07eaf1361911  # rust-workflows: the commit that ships this gate
       - name: Install verified JSON tool
         run: rust-gate install-tools
         env:
@@ -154,7 +154,7 @@ jobs:
       actions: read  # inspect release environment reviewers and tag policies
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@beda4ef938e575971c99c93d683e7b884402462b  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@a064dae4efbc2826baf0fb5513cd07eaf1361911  # rust-workflows: the commit that ships this gate
       - name: Install verified JSON tool
         run: rust-gate install-tools
         env:

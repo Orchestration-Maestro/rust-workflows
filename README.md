@@ -73,9 +73,9 @@ through OIDC, so there is no Codecov token to store.
 That is the whole adoption. Every run enforces formatting, Clippy, tests,
 rustdoc, 80% line coverage, advisories, a secret scan, the declared MSRV,
 dependency sources and versions, a reproducible hardened release build and both
-SBOM formats. Four more gates are on by default and each is one input to switch
-off: mutation testing, the unused-dependency check, the `unsafe` ban and SARIF
-reports. The full list is under [gates](#-gates). Semantic security analysis is CodeQL default
+SBOM formats. Five more gates are on by default and each is one input to switch
+off: mutation testing, the unused-dependency check, the `unsafe` ban, SARIF
+reports and public API compatibility. The full list is under [gates](#-gates). Semantic security analysis is CodeQL default
 setup, enabled by organization administrators rather than by this workflow; see
 [platform requirements](docs/platform-requirements.md#administrator-owned-setup).
 
@@ -245,6 +245,7 @@ Each is one input to switch off, documented in [docs/ci.md](docs/ci.md).
 | Unused dependencies | `unused-dependencies: false` | A declared dependency no source file uses | SCH-010 | `unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does` |
 | `unsafe` ban | `unsafe-policy: allow` | An `unsafe` block in your crates; dependencies are unaffected | SST-001 | `clippy_denies_leftover_scaffolding_at_every_level` |
 | SARIF reports | `sarif-reports: false` | A Clippy or secret-scan SARIF report that is missing or empty; `upload-sarif.yml` shows the findings in code scanning | SST-003 | `sarif_reports_are_written_only_when_asked_and_never_empty`, `sarif_reports_are_on_by_default_and_upload_in_their_own_workflow` |
+| Public API compatibility | `api-compatibility: false` | A pull request that breaks a library's public API without `!` after the type in its title; not applicable to a push, a project without a library or Rust older than 1.93 | North Star, Quality | `an_undeclared_break_fails_the_pull_request`, `a_declared_break_and_what_has_no_api_are_not_checked` |
 | Dependency policy | `license-policy: off` | Violations of your `deny.toml`, or the default source/version policy; licence checks apply only with a consumer policy or `LICENSE_ALLOWLIST`. `off` skips the whole gate | SCH-010 | `the_organization_allowlist_adds_licences_and_a_committed_policy_wins`, `the_dependency_policy_holds_by_default_and_licences_only_with_a_list` |
 
 ### Opt-in
@@ -253,7 +254,6 @@ Each is one input to switch off, documented in [docs/ci.md](docs/ci.md).
 | --- | --- | --- | --- |
 | Recorded dependency audits | `dependency-audit: true`, cargo-vet against your committed audits | SCH-007 | `unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does` |
 | Wider Clippy | `clippy-level: pedantic` or `nursery` | SST-001 | `clippy_denies_leftover_scaffolding_at_every_level` |
-| Public API compatibility | `api-compatibility: true`; a pull request that breaks a library's public API without `!` after the type in its title fails, against the base branch | North Star, Quality | `an_undeclared_break_fails_the_pull_request`, `a_declared_break_and_what_has_no_api_are_not_checked` |
 | Semantic-version compatibility | `semver-check: true` on `publish-crate.yml`; off for a first publication, which has no baseline | North Star, Quality | `semver_check_fails_the_publication_when_cargo_semver_checks_does` |
 | Signed build provenance | `attest-binaries.yml`, see below | SCH-001, SCH-002 | `attestation_signs_only_bytes_it_verified_itself`, `provenance_attestation_is_isolated_and_reverifies_the_payload` |
 | Undefined-behaviour audit | `unsafe-audit.yml`, Miri on nightly, see below | SST-006 | `the_undefined_behaviour_audit_refuses_to_pass_without_running_anything` |

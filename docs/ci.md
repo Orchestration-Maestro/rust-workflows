@@ -32,7 +32,7 @@ committed `deny.toml` applies the same way to every pull request. See [runner se
 | `mutation-test` | boolean | `true` | Run cargo-mutants and fail on surviving mutants; a pull request mutates its diff, a push or tag its own commit; set `false` when run time exceeds the job |
 | `sarif-reports` | boolean | `true` | Also emit Clippy and secret findings as SARIF, for `upload-sarif.yml` to show in code scanning |
 | `unused-dependencies` | boolean | `true` | Fail when a workspace member declares a dependency it never uses; remove it or set `false` |
-| `api-compatibility` | boolean | `false` | Fail a pull request that breaks a library's public API without `!` after the type in its title; see [public API compatibility](#public-api-compatibility) |
+| `api-compatibility` | boolean | `true` | Fail a pull request that breaks a library's public API without `!` after the type in its title; see [public API compatibility](#public-api-compatibility) |
 | `dependency-audit` | boolean | `false` | Require a recorded cargo-vet audit for every dependency; opt-in because it commits the team to reviewing third-party source on each bump |
 | `unsafe-policy` | string | `deny` | Refuses an `unsafe` block in any workspace member; `allow` leaves the decision to a project that needs it |
 | `clippy-level` | string | `default` | `pedantic` or `nursery` also deny those Clippy groups |
@@ -441,7 +441,7 @@ also does not apply to a push or a tag, whose pull request was compared, to a
 project without a library target, or on a toolchain older than Rust 1.93, the
 oldest the pinned cargo-semver-checks runs on. Each of those writes its reason to
 `api-compatibility.txt` and shows as not applicable in the scorecard, never as a
-pass. Set `api-compatibility: true` to switch the gate on.
+pass. Set `api-compatibility: false` to switch the gate off.
 
 Outputs are strings, available through the final successful gate:
 

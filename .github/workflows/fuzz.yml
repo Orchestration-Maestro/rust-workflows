@@ -44,7 +44,7 @@ jobs:
       contents: read
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@beda4ef938e575971c99c93d683e7b884402462b  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@a064dae4efbc2826baf0fb5513cd07eaf1361911  # rust-workflows: the commit that ships this gate
       - name: Checkout consumer revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
