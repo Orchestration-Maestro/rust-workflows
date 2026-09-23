@@ -136,3 +136,25 @@ fn checks_hand_the_runners_to_portability_and_the_result_to_the_required_status(
         "${{ needs.checks.outputs.platforms }}"
     );
 }
+
+#[test]
+fn the_consumer_matrix_proves_every_platform_and_requires_it() {
+    // One consumer case names every platform, so each pinned runner builds
+    // and tests a real fixture on every pull request here, and the required
+    // consumer status waits for it.
+    let internal = workflow("ci-internal");
+    let case = &internal["jobs"]["portability-ci"];
+    assert_eq!(case["uses"], "./.github/workflows/ci.yml");
+    assert_eq!(case["with"]["platforms"], "macos windows linux-arm");
+    let required = &internal["jobs"]["required"];
+    assert!(
+        required["needs"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("portability-ci"))
+    );
+    assert_eq!(
+        required["steps"][0]["env"]["PORTABILITY_RESULT"],
+        "${{ needs.portability-ci.result }}"
+    );
+}

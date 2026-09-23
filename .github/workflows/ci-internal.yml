@@ -129,6 +129,16 @@ jobs:
       package: ${{ matrix.package }}
       artifact-key: matrix-crate
       dry-run: true
+  # Every platform ci.yml can test on, with a fixture that fetches a crate.
+  portability-ci:
+    name: Portability CI
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+    with:
+      working-directory: examples/binary
+      artifact-key: portability
+      platforms: macos windows linux-arm
   # upload-sarif.yml and upload-coverage.yml end to end: one CI run, then its
   # SARIF into code scanning and its coverage and test results into Codecov.
   reports-ci:
@@ -163,6 +173,7 @@ jobs:
     name: Required consumer tests
     needs:
       - consumers
+      - portability-ci
       - binary-dry-run
       - crate-dry-run
     if: ${{ always() }}
@@ -175,11 +186,12 @@ jobs:
         shell: bash
         env:
           CI_RESULT: ${{ needs.consumers.result }}
+          PORTABILITY_RESULT: ${{ needs.portability-ci.result }}
           BINARY_RESULT: ${{ needs.binary-dry-run.result }}
           CRATE_RESULT: ${{ needs.crate-dry-run.result }}
         run: |
           set -euo pipefail
-          for result in "$CI_RESULT" "$BINARY_RESULT" "$CRATE_RESULT"; do
+          for result in "$CI_RESULT" "$PORTABILITY_RESULT" "$BINARY_RESULT" "$CRATE_RESULT"; do
             [[ "$result" == success ]] || {
               echo 'A required consumer workflow failed, was cancelled or was skipped' >&2; exit 1;
             }
@@ -189,8 +201,8 @@ jobs:
         if: ${{ always() }}
         shell: bash
         env:
-          CHECK_RESULTS: ${{ needs.consumers.result }} ${{ needs.binary-dry-run.result }} ${{ needs.crate-dry-run.result }}
-          EVIDENCE_SCOPE: All consumer matrix cases and binary/crate dry-run publishers
+          CHECK_RESULTS: ${{ needs.consumers.result }} ${{ needs.portability-ci.result }} ${{ needs.binary-dry-run.result }} ${{ needs.crate-dry-run.result }}
+          EVIDENCE_SCOPE: All consumer matrix cases, the portability case and binary/crate dry-run publishers
         run: |
           set -euo pipefail
           [[ "$CHECK_RESULTS" =~ ^success(\ success)*$ ]] || { echo 'Required checks did not all succeed' >&2; exit 1; }

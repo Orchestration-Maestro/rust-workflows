@@ -159,11 +159,21 @@ fn the_required_status_fails_unless_every_result_succeeded() {
     }
     f.set("RESULT", "success");
     succeeds(&f.run("ci", "required"));
-    for key in ["CI_RESULT", "BINARY_RESULT", "CRATE_RESULT"] {
+    for key in [
+        "CI_RESULT",
+        "BINARY_RESULT",
+        "CRATE_RESULT",
+        "PORTABILITY_RESULT",
+    ] {
         f.set(key, "success");
     }
     succeeds(&f.run("ci-internal", "required"));
-    for key in ["CI_RESULT", "BINARY_RESULT", "CRATE_RESULT"] {
+    for key in [
+        "CI_RESULT",
+        "BINARY_RESULT",
+        "CRATE_RESULT",
+        "PORTABILITY_RESULT",
+    ] {
         f.set(key, "skipped");
         assert!(!f.run("ci-internal", "required").status.success());
         f.set(key, "success");
