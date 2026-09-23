@@ -55,7 +55,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   ├── CODEOWNERS                              # Required reviewers for every change
 │   ├── actionlint.yml                          # Uses the built-in GitHub-hosted runner labels
 │   ├── copilot-instructions.md                 # This file: the maintained-file map
-│   ├── dependabot.yml                          # Action and Cargo update schedule
+│   ├── dependabot.yml                          # Weekly action and Cargo updates, patch and minor grouped per ecosystem
 │   ├── pull_request_template.md                # Review checklist and release-impact prompt
 │   └── zizmor.yml                              # Workflow audit exceptions, each with its reason
 ├── docs/                                       # Contracts, standards and platform boundaries

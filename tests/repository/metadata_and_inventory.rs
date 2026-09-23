@@ -192,9 +192,22 @@ fn release_workflow_uses_an_app_token(root: &Path) {
 }
 
 /// Dependabot covers what is actually here, with titles the organization's
-/// conventional-commit ruleset accepts once squashed.
+/// conventional-commit ruleset accepts once squashed. Each ecosystem's patch
+/// and minor updates arrive as one pull request, which the auto-merge workflow
+/// queues; a major update keeps a pull request of its own for review.
 fn dependabot_titles_and_directories_are_wired(root: &Path) {
     let dependabot = root.join(".github/dependabot.yml");
+    for line in query(
+        &dependabot,
+        ".updates[] | .groups | to_entries[] \
+         | [.value.patterns[], .value[\"update-types\"][]] | join(\" \")",
+    )
+    .lines()
+    {
+        assert_eq!(line, "* minor patch");
+    }
+    let groups = query(&dependabot, ".updates[] | .groups | length");
+    assert!(groups.lines().all(|count| count == "1"), "{groups}");
     for line in query(
         &dependabot,
         ".updates[] | [.[\"commit-message\"].prefix, .[\"commit-message\"].include] | join(\" \")",

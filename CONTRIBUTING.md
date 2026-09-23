@@ -231,7 +231,8 @@ organization forbids `GITHUB_TOKEN` from opening one, and a pull request it
 opened would trigger none of the checks a merge requires.
 
 `.github/workflows/dependabot-auto-merge.yml` uses the same App to queue a
-squash merge of each Dependabot patch or minor update; the required checks still
+squash merge of each Dependabot pull request, which groups an ecosystem's
+patch and minor updates of the week; the required checks still
 decide whether it merges. A major update, or one whose type Dependabot did not
 record, waits for a person. The App's Workflows permission is what lets an
 action update, which edits workflow files, merge.

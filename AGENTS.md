@@ -42,6 +42,11 @@ expect it to print; its last lines are the SPEED reading and the verdict.
    at most 71 characters, and every line within 80 columns. The commit-msg
    hooks refuse the rest, and release-please writes `CHANGELOG.md` from the
    titles.
+7. Bundle a session's work into one pull request, titled for the change a
+   consumer sees; documentation, test and CI changes ride along. A `feat` and
+   a `fix` need one each, because a squash merge keeps a single title and so a
+   single changelog line. A gate change needs its second pull request anyway;
+   see CONTRIBUTING.
 
 ## Before you change something
 
