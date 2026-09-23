@@ -21,6 +21,12 @@
   <img src="https://img.shields.io/badge/JSON%20and%20YAML-jaq-CE422B?style=for-the-badge&amp;logo=rust&amp;logoColor=white" alt="jaq reads the JSON and the YAML" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/Orchestration-Maestro/rust-workflows/actions/workflows/ci-internal.yml"><img src="https://github.com/Orchestration-Maestro/rust-workflows/actions/workflows/ci-internal.yml/badge.svg?branch=main" alt="Repository quality on main" /></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/Orchestration-Maestro/rust-workflows"><img src="https://api.scorecard.dev/projects/github.com/Orchestration-Maestro/rust-workflows/badge" alt="OpenSSF Scorecard" /></a>
+  <a href="https://codecov.io/gh/Orchestration-Maestro/rust-workflows"><img src="https://codecov.io/gh/Orchestration-Maestro/rust-workflows/graph/badge.svg" alt="Codecov coverage of the example fixtures" /></a>
+</p>
+
 ## ⚡ Quick start
 
 Add one file to your Rust repository:
@@ -38,8 +44,9 @@ jobs:
       contents: read
 ```
 
-To see Clippy and secret-scan findings in the repository's Security tab, add
-one job; it alone holds `security-events: write`:
+To see Clippy and secret-scan findings in the repository's Security tab, and
+coverage and test results in Codecov, add two jobs; each alone holds its write
+scope:
 
 ```yaml
   sarif:
@@ -50,7 +57,18 @@ one job; it alone holds `security-events: write`:
       security-events: write
     with:
       artifact-name: ${{ needs.rust.outputs.artifact-name }}
+  coverage:
+    needs: rust
+    uses: Orchestration-Maestro/rust-workflows/.github/workflows/upload-coverage.yml@<reviewed-sha>
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      artifact-name: ${{ needs.rust.outputs.artifact-name }}
 ```
+
+Codecov needs its GitHub App installed on the organization; the upload logs in
+through OIDC, so there is no Codecov token to store.
 
 That is the whole adoption. Every run enforces formatting, Clippy, tests,
 rustdoc, 80% line coverage, advisories, a secret scan, the declared MSRV,
@@ -122,6 +140,7 @@ workflows.
 | [`unsafe-audit.yml`](.github/workflows/unsafe-audit.yml) | Opt-in Miri run detecting undefined behaviour; nightly-only, so kept outside the stable-only policy |
 | [`fuzz.yml`](.github/workflows/fuzz.yml) | Opt-in bounded fuzz regression: replays the committed corpus, then explores for a fixed budget |
 | [`publish-evidence.yml`](.github/workflows/publish-evidence.yml) | Dry-run-first archive of release reports; live assets only on protected-tag GitHub Releases |
+| [`upload-coverage.yml`](.github/workflows/upload-coverage.yml) | The same run's LCOV coverage and JUnit test results into Codecov, through OIDC; isolated so only its job needs `id-token: write`, and skipped for fork pull requests |
 | [`upload-sarif.yml`](.github/workflows/upload-sarif.yml) | Clippy and secret-scan SARIF from the same run into code scanning; isolated so only its job needs `security-events: write`, and skipped for fork pull requests |
 
 Artifact attestations work on the organization's public repositories; a private

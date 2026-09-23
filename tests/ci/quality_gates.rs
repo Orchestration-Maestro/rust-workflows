@@ -167,6 +167,69 @@ fn sarif_reports_are_on_by_default_and_upload_in_their_own_workflow() {
 }
 
 #[test]
+fn coverage_and_test_results_upload_to_codecov_in_their_own_workflow() {
+    // Codecov takes the run's LCOV and JUnit reports. Only the upload
+    // workflow asks for id-token: write, the OIDC login that replaces a stored
+    // Codecov token, so an ordinary CI caller keeps a read-only token. A fork
+    // pull request gets no OIDC token, so the upload skips it; its reports
+    // stay in the artifact.
+    let upload = workflow("upload-coverage");
+    let input = &upload["on"]["workflow_call"]["inputs"]["artifact-name"];
+    assert_eq!(input["required"], true);
+    let job = &upload["jobs"]["upload"];
+    assert_eq!(
+        job["permissions"],
+        json!({"contents": "read", "id-token": "write"})
+    );
+    assert_eq!(job["if"], workflow("upload-sarif")["jobs"]["upload"]["if"]);
+    let steps = job["steps"].as_array().unwrap();
+    // Codecov maps the report's paths onto the files of this checkout.
+    assert!(
+        steps[0]["uses"]
+            .as_str()
+            .unwrap()
+            .starts_with("actions/checkout@")
+    );
+    assert_eq!(steps[0]["with"]["persist-credentials"], false);
+    assert!(
+        steps[1]["uses"]
+            .as_str()
+            .unwrap()
+            .starts_with("actions/download-artifact@")
+    );
+    assert_eq!(
+        steps[1]["with"]["name"],
+        "${{ inputs.artifact-name }}-reports"
+    );
+    let uploads: Vec<(&str, &str, &str)> = steps[2..]
+        .iter()
+        .map(|step| {
+            let with = &step["with"];
+            // Exactly the named file, through OIDC, with a pinned CLI, and a
+            // failed upload fails the job rather than vanish.
+            assert_eq!(with["use_oidc"], true);
+            assert_eq!(with["disable_search"], true);
+            assert_eq!(with["fail_ci_if_error"], true);
+            let cli = with["version"].as_str().unwrap();
+            assert!(cli.starts_with('v') && cli != "latest", "{cli}");
+            (
+                step["uses"].as_str().unwrap().split('@').next().unwrap(),
+                with["files"].as_str().unwrap(),
+                with["report_type"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    let action = "codecov/codecov-action";
+    assert_eq!(
+        uploads,
+        [
+            (action, "reports/coverage.lcov", "coverage"),
+            (action, "reports/tests.xml", "test_results"),
+        ]
+    );
+}
+
+#[test]
 fn strict_rustdoc_fails_the_run_when_cargo_doc_does() {
     // Strict rustdoc is the last cargo command of the quality step: an
     // undocumented public item or a broken intra-doc link fails cargo doc,
