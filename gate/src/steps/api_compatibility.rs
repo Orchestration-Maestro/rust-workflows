@@ -6,7 +6,7 @@
 //! declares the break and skips the comparison.
 
 use crate::checks::rust_versions::parse;
-use crate::runner::{Cmd, Job, Outcome, Step, flag, input, optional, output, tee_line};
+use crate::runner::{Cmd, Failure, Job, Outcome, Step, flag, input, optional, output, tee_line};
 
 /// What this step declares: its inputs, its tools and its reports.
 pub(crate) const STEPS: &[Step] = &[Step {
@@ -24,9 +24,11 @@ pub(crate) const STEPS: &[Step] = &[Step {
     run,
 }];
 
-/// Whether any workspace member has a target with a public API to compare.
-const LIBRARY: &str =
-    r#"[.packages[].targets[].kind[]] | any(. == "lib" or . == "rlib" or . == "proc-macro")"#;
+/// Each workspace library, one per line: its name, then its manifest path.
+const LIBRARIES: &str = concat!(
+    r#".packages[] | select([.targets[].kind[]] | "#,
+    r#"any(. == "lib" or . == "rlib" or . == "proc-macro")) | "\(.name) \(.manifest_path)""#
+);
 
 /// The oldest compiler cargo-semver-checks 0.50 runs on.
 const OLDEST_RUST: (u64, u64, u64) = (1, 93, 0);
@@ -62,21 +64,64 @@ fn run() -> Outcome {
     if !parent {
         return Err("pull request checkout must include the base parent".into());
     }
-    let kinds = Cmd::new("cargo metadata --format-version 1 --no-deps --locked")
+    let metadata = Cmd::new("cargo metadata --format-version 1 --no-deps --locked")
         .cwd(&job.project)
         .capture()?;
-    let library = Cmd::new("jaq -r")
-        .arg(LIBRARY)
-        .stdin_bytes(kinds.as_bytes())
+    let libraries = Cmd::new("jaq -r")
+        .arg(LIBRARIES)
+        .stdin_bytes(metadata.as_bytes())
         .capture()?;
-    if library.trim() != "true" {
+    if libraries.trim().is_empty() {
         return skip("NOT APPLICABLE: no library target, so no public API");
     }
+    let (compared, new) = split_by_base(&job, &libraries)?;
     tee_line(&format!("baseline: {base}"), &report, false)?;
-    Cmd::new("cargo semver-checks --workspace --baseline-rev HEAD^1 --release-type minor")
-        .cwd(&job.project)
-        .tee(&report, true)?;
+    if !new.is_empty() {
+        let names = new.join(", ");
+        tee_line(&format!("new in this pull request: {names}"), &report, true)?;
+    }
+    if compared.is_empty() {
+        tee_line(
+            "NOT APPLICABLE: every library is new in this pull request",
+            &report,
+            true,
+        )?;
+        return output("applied", "false");
+    }
+    let mut check = Cmd::new("cargo semver-checks --baseline-rev HEAD^1 --release-type minor");
+    for name in &compared {
+        check = check.arg("--package").arg(name);
+    }
+    check.cwd(&job.project).tee(&report, true)?;
     output("applied", "true")
+}
+
+/// The libraries the base branch already has, which can be compared, and
+/// the ones this pull request adds, which have no baseline: a manifest at the
+/// same path in the base commit decides.
+fn split_by_base(job: &Job, libraries: &str) -> Result<(Vec<String>, Vec<String>), Failure> {
+    let top = Cmd::new("git rev-parse --show-toplevel")
+        .cwd(&job.project)
+        .capture()?;
+    let top = format!("{}/", top.trim());
+    let (mut compared, mut new) = (Vec::new(), Vec::new());
+    for line in libraries.lines() {
+        let Some((name, manifest)) = line.split_once(' ') else {
+            continue;
+        };
+        let relative = manifest.strip_prefix(&top).unwrap_or(manifest);
+        let in_base = Cmd::new("git cat-file -e")
+            .arg(format!("HEAD^1:{relative}"))
+            .cwd(&job.project)
+            .capture()
+            .is_ok();
+        if in_base {
+            compared.push(name.to_owned());
+        } else {
+            new.push(name.to_owned());
+        }
+    }
+    Ok((compared, new))
 }
 
 /// Whether a conventional title marks a breaking change: `!` right after its
