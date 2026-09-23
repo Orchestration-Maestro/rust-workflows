@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/Orchestration-Maestro/rust-workflows/compare/v1.2.0...v1.2.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* compare only the libraries the base branch already has ([#25](https://github.com/Orchestration-Maestro/rust-workflows/issues/25)) ([75807b0](https://github.com/Orchestration-Maestro/rust-workflows/commit/75807b0f9d6fc3f3389f43d3890342b23943b3cb))
+* keep mise's progress out of the tool moves ([#20](https://github.com/Orchestration-Maestro/rust-workflows/issues/20)) ([8e22793](https://github.com/Orchestration-Maestro/rust-workflows/commit/8e22793345cb248bc2dd1d2408975c26cc148a3d))
+
 ## [1.2.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v1.1.0...v1.2.0) (2026-09-23)
 
 
