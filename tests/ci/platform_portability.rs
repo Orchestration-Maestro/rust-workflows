@@ -82,9 +82,12 @@ fn the_portability_job_tests_the_validated_project_on_each_runner() {
         job["env"]["RUSTUP_TOOLCHAIN"],
         "${{ needs.checks.outputs.toolchain }}"
     );
+    // A job's own run defaults replace the workflow's, so the job names Bash
+    // again: Windows would otherwise run the bodies in PowerShell, where
+    // "$RUSTUP_TOOLCHAIN" is not the environment variable.
     assert_eq!(
-        job["defaults"]["run"]["working-directory"],
-        "${{ inputs.working-directory }}"
+        job["defaults"]["run"],
+        json!({"shell": "bash", "working-directory": "${{ inputs.working-directory }}"})
     );
     let steps = job["steps"].as_array().unwrap();
     assert!(
