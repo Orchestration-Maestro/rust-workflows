@@ -142,7 +142,7 @@ jobs:
       - name: Build the gate
         uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@eabfa547d40f60f6ee7cd040bc8ffbbf077aacbc  # rust-workflows: the commit that ships this gate
       - name: Checkout validated consumer revision
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.ci.outputs.revision }}
           persist-credentials: false
@@ -204,7 +204,7 @@ jobs:
       - name: Build the gate
         uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@eabfa547d40f60f6ee7cd040bc8ffbbf077aacbc  # rust-workflows: the commit that ships this gate
       - name: Checkout validated consumer revision
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.ci.outputs.revision }}
           persist-credentials: false
