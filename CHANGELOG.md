@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/Orchestration-Maestro/rust-workflows/compare/v1.0.0...v1.0.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* retry a dropped connection before a tool download fails ([#7](https://github.com/Orchestration-Maestro/rust-workflows/issues/7)) ([beda4ef](https://github.com/Orchestration-Maestro/rust-workflows/commit/beda4ef938e575971c99c93d683e7b884402462b))
+
 ## 1.0.0 (2026-09-23)
 
 ### Features
