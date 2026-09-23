@@ -44,7 +44,13 @@ fn repository_uses_just_and_an_isolated_rust_test_harness() {
 
 #[test]
 fn permissions_timeouts_and_shell_policy_hold_in_every_workflow() {
-    for name in ["ci", "publish-binaries", "publish-crate", "ci-internal"] {
+    for name in [
+        "ci",
+        "publish-binaries",
+        "publish-crate",
+        "ci-internal",
+        "dependabot-auto-merge",
+    ] {
         let data = workflow(name);
         assert!(data.get("permissions").is_some());
         for job in data["jobs"].as_object().unwrap().values() {
@@ -96,6 +102,7 @@ fn all_jobs_use_github_runners_without_caller_overrides() {
         "publish-evidence",
         "unsafe-audit",
         "fuzz",
+        "dependabot-auto-merge",
     ] {
         let data = workflow(name);
         for input in ["runs-on", "publish-runs-on"] {
@@ -278,4 +285,74 @@ fn canonical_document_generation_and_native_status_remain_safe() {
         "canonical docs require Linux"
     );
     assert!(recipes.contains("set windows-shell := [\"cmd.exe\", \"/d\", \"/s\", \"/c\"]"));
+}
+
+/// Dependabot's own pull requests queue a squash merge on the organization's
+/// bot token, which reaches a Dependabot run only as a Dependabot secret. A merge
+/// by `GITHUB_TOKEN` would trigger no workflow on `main`. An update is left to
+/// a person when any member of it is major or its type is not recorded.
+#[test]
+fn dependabot_updates_merge_through_the_bot_unless_one_is_major() {
+    let data = workflow("dependabot-auto-merge");
+    assert_eq!(
+        data["on"].as_object().unwrap().keys().collect::<Vec<_>>(),
+        ["pull_request"]
+    );
+    let job = &data["jobs"]["auto-merge"];
+    assert_eq!(
+        job["if"],
+        "${{ github.event.pull_request.user.login == 'dependabot[bot]' }}"
+    );
+    let token = &job["steps"][0];
+    assert!(
+        token["uses"]
+            .as_str()
+            .unwrap()
+            .starts_with("actions/create-github-app-token@")
+    );
+    assert_eq!(
+        token["with"]["client-id"],
+        "${{ secrets.RELEASE_APP_CLIENT_ID }}"
+    );
+    assert_eq!(
+        token["with"]["private-key"],
+        "${{ secrets.RELEASE_APP_PRIVATE_KEY }}"
+    );
+    assert_eq!(
+        job["steps"][1]["env"]["GH_TOKEN"],
+        "${{ steps.token.outputs.token }}"
+    );
+
+    let pull_request = "https://github.com/o/r/pull/7";
+    for (types, merges) in [
+        (&["patch"][..], true),
+        (&["minor", "patch"][..], true),
+        (&["minor", "major"][..], false),
+        (&[][..], false),
+    ] {
+        let mut f = Fixture::new();
+        f.set("PR_URL", pull_request);
+        let trailer = types
+            .iter()
+            .map(|kind| {
+                format!("- dependency-name: example\n  update-type: version-update:semver-{kind}\n")
+            })
+            .collect::<Vec<_>>()
+            .concat();
+        f.stub(
+            "gh",
+            &format!(
+                "if [[ $1 == pr && $2 == view ]]; then cat <<'BODY'\n\
+                 Bumps example.\n---\nupdated-dependencies:\n{trailer}...\n\n\
+                 Signed-off-by: dependabot[bot]\nBODY\nfi"
+            ),
+        );
+        succeeds(&f.run("dependabot-auto-merge", "merge"));
+        assert_eq!(
+            f.calls()
+                .contains(&format!("pr merge --auto --squash {pull_request}")),
+            merges,
+            "{types:?}"
+        );
+    }
 }
