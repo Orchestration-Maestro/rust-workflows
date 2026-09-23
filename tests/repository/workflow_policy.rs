@@ -218,20 +218,29 @@ fn the_path_guard_is_identical_in_every_workflow_that_takes_a_directory() {
 fn security_policy_documents_how_to_verify_a_release() {
     let text = fs::read_to_string(root().join("SECURITY.md")).unwrap();
     // A reader who cannot verify a release has no way to tell a real asset from
-    // a substituted one, whatever the pipeline produced.
+    // a substituted one, whatever the pipeline produced. The bills of materials
+    // are named as the payload holds them: the merged CycloneDX document and
+    // one SPDX document per binary.
     for step in [
         "sha256sum --check",
         "gh attestation verify",
-        "payload.spdx.json",
+        "payload.cdx.json",
+        "<binary>.spdx.json",
         "cargo audit bin",
     ] {
         assert!(text.contains(step), "SECURITY.md must document: {step}");
     }
-    // The procedure has never been run against a published asset. Saying so is
-    // part of the instruction, not a disclaimer to be dropped later.
     assert!(
-        text.contains("No release with binary\nassets has been published"),
-        "unexercised verification steps must say they are unexercised"
+        !text.contains("payload.spdx.json"),
+        "no such file is released"
+    );
+    // The procedure was run against a published release; saying which one is
+    // part of the instruction, so a reader can repeat it.
+    assert!(
+        text.contains(
+            "https://github.com/Orchestration-Maestro/release-canary/releases/tag/v0.1.0"
+        ),
+        "SECURITY.md must name the release the procedure was run against"
     );
 }
 
