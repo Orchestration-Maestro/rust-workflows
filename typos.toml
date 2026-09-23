@@ -1,0 +1,13 @@
+# The spell checker over every tracked file. A wrong word in a comment or a
+# document is the same rot the inventory gate catches in tree explanations,
+# caught one layer earlier and for prose rather than code names.
+#
+# Every entry below is a word this repository means, not a mistake the checker
+# should keep reporting. Adding one is a decision: it says the word is domain
+# vocabulary. An entry nobody needs any more is noise, so take it out when the
+# word leaves the repository.
+
+[default.extend-words]
+# The identifier prefix of the Foundation standards in docs/standards, read as
+# a misspelling of "find".
+FND = "FND"

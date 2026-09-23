@@ -1,0 +1,64 @@
+name: Feature request
+description: Propose a concrete improvement to the Rust workflow contracts or contributor experience.
+title: '[Feature]: '
+# Applied on creation so triage starts from a labelled queue instead of from a
+# person reading every new issue to sort it.
+labels: ['enhancement', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the user need and the smallest useful change. Preserve the Rust
+        version policy, GitHub-hosted runner requirements and protected publishing boundaries.
+        Keep credentials and confidential project details out of the request.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Explain the current limitation and who it affects.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe observable acceptance criteria rather than a speculative framework.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and alternatives
+      description: Name the affected workflows/files and any existing capability that nearly solves the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and security impact
+      description: Cover public inputs/outputs, artifact shape, MSRV, runner permissions, credentials and publication. State when a boundary is unchanged.
+    validations:
+      required: true
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: Would this change behaviour for current callers?
+      description: >-
+        These workflows are built for wide adoption. Something additive and off
+        by default can ship at any time; anything that changes an existing
+        default has to wait for a major release and a migration note.
+      options:
+        - 'No: additive, and off by default for current callers'
+        - 'Yes: changes an existing default, output or required status'
+        - Unsure
+    validations:
+      required: true
+  - type: checkboxes
+    id: preparation
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked the documented contracts and existing requests.
+          required: true
+        - label: The request includes no credentials or confidential source data.
+          required: true

@@ -1,0 +1,22 @@
+name: Build the gate
+description: >-
+  Builds rust-gate, the binary every step of these workflows runs, from the
+  pinned commit of this repository with the compiler the crate pins, and puts
+  it on the PATH of every later step. Rebuilt in a fresh directory on every
+  invocation; the crate has no dependency, so nothing is fetched beyond that compiler.
+runs:
+  using: composite
+  steps:
+    - name: Build the gate and put it on the PATH
+      shell: bash
+      env:
+        GATE: ${{ github.action_path }}/../../../gate
+      run: |  # zizmor: ignore[github-env] a fresh RUNNER_TEMP directory, no untrusted input
+        set -euo pipefail
+        # Never restore executable bytes or Cargo fingerprints from a consumer job.
+        # Rustup reads the compiler pin beside this dependency-free crate.
+        build="$(mktemp -d "$RUNNER_TEMP/rust-gate.XXXXXXXX")"
+        cd "$GATE"
+        cargo build --release --locked --offline --target-dir "$build/target"
+        install -D -m755 "$build/target/release/rust-gate" "$build/bin/rust-gate"
+        echo "$build/bin" >> "$GITHUB_PATH"

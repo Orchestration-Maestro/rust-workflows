@@ -1,0 +1,78 @@
+name: Rust fuzz regression
+# Fuzzing has no natural stopping point, so an unbounded run does not belong in
+# CI. What does belong is a bounded regression pass: replay the committed corpus
+# so a previously found crash cannot come back unnoticed, then explore for a
+# fixed budget. Finding nothing here is not proof of absence, and the workflow
+# says so rather than implying a clean bill of health.
+#
+# cargo-fuzz requires nightly, which ci.yml's stable-only policy deliberately
+# exclude, so this lives outside ci.yml for the same reason as unsafe-audit.yml.
+'on':
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Relative Cargo package or workspace directory containing fuzz/
+        type: string
+        default: .
+      toolchain:
+        description: Nightly toolchain; a dated value keeps the run reproducible
+        type: string
+        default: nightly-2026-09-14
+      target:
+        description: Fuzz target name; empty runs every target in fuzz/fuzz_targets
+        type: string
+        default: ''
+      max-total-time:
+        description: Seconds of exploration per target, after the corpus replay
+        type: number
+        default: 120
+permissions:
+  contents: read
+concurrency:
+  group: rust-fuzz-${{ github.workflow }}-${{ github.ref }}-${{ inputs.working-directory }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+defaults:
+  run:
+    shell: bash
+jobs:
+  fuzz:
+    name: Fuzz regression from the corpus
+    if: ${{ github.event_name != 'pull_request_target' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Build the gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@0000000000000000000000000000000000000000  # UNPUBLISHED: replace with the actual reviewed provider commit
+      - name: Checkout consumer revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate consumer inputs
+        id: validate
+        env:
+          DIRECTORY: ${{ inputs.working-directory }}
+          TOOLCHAIN: ${{ inputs.toolchain }}
+          TARGET: ${{ inputs.target }}
+          MAX_TOTAL_TIME: ${{ inputs.max-total-time }}
+        run: rust-gate fuzz validate
+      - name: Install nightly toolchain and cargo-fuzz
+        run: rust-gate fuzz toolchain
+      - name: Replay corpus and explore
+        id: replay
+        env:
+          TARGET: ${{ inputs.target }}
+          MAX_TOTAL_TIME: ${{ inputs.max-total-time }}
+        run: rust-gate fuzz replay
+      - name: Upload fuzz reports
+        if: ${{ always() && steps.validate.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: rust-fuzz-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/fuzz-reports/
+            ${{ inputs.working-directory }}/fuzz/artifacts/
+          if-no-files-found: warn
+          retention-days: 7

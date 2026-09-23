@@ -1,0 +1,18 @@
+//! The one door of the contract tests: the repository and its toolbelt, the
+//! readers of workflow YAML, what the gate declares about itself, and the
+//! fixture that runs a step against stand-ins. Each part names what it takes
+//! from its siblings; nothing here names a test module.
+
+mod fixture;
+mod gate_declarations;
+mod repository;
+mod workflow_yaml;
+
+pub(crate) use fixture::{Fixture, checksums, refused, succeeds};
+pub(crate) use gate_declarations::{Described, describe_text, described, described_step};
+pub(crate) use repository::{
+    capture, command_line, root, temp_dir, test_sources, tool, toolbelt_path,
+};
+pub(crate) use workflow_yaml::{
+    GATE_STEPS, action, helper_action, query, step, tool_rows, workflow,
+};

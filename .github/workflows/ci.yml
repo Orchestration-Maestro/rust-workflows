@@ -1,0 +1,308 @@
+name: Rust CI
+'on':
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Relative Cargo package or workspace directory
+        type: string
+        default: .
+      rust-version:
+        description: Exact stable Rust version, 1.85.0 or newer; empty selects rust-toolchain.toml
+        type: string
+        default: ''
+      coverage-threshold:
+        description: Minimum line coverage percentage (0 through 100)
+        type: number
+        default: 80
+      artifact-key:
+        description: Unique invocation key within this run and working directory
+        type: string
+        default: ci
+      license-policy:
+        description: >-
+          Licence and dependency-source policy: auto applies the consumer
+          deny.toml when present, enforce requires one, off skips the gate
+        type: string
+        default: auto
+      mutation-test:
+        description: >-
+          Run cargo-mutants over the consumer workspace and fail on surviving or
+          timed-out mutants. On by default; set false when run time exceeds the job,
+          or scope it with the consumer mutants config.
+        type: boolean
+        default: true
+      sarif-reports:
+        description: >-
+          Emit Clippy and secret-scan findings as SARIF alongside the run reports.
+          Uploading them to code scanning needs GitHub Advanced Security.
+        type: boolean
+        default: false
+      clippy-level:
+        description: >-
+          `default` denies every warning from Clippy's default groups.
+          `pedantic` and `nursery` additionally deny those groups, which catch
+          more but also report style opinions that a codebase may reject.
+        type: string
+        default: default
+      dependency-audit:
+        description: >-
+          Require every dependency to carry a recorded cargo-vet audit. Opt-in:
+          it commits the project to reviewing third-party source on every bump.
+        type: boolean
+        default: false
+      unsafe-policy:
+        description: >-
+          `deny` (the default) refuses an `unsafe` block in any workspace member;
+          `allow` leaves the decision to a project that needs it, such as an FFI
+          crate. Applies to the consumer's own crates only, never to its
+          dependencies.
+        type: string
+        default: deny
+      unused-dependencies:
+        description: >-
+          Fail when a workspace member declares a dependency it never uses. On by
+          default, as a golden workflow enforces the standard; remove the
+          dependency, or set false.
+        type: boolean
+        default: true
+    outputs:
+      artifact-id:
+        description: Immutable release artifact ID; available only after required gate
+        value: ${{ jobs.gate.outputs.artifact-id }}
+      artifact-name:
+        description: Exact release artifact name in this run
+        value: ${{ jobs.gate.outputs.artifact-name }}
+      revision:
+        description: Validated source commit
+        value: ${{ jobs.gate.outputs.revision }}
+permissions:
+  contents: read
+# Supersede only the same caller, directory, key and compiler, not another
+# toolchain in the matrix. Pull requests cancel; other runs finish, and GitHub
+# keeps only the newest waiting run per group. Each tag is its own group.
+concurrency:
+  group: rust-ci-${{ github.workflow }}-${{ github.ref }}-${{ inputs.working-directory }}-${{ inputs.artifact-key }}-${{ inputs.rust-version }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+defaults:
+  run:
+    shell: bash
+jobs:
+  checks:
+    name: Rust CI checks
+    # Forks run too: CI takes no secret and a read-only token, and the
+    # organization holds external contributors' runs for approval.
+    if: ${{ github.event_name != 'pull_request_target' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      artifact-name: ${{ steps.validate.outputs.artifact-name }}
+      revision: ${{ github.sha }}
+    steps:
+      - name: Checkout consumer revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          # Mutation testing diffs the commit against its first parent: the base
+          # branch of a pull request's merge commit, or the previous commit of a
+          # push or tag.
+          fetch-depth: 2
+      - name: Build the gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@0000000000000000000000000000000000000000  # UNPUBLISHED: replace with the actual reviewed provider commit
+      - name: Validate consumer inputs
+        id: validate
+        env:
+          DIRECTORY: ${{ inputs.working-directory }}
+          REQUESTED_TOOLCHAIN: ${{ inputs.rust-version }}
+          COVERAGE: ${{ inputs.coverage-threshold }}
+          ARTIFACT_KEY: ${{ inputs.artifact-key }}
+          LICENSE_POLICY: ${{ inputs.license-policy }}
+          MUTATION_TEST: ${{ inputs.mutation-test }}
+          SARIF_REPORTS: ${{ inputs.sarif-reports }}
+          UNUSED_DEPENDENCIES: ${{ inputs.unused-dependencies }}
+          UNSAFE_POLICY: ${{ inputs.unsafe-policy }}
+          DEPENDENCY_AUDIT: ${{ inputs.dependency-audit }}
+          CLIPPY_LEVEL: ${{ inputs.clippy-level }}
+        run: rust-gate validate
+      - name: Configure private Cargo state for direct crates.io access
+        id: registry
+        run: rust-gate registry
+      - name: Restore Cargo registry and build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          # Keyed on the resolved dependency graph and the selected compiler, so a
+          # lockfile or toolchain change can never reuse an incompatible build.
+          path: |
+            ${{ env.CARGO_HOME }}/registry/index
+            ${{ env.CARGO_HOME }}/registry/cache
+            ${{ env.CARGO_HOME }}/git/db
+            ${{ runner.temp }}/rust-target
+          key: rust-${{ env.RUSTUP_TOOLCHAIN }}-${{ hashFiles(format('{0}/Cargo.lock', env.PROJECT)) }}
+          restore-keys: |
+            rust-${{ env.RUSTUP_TOOLCHAIN }}-
+      - name: Install verified tools
+        id: install
+        run: rust-gate install-tools
+        env:
+          # Verified prebuilt releases instead of `cargo install`: building these
+          # from source cost every caller minutes of compile time on every job,
+          # multiplied by the compiler matrix. Each asset is pinned by checksum.
+          TOOLS: |
+            jaq 01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu 5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454
+            gitleaks gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz 9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c gitleaks
+            cargo-llvm-cov taiki-e/cargo-llvm-cov/releases/download/v0.9.0/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz b068f7c98841aacb9c4f382b4a0c184ae82f49b56a32d442b429b2961c73be15 cargo-llvm-cov
+            cargo-audit rustsec/rustsec/releases/download/cargo-audit%2Fv0.22.2/cargo-audit-x86_64-unknown-linux-gnu-v0.22.2.tgz ab28a1bdb54db4d5d8ad5981cf1f959410370b3d28250dbd35f6a44248620e39 cargo-audit-x86_64-unknown-linux-gnu-v0.22.2/cargo-audit
+            cargo-cyclonedx CycloneDX/cyclonedx-rust-cargo/releases/download/cargo-cyclonedx-0.5.7/cargo-cyclonedx-x86_64-unknown-linux-gnu.tar.xz c28d86750e2dd5ed9a325f148e2e625ba8ce574ce580fb5e9ace913a1b20f403 cargo-cyclonedx-x86_64-unknown-linux-gnu/cargo-cyclonedx
+            # cyclonedx merges the per-member SBOMs into the single document that
+            # describes the payload, which is what an attestation can take as its subject.
+            cyclonedx CycloneDX/cyclonedx-cli/releases/download/v0.33.1/cyclonedx-linux-x64 bfc8b2538da86fe239bc53658bbb63c1c8c510a293c1e6891aa5bea5d3c58746
+            # cargo-auditable embeds the resolved dependency list inside each released
+            # binary, so an auditor can answer "what is in this file" from the file itself.
+            cargo-auditable rust-secure-code/cargo-auditable/releases/download/v0.7.6/cargo-auditable-x86_64-unknown-linux-gnu.tar.xz 4b5b009ad799409bdaf70210e2e4d0ff00e415a78621949a88fb81a63f60ff48 cargo-auditable-x86_64-unknown-linux-gnu/cargo-auditable
+            # cargo-sbom writes native SPDX: converting the CycloneDX document instead
+            # loses packages and drops the relationship graph.
+            cargo-sbom psastras/sbom-rs/releases/download/cargo-sbom-v0.10.0/cargo-sbom-x86_64-unknown-linux-gnu 860a50d3e009c72fefc12506869cc11ea34d240c65da65cda2c491ed2aaa34f3
+            # cargo-deny holds the default dependency policy for every project, and
+            # a committed deny.toml on top.
+            cargo-deny EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz 9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f cargo-deny-0.20.2-x86_64-unknown-linux-musl/cargo-deny
+            # similarity-rs lists the pairs of functions whose syntax trees match,
+            # information the duplication step reports and never enforces.
+            similarity-rs mizchi/similarity/releases/download/v0.5.0/similarity-v0.5.0-x86_64-unknown-linux-gnu.tar.gz 2afda6201b6afb1ee36c1ce51b95a538ec99310c79f661905536d917470a406a similarity-v0.5.0-x86_64-unknown-linux-gnu/similarity-rs
+            # cargo-hack builds each declared feature on its own. Whether a workspace
+            # has features is a property of its manifests, not of an input, so this
+            # one cannot be deferred behind a flag the caller sets.
+            cargo-hack taiki-e/cargo-hack/releases/download/v0.6.45/cargo-hack-x86_64-unknown-linux-musl.tar.gz b242dffcfd43317ac484dd2dbc3b9fc5f8a7eb3ba252af31b531503f0bad33d1 cargo-hack
+            # nextest runs each test in its own process and writes JUnit, which
+            # cargo test does not; the doc tests stay on cargo test, which is the
+            # one thing nextest does not run.
+            cargo-nextest nextest-rs/nextest/releases/download/cargo-nextest-0.9.145/cargo-nextest-0.9.145-x86_64-unknown-linux-musl.tar.gz cd3c85194e8b28ad26676d287f41f0d6b4d456cef5bd94700def5dea8e328883 cargo-nextest
+      # Optional gates download only when selected; every consumer otherwise
+      # pays their run time for a tool the invocation never uses.
+      - name: Install the mutation testing tool
+        if: ${{ inputs.mutation-test }}
+        run: rust-gate install-tools
+        env:
+          TOOLS: cargo-mutants sourcefrog/cargo-mutants/releases/download/v25.3.1/cargo-mutants-x86_64-unknown-linux-gnu.tar.gz be41e6f74b633452fb17ef3b6b6113e180130f7b5693863b400c58b39e476726 cargo-mutants
+      - name: Install the SARIF converter
+        if: ${{ inputs.sarif-reports }}
+        run: rust-gate install-tools
+        env:
+          TOOLS: clippy-sarif psastras/sarif-rs/releases/download/clippy-sarif-v0.8.0/clippy-sarif-x86_64-unknown-linux-gnu d97c49a32e50c294437dbfdb764a6ced94c386ee5d45d82ba881694cc6d77329
+      - name: Install the unused-dependency tool
+        if: ${{ inputs.unused-dependencies }}
+        run: rust-gate install-tools
+        env:
+          TOOLS: cargo-machete bnjbvr/cargo-machete/releases/download/v0.9.2/cargo-machete-v0.9.2-x86_64-unknown-linux-musl.tar.gz 48200087f54c55aabcd4db4af1e25742b49846c02a1b1bfa134711945b35b2e9 cargo-machete-v0.9.2-x86_64-unknown-linux-musl/cargo-machete
+      - name: Install the dependency audit tool
+        if: ${{ inputs.dependency-audit }}
+        run: rust-gate install-tools
+        env:
+          TOOLS: cargo-vet mozilla/cargo-vet/releases/download/v0.10.0/cargo-vet-x86_64-unknown-linux-gnu.tar.xz c7664d9db5dd2ff813f20303650ac8253fa712ff2a1ea9ce12bed71e346f1744 cargo-vet-x86_64-unknown-linux-gnu/cargo-vet
+      - name: Install the toolchain
+        id: tools
+        run: rust-gate tools
+      - name: Formatting, Clippy and tests
+        id: quality
+        run: rust-gate quality
+      - name: Function and file sizes, never blocking
+        id: complexity
+        run: rust-gate complexity
+      - name: Duplicated functions, never blocking
+        id: duplication
+        run: rust-gate duplication
+      - name: Line coverage gate
+        id: coverage
+        env:
+          COVERAGE: ${{ inputs.coverage-threshold }}
+        run: rust-gate coverage
+      - name: Dependency vulnerability audit
+        id: audit
+        run: rust-gate audit
+      - name: Licence, dependency-ban and source policy
+        id: licenses
+        env:
+          LICENSE_ALLOWLIST: ${{ vars.LICENSE_ALLOWLIST }}
+        run: rust-gate licenses
+      - name: Mutation testing
+        id: mutants
+        run: rust-gate mutants
+      - name: Redacted source secret scan
+        id: secrets
+        run: rust-gate secrets
+      - name: Declared minimum supported Rust version
+        id: msrv
+        run: rust-gate msrv
+      - name: Every declared feature compiles
+        id: features
+        run: rust-gate features
+      - name: Unused declared dependencies
+        id: unused
+        run: rust-gate unused
+      - name: Recorded dependency audits
+        id: vet
+        run: rust-gate vet
+      - name: Release build, verified packages and SBOMs
+        id: build
+        run: rust-gate build
+      - name: Reproducible build and binary hardening
+        id: hardening
+        run: rust-gate hardening
+      - name: Stage immutable release payload
+        id: stage
+        run: rust-gate stage
+      - name: Upload release payload
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ${{ steps.validate.outputs.artifact-name }}
+          path: ${{ runner.temp }}/rust-release/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Build quality scorecard
+        id: scorecard
+        if: ${{ always() && steps.validate.outcome == 'success' }}
+        env:
+          OUT_QUALITY: ${{ steps.quality.outcome }}
+          OUT_COVERAGE: ${{ steps.coverage.outcome }}
+          OUT_AUDIT: ${{ steps.audit.outcome }}
+          OUT_SECRETS: ${{ steps.secrets.outcome }}
+          OUT_MSRV: ${{ steps.msrv.outcome }}
+          OUT_FEATURES: ${{ steps.features.outcome }}
+          OUT_LICENCES: ${{ steps.licenses.outcome }}
+          OUT_MUTANTS: ${{ steps.mutants.outcome }}
+          OUT_UNUSED: ${{ steps.unused.outcome }}
+          OUT_STAGE: ${{ steps.stage.outcome }}
+          FEATURES_APPLIED: ${{ steps.features.outputs.applied }}
+          MUTANTS_APPLIED: ${{ steps.mutants.outputs.applied }}
+        run: rust-gate scorecard
+      - name: Upload diagnostic reports
+        if: ${{ always() && steps.validate.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ${{ steps.validate.outputs.artifact-name }}-reports
+          path: ${{ runner.temp }}/rust-reports/
+          if-no-files-found: error
+          retention-days: 7
+  gate:
+    name: Required Rust CI
+    needs:
+      - checks
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      artifact-id: ${{ needs.checks.outputs.artifact-id }}
+      artifact-name: ${{ needs.checks.outputs.artifact-name }}
+      revision: ${{ needs.checks.outputs.revision }}
+    steps:
+      - name: Build the gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@0000000000000000000000000000000000000000  # UNPUBLISHED: replace with the actual reviewed provider commit
+      - name: Require every check
+        id: required
+        env:
+          RESULT: ${{ needs.checks.result }}
+        run: rust-gate required

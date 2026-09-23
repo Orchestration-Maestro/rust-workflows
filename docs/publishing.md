@@ -1,0 +1,181 @@
+# Publishing
+
+Start with `dry-run: true` and no publication secrets. Both application publishers
+rerun CI for the same `github.sha`, verify its immutable artifact and default to
+simulation. All jobs run on `ubuntu-24.04` with explicit timeouts. Every
+Orchestration-Maestro repository is public, which is what makes the environment
+reviewers and artifact attestations below available on the GitHub Team plan.
+
+Dependency reads use crates.io directly and tool assets use official GitHub URLs.
+Binary assets and release evidence go only to an existing GitHub Release. Crates
+go explicitly to public crates.io, never to an arbitrary registry. Evidence live
+publication is now limited to protected release tags; this no longer archives
+all runs. Ordinary CI reports still expire after seven days.
+
+## Shared application publisher contract
+
+| Input | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `working-directory` | string | `.` | Validated Cargo package/workspace path |
+| `dry-run` | boolean | `true` | Validate/stage only, no authorization API or live publication |
+| `artifact-key` | string | `publish-binaries` / `publish-crate` | Unique CI invocation key for this directory/run |
+| `coverage-threshold`, `license-policy`, `mutation-test`, `sarif-reports`, `clippy-level`, `dependency-audit`, `unsafe-policy`, `unused-dependencies` | as in [ci.md](ci.md) | as in `ci.yml` | Forwarded unchanged to the CI run, so a release passes the same gates as the project's own CI. `rust-version` is not: a release builds with the committed pin |
+
+Both return string outputs `artifact-id`, `artifact-name` and `revision` from CI.
+They identify the validated release artifact, not proof of publication; a later
+staging or publication failure does not invalidate their existence. No publication
+URL is returned.
+
+## Live approval boundary
+
+Every live publisher requires all of the following:
+
+1. Explicit `dry-run: false`, a `push` or `workflow_dispatch` event and a
+   ruleset-protected `refs/tags/vMAJOR.MINOR.PATCH` (optional prerelease suffix).
+2. The pre-existing `release` environment with nonempty required reviewers and
+   exactly one custom deployment policy: type `tag`, name `v*`.
+3. Successful API verification of those protections in preflight and again just
+   before writing. Missing configuration, unavailable protection, API errors,
+   permission errors or unexpected JSON fail closed. GitHub must approve the
+   publishing job through that environment.
+4. A caller permission ceiling matching the workflow: `actions: read` for the
+   environment API, plus `contents: write` for binary/evidence uploads or
+   `contents: read` for crate publication. Only conditional live upload jobs
+   request a write scope; dry-run jobs execute with read-only permissions.
+
+Required reviewers are available because every repository in the organization
+is public; on GitHub Team a private repository could not meet this boundary.
+The environment name alone never proves approval. See
+[platform requirements](platform-requirements.md#live-protection-availability)
+for official API permissions and plan restrictions. No PAT or new approval
+variable is used, and no job configures its own protection.
+
+## Binary publisher
+
+`publish-binaries.yml` downloads the exact CI artifact ID and verifies checksums,
+source revision, target and nonempty binary selection. Dry-run stops after that
+verification. It never unpacks/executes release payloads or runs a live publisher.
+
+The protected job downloads the same immutable artifact and verifies it again.
+The Release must already exist for the selected tag, and the remote tag must
+resolve to the validated commit. All three local files must exist as nonempty
+regular files, and no matching remote asset may exist before upload:
+`payload.tar.gz`, `provenance.json`, `SHA256SUMS`.
+
+`gh release upload` adds those files without `--clobber`. The workflow never
+creates a release/tag or replaces an asset. Uploads are not a transaction: a
+network failure may leave earlier assets uploaded. Inspect the failed release
+before an explicitly authorized repair; a rerun refuses existing assets rather
+than silently overwriting them. A successful upload is not an attestation.
+
+## Crate publisher
+
+Additional inputs for `publish-crate.yml`:
+
+| Input | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `package` | string | required | Exact member name, 1 to 64 safe Cargo-name characters, never a package-ID expression |
+| `semver-check` | boolean | `false` | Compare against the newest published version; leave off for a first release without a baseline |
+
+The only publication secret is the existing optional `CARGO_REGISTRY_TOKEN`:
+a scoped public crates.io token, required and read only in the protected live
+step. Prefer the protected environment's secret. Map it explicitly if supplied
+from the caller; never use `secrets: inherit`.
+
+Dry-run needs only path and package. It runs CI, verifies its artifact, selects
+exactly one workspace member with Cargo metadata, and runs
+`cargo package --package NAME --locked`, including packaging verification.
+It never calls `cargo publish`. Independently packaging a crate with unpublished
+sibling dependencies can fail; multi-crate release ordering is not implemented.
+
+Live release additionally requires the tag to equal `v` plus the package version
+and the manifest's `publish` list, if set, to permit `crates-io`. `publish = false`
+forbids release. The protected job checks out the validated SHA, creates private
+Cargo state, installs the validated compiler, rechecks event/ref/revision and
+actual environment protection, and invokes
+`cargo publish --locked --no-verify --package NAME --registry crates-io`.
+The crates.io sparse index, token and `cargo:token` provider are explicit process
+environment values. There is no private registry selector or fallback.
+
+Cargo may repackage; it does not upload our staged `.crate` verbatim. Verification
+already succeeded without the token. Review source/build scripts and Cargo
+configuration before approving publication. Everything uploaded to the public
+registry is public.
+
+## Release evidence
+
+`publish-evidence.yml` is separate so ordinary CI callers need no write scope.
+
+| Input | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `artifact-name` | string | required | CI artifact name, without its `-reports` suffix; downloaded from this run |
+| `revision` | string | required | Immutable source SHA, equal to `github.sha` and the scorecard revision |
+| `dry-run` | boolean | `true` | Validate reports and create a local archive only |
+
+No secret is accepted. The staging job requires a nonempty scorecard, matching
+source revision and only regular files/directories inside `evidence`, without
+symlinks or escapes. It produces `evidence.tar.gz` locally. Dry-run ends there.
+
+Live upload requires the same protected tag, verified `release` environment and
+pre-existing Release as the binary publisher. The protected job downloads the
+same run's reports and validates them again before uploading `evidence.tar.gz`
+without replacement. Reports may describe failed controls; publishing evidence
+is not a claim that all controls passed. Release assets do not have the CI
+artifact expiry, but can be deleted by repository administrators: no immutable
+regulatory retention or all-runs archive is claimed.
+
+## Provenance attestation
+
+`attest-binaries.yml` records a Sigstore-signed SLSA build provenance statement
+for `payload.tar.gz`, then verifies it in the same job with `gh attestation
+verify`, pinning the expected signer workflow and checking the verified subject
+digest against the payload the job hashed itself. A signature nothing checks is
+not a control, so a broken or unattached attestation fails the run.
+
+It is a separate callable workflow rather than a job inside publication. GitHub
+validates the scopes of every job in a called workflow at startup, including jobs
+an `if:` would skip, so declaring `attestations: write` inside
+`publish-binaries.yml` would force that grant on every caller and fail publication
+with an opaque startup error for anyone who cannot grant it. Artifact attestations
+are available because the repositories are public; a private repository would
+need GitHub Enterprise Cloud. Confirm the caller's permissions before wiring the
+workflow.
+
+The default `on-unavailable: skip` tolerates only Enterprise Server identified
+by a successful `GET /meta` response containing a nonempty `installed_version`.
+Both gh calls derive a hostname from GitHub's HTTPS server URL; each step supplies
+the job token through both `GH_TOKEN` and `GH_ENTERPRISE_TOKEN` so the CLI selects
+the appropriate one for Cloud or Server.
+No missing Cloud entitlement, HTTP status, OIDC error or signing failure is treated
+as proof of unavailability. Both signing actions and provenance verification must
+succeed; the outcome step runs even after failure and never reports it as success.
+`on-unavailable: fail` also rejects proven unavailability. This runtime policy
+cannot bypass permission validation before GitHub starts a job.
+
+Migration from the earlier candidate: `skip` no longer suppresses arbitrary
+signing errors. Repair permissions, entitlement or signing failures rather than
+using that input as a general nonblocking mode. The CLI verifies the default
+provenance predicate, not a second, independent SBOM predicate verification.
+
+| Input | Required | Meaning |
+| --- | --- | --- |
+| `artifact-id` | yes | Immutable release artifact ID produced by the CI workflow |
+| `revision` | yes | Validated source commit; must equal the checked-out SHA |
+| `on-unavailable` | no | `skip` by default, only for proven Enterprise Server unavailability; `fail` rejects it |
+
+The caller grants `contents: read`, `id-token: write` and `attestations: write`
+on that job alone. A consumer verifies a published artifact with
+`gh attestation verify <file> --repo <org>/<repo>
+--signer-workflow Orchestration-Maestro/rust-workflows/.github/workflows/attest-binaries.yml`.
+The consumer is the repository holding the attestation, not the reusable signer.
+
+## Runnable dry-run examples
+
+The [repository workflow](../.github/workflows/ci-internal.yml) is canonical:
+relative references, all fifteen consumer/version cases, unique artifact keys,
+and both binary/crate publisher dry-runs. No publishing secret is required.
+External consumers use the actual reviewed remote SHA once the provider exists;
+see [README](../README.md).
+
+Local tests use controlled GitHub/Cargo stand-ins for live writes. No release,
+crate upload, hosted approval or successful remote integration is claimed here.

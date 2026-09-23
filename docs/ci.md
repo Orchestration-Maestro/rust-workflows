@@ -1,0 +1,546 @@
+# CI contract
+
+Call `.github/workflows/ci.yml`; see the [README](../README.md) for safe revision
+references. The workflow checks out the caller's immutable `github.sha` with no
+persisted checkout credential. No workflow-repository helper script is required
+in that checkout.
+
+Every step body is one `rust-gate` command: the standard-library-only binary in
+`gate/` that the `gate` action builds from this repository's pinned commit, with
+every input arriving as an environment variable. A reusable workflow runs in the
+caller's checkout and cannot read this repository's files, so that pinned build
+is the only copy the job can trust; the contract tests in `tests/` run the same
+commands, and `just check` runs them against the example fixtures. See
+[rust-gate.md](rust-gate.md).
+
+## Inputs and outputs
+
+All inputs are optional. Every CI job runs on GitHub-hosted `ubuntu-24.04`;
+callers cannot override runner selection. Entry jobs refuse `pull_request_target`
+before allocating a runner. A fork pull request runs, with no secret and a
+read-only token, once an owner approves the external contributor's run. GitHub
+passes no configuration variable to it, so `LICENSE_ALLOWLIST` is empty there; a
+committed `deny.toml` applies the same way to every pull request. See [runner security requirements](platform-requirements.md#administrator-owned-setup).
+
+| Input | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `working-directory` | string | `.` | Relative package/workspace directory inside checkout; must contain `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` |
+| `rust-version` | string | Empty | Exact stable version, `1.85.0` or newer; empty uses `rust-toolchain.toml` |
+| `coverage-threshold` | number | `80` | Finite minimum line percentage, inclusive range 0 to 100 |
+| `artifact-key` | string | `ci` | Invocation identity, 1 to 40 alphanumeric/underscore/hyphen characters, starting alphanumeric |
+| `license-policy` | string | `auto` | `auto` applies a consumer `deny.toml` when present, else the default source and version policy plus the `LICENSE_ALLOWLIST` organization allowlist when set; `enforce` requires a consumer file; `off` skips the gate |
+| `mutation-test` | boolean | `true` | Run cargo-mutants and fail on surviving mutants; a pull request mutates its diff, a push or tag its own commit; set `false` when run time exceeds the job |
+| `sarif-reports` | boolean | `false` | Also emit Clippy and secret findings as SARIF; uploading them to code scanning needs GitHub Advanced Security |
+| `unused-dependencies` | boolean | `true` | Fail when a workspace member declares a dependency it never uses; remove it or set `false` |
+| `dependency-audit` | boolean | `false` | Require a recorded cargo-vet audit for every dependency; opt-in because it commits the team to reviewing third-party source on each bump |
+| `unsafe-policy` | string | `deny` | Refuses an `unsafe` block in any workspace member; `allow` leaves the decision to a project that needs it |
+| `clippy-level` | string | `default` | `pedantic` or `nursery` also deny those Clippy groups |
+
+### Direct dependency access
+
+The `registry` step creates a private job-local Cargo home under the runner's
+temporary directory. Cargo uses the official sparse crates.io index directly;
+no source replacement or registry credential is written or exported. The
+runner's own Cargo configuration is left untouched. CI downloads checksum-pinned
+tool assets directly from their official GitHub release paths. Neither download
+origin is a caller-selectable CI input.
+
+Publication uses GitHub Releases and explicit public crates.io; see
+[publishing.md](publishing.md).
+The all-zero action pins still require actual published provider revisions;
+this local wiring does not establish a hosted CI result.
+
+### Static analysis
+
+Clippy is the static analyser for Rust, and it already runs with every warning
+denied across all targets. `clippy-level` widens the rule set rather than adding
+a second tool: `pedantic` and `nursery` catch more but also report style opinions
+a codebase may legitimately reject, which is why the default stays at the groups
+Rust itself treats as correctness-relevant. Two lints are denied at every level:
+`todo!()` and `dbg!()` are scaffolding and do not belong in release code.
+
+Clippy runs once: its JSON diagnostics and optional SARIF are saved before its
+exit status is propagated, including when warnings fail the gate.
+
+CodeQL adds taint tracking on top of Clippy. It is not a step of this workflow:
+uploading its results needs `security-events: write`, which would become a
+requirement on every caller. Organization administrators enable CodeQL default
+setup instead; see
+[platform requirements](platform-requirements.md#administrator-owned-setup).
+
+### Function and file sizes
+
+The `complexity` step measures every function's cognitive complexity, length
+and parameter count through Clippy, and every Rust file's lines of code with
+doc comments not counted. It never fails the run: the counts land in
+`complexity.txt` and `complexity.json`, in the step summary, and as one line
+of the scorecard that changes no score. The thresholds are the consumer's
+own `clippy.toml` when one is committed, and otherwise this workflow's
+defaults, cognitive complexity 15, 100 lines and 5 parameters per function,
+with 300 lines of code per file. A consumer who wants the limits enforced
+commits the `clippy.toml` and denies the three lints in their own crate, or
+selects `clippy-level: pedantic`, which makes function length blocking.
+
+### Duplicated functions
+
+The `duplication` step lists the pairs of functions whose syntax trees match
+at 90 % or more, among functions of eight lines or more, through
+similarity-rs. It never fails the run: the listing lands in `duplication.txt`
+and its count in the step summary. A pair is a candidate to merge, or a shape
+two functions share on purpose; the report leaves that call to the consumer.
+
+### Unsafe code
+
+`deny` adds `-D unsafe_code` to the Clippy invocation. Lints after `--` reach the
+selected workspace members only, so a dependency that legitimately uses `unsafe`
+never fails the build. `RUSTFLAGS` would apply to the whole dependency graph and
+break almost any real project, which is why it is not used here.
+
+The default is `deny`, because a golden workflow enforces the standard; a
+project doing FFI sets `allow`, one input, on adoption. `deny` does not detect
+undefined behaviour; it forces the decision to be explicit. A member that genuinely needs `unsafe` keeps
+a greppable `#[allow(unsafe_code)]` at the site instead of compiling silently.
+
+Detecting undefined behaviour inside `unsafe` needs Miri or the sanitizers, which
+are nightly-only and therefore outside stable.
+
+### Fuzz regression
+
+`fuzz.yml` is a separate callable workflow, nightly-only for the same reason as
+the undefined-behaviour audit. Fuzzing has no natural stopping point, so an
+unbounded run does not belong in CI. This workflow does the part that does: it
+replays the committed corpus with `-runs=0` so a previously fixed crash that
+regressed fails immediately and deterministically, then explores for a bounded
+budget (`max-total-time`, 10 to 1800 seconds per target).
+
+A missing `fuzz/fuzz_targets` directory is an error rather than a skipped run, so
+enabling the workflow cannot silently fuzz nothing. The summary states plainly
+that a clean run means no crash was reached within the budget, not that none
+exists; continuous fuzzing belongs on dedicated infrastructure.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `working-directory` | `.` | Relative package or workspace directory containing the `fuzz` crate |
+| `toolchain` | `nightly-2026-09-14` | Dated nightly keeps the run reproducible |
+| `target` | empty | One fuzz target name; empty runs every target in `fuzz/fuzz_targets` |
+| `max-total-time` | `120` | Seconds of exploration per target after the corpus replay, 10 to 1800 |
+
+### Undefined-behaviour audit
+
+`unsafe-audit.yml` is a separate callable workflow running the consumer's tests
+under Miri. It is not an input here because Miri exists only on nightly, and
+`ci.yml` accepts only exact stable versions: keeping it apart is what keeps that
+true. A regression test enforces that `ci.yml` never mentions nightly.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `working-directory` | `.` | Relative package or workspace directory |
+| `toolchain` | `nightly-2026-09-14` | Dated nightly keeps the run reproducible; plain `nightly` follows today's |
+| `test-filter` | empty | Narrow the run to the tests that exercise `unsafe` |
+| `strict-provenance` | `false` | Also reject pointer-provenance mistakes that work today by accident |
+
+Call it on a schedule or before a release, never on every pull request: Miri
+interprets the program instead of executing it, so it is orders of magnitude
+slower than a native test run. A finding fails the job.
+
+### Signed build provenance
+
+`attest-binaries.yml` is a separate callable workflow that records and verifies a
+GitHub build provenance attestation for a payload CI already produced; the README
+explains why it is not a job inside publication.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `artifact-id` | required | Immutable release artifact ID produced by the CI workflow |
+| `revision` | required | Validated source commit that produced the artifact; must equal the checked-out SHA |
+| `on-unavailable` | `skip` | Only Enterprise Server identified by a successful metadata response may be skipped; `fail` rejects it. Unknown availability and signing, OIDC, API or verification errors always block |
+
+Outputs: `subject-digest`, the payload digest verified in this job (empty on a
+platform skip), and `attested`, true only after both signing actions and the
+independent provenance verification succeed. Callers require `attested == 'true'`
+instead of the job's success. Private Cloud entitlement is not inferred from an
+API error. GitHub can reject permissions before this runtime policy executes.
+
+### Quality scorecard
+
+Every run publishes a scorecard to the job summary and to the reports artifact as
+`scorecard.json`, `scorecard.md` and `scorecard.svg`. It records what the run
+actually enforced. Each control has a `state`: `passed`, `disabled`,
+`not-applicable`, `failed` or `not-run`. Only `passed` contributes to `active`;
+turning a control on is not evidence that it ran. Features and mutations supply
+explicit application results. Missing results never count as success. The grouped source, version and licence row
+reflects the selected dependency policy; `licenses.txt` states whether a licence
+allowlist actually applied. `license-policy: off` disables that row.
+
+The badge is generated here, with no external service and no runtime dependency,
+using the palette sampled from this repository's banner. It turns red for a
+failed control or an enforced control that did not run. To show it in a README, publish `scorecard.svg` wherever
+your project already serves static files and reference that URL; this workflow
+deliberately does not write to the consumer's repository, which would require
+granting `contents: write` to every caller.
+
+### Release evidence
+
+Ordinary CI artifacts expire after seven days. `publish-evidence.yml` optionally
+archives a run's reports as `evidence.tar.gz` on an existing GitHub Release.
+It defaults to a local dry-run and accepts `artifact-name`, `revision` and
+`dry-run`. Live uploads require a protected release tag and the verified `release`
+environment. Reports are source-bound through the scorecard revision and checked
+for unsafe files before archiving. This is not durable archival for every run or
+immutable regulatory retention. See [the contract](publishing.md#release-evidence).
+
+### Payload bill of materials
+
+`cargo cyclonedx` emits one SBOM per workspace member, but an attestation binds a
+single subject, so those files cannot describe the release payload. Staging
+therefore merges them with `cyclonedx merge --hierarchical`, producing
+`payload.cdx.json`: a root component named `rust-release-payload` with each member
+nested beneath it. A flat merge would list shared members twice. The output is
+pinned to CycloneDX 1.5, validated by the tool and then re-checked with `jaq`.
+
+The merged document travels inside `payload.tar.gz` and also ships with the
+reports. `attest-binaries.yml` extracts it from the verified tarball rather than
+fetching a separate copy, so the attested bill of materials is the one whose
+checksum was just confirmed.
+
+#### The same dependencies in SPDX
+
+Consumer tooling is split between the two formats, and one a consumer cannot read
+is no bill of materials at all. `cargo sbom` therefore emits an SPDX 2.3 document
+per workspace member alongside the CycloneDX files.
+
+It is generated, not converted. `cyclonedx convert --output-format spdxjson` was
+tried first and rejected on measurement: converting the hierarchical merge lost
+nested members, converting a flat merge duplicated shared ones, and both dropped
+the SPDX relationship graph entirely. An SBOM that is quietly incomplete is worse
+than none, because it looks like an answer.
+
+No SPDX merge exists, because nothing attests these documents; the CycloneDX files
+are merged only because an attestation binds exactly one subject. A check compares
+the member names in both formats and fails the build when they disagree, so a
+consumer's answer cannot depend on which file their tooling happened to read.
+
+#### Dependencies inside the binary
+
+Both release builds run through `cargo auditable`, which embeds the resolved
+dependency list in a `.dep-v0` ELF section. A binary copied somewhere its SBOM did
+not follow can still be audited:
+
+```bash
+cargo audit bin <binary>
+```
+
+Both builds use it, or the two binaries would differ and the reproducibility check
+would fail for a reason unrelated to reproducibility. Installing the tool and
+forgetting to build through it produces a perfectly normal binary and no error, so
+the hardening step checks that the section is present rather than assuming it.
+
+### Recorded dependency audits
+
+`dependency-audit` runs `cargo vet --locked`, which fails unless every dependency
+carries a recorded human audit. It is off by default because it commits a project
+to reviewing third-party source on every version bump; audits can be imported from
+publishers such as Mozilla and Google, so the initial cost is usually small and
+the ongoing cost is the real one. The gate requires a committed
+`supply-chain/config.toml` and says so explicitly rather than auditing nothing.
+
+### Reproducible builds and binary hardening
+
+The release build runs a second time into a different target directory and the
+digests must match. A difference means the released bytes depend on something
+other than the source, which would make signing them meaningless. Each executable
+is then checked for position independence, full RELRO and a non-executable stack;
+the result ships as `hardening.txt`. Rust does not emit C stack canaries, so
+`__stack_chk` is deliberately not required.
+
+### Declared minimum supported Rust version
+
+Every workspace member must declare `rust-version`, and the declared value must
+not exceed the compiler under test. A workspace that omits the field still
+compiles on the current toolchain and then breaks silently for a consumer on an
+older one; this gate makes the claim explicit and keeps it honest. The result is
+published as `msrv.tsv` with the diagnostic reports. This check is always on: it
+verifies a declaration the project already owns rather than adding a new policy.
+
+The declaration is then compiled against. Cargo refuses a member whose
+`rust-version` sits above the active toolchain, so the oldest compiler the whole
+workspace can use is the highest version declared. A declaration such as `1.85`
+is normalized to `1.85.0`, not rustup's latest `1.85` patch alias. The step
+installs that exact compiler and runs `cargo check --workspace --locked` with
+its exact `RUSTUP_TOOLCHAIN`. A member declaring less is carried by that floor and
+is never built on its own, which the run reports rather than leaves implied.
+Without this build the declaration is a number in a manifest: a workspace can
+use an API newer than the version it claims to support and still pass.
+
+### Feature combinations
+
+A default build proves one combination. A feature that nobody selects in CI can
+stop compiling and ship that way, and the consumer who turns it on is the one
+who finds out. `cargo hack check --each-feature` builds each declared feature on
+its own, the default set, none of them and all of them: linear in the number of
+features, where a full powerset would be exponential and price the gate out of
+every run. This is not a powerset or every optional feature added to defaults.
+A workspace declaring no feature is `not-applicable`, not an active control.
+The names it found are published as `features.txt`. The example replay includes
+the step; a separate real multi-feature fixture rejects both an invalid isolated
+feature and an invalid all-features combination.
+
+### Yanked dependencies
+
+`cargo deny check ... advisories` covers the one case `cargo audit` does not: a
+crate withdrawn from the registry. A yanked crate stays resolvable from a
+committed lockfile indefinitely, so it is a distinct failure from a published
+vulnerability. The check reads the registry index and therefore needs network
+access, which the hosted run has.
+
+CI accepts no secret.
+
+### Run cost
+
+Every pinned Rust tool is installed from a checksum-verified prebuilt release
+rather than built with `cargo install`. Compiling them from source cost each
+caller minutes of runner time on every job, multiplied by the compiler matrix.
+Optional tools download only when their gate is selected. On every action
+invocation, `rust-gate` compiles from this repository's pinned commit with its
+own pinned compiler in a fresh directory. Neither its executable nor its Cargo
+build fingerprints are restored from a previous job.
+
+The workflow restores a Cargo registry and build cache keyed on the resolved
+`Cargo.lock` and the selected compiler, so a lockfile or toolchain change can
+never reuse an incompatible build. A `concurrency` group supersedes in-flight
+runs for the same caller, reference, working directory, artifact key and requested
+Rust version; only pull requests cancel a run in progress, so matrix versions do
+not cancel each other and a running push or tag run always finishes. GitHub keeps
+at most one waiting run per group, so a newer push replaces a run still waiting
+for its turn; every release tag is its own group.
+
+### Diagnostic reports
+
+The `<artifact-name>-reports` artifact carries the results that were produced.
+The table describes selection, not a promise that every file exists after an
+earlier failure. The scorecard identifies controls that never ran.
+
+| File | Contents | Selection |
+| --- | --- | --- |
+| `clippy.json` | Diagnostics from the enforcing Clippy invocation, preserved even on failure | always |
+| `tests.xml` | nextest JUnit, including failed tests when nextest produces it | always |
+| `complexity.txt`, `complexity.json` | Functions over the size thresholds and files over 300 lines of code; informational, never fails the run | always |
+| `duplication.txt` | Pairs of functions at or above 90 % similarity, eight lines or more; informational, never fails the run | always |
+| `coverage.lcov` | Line coverage in LCOV format | always |
+| `audit.json` | RustSec advisory results | always |
+| `secrets.json` | Redacted secret-scan findings | always |
+| `licenses.txt` | Selected dependency policy and whether a licence list applied; a text skip with `off` | `license-policy` |
+| `msrv.tsv` | Each workspace member and its declared `rust-version` | always |
+| `features.txt` | Every feature name the workspace members declare, one per line | always |
+| `hardening.txt` | Per-binary reproducibility, PIE, RELRO, BIND\_NOW, non-executable stack and embedded dependency list | always |
+| `payload.cdx.json` | Merged CycloneDX bill of materials for the release payload | always |
+| `*.spdx.json` | One SPDX 2.3 document per workspace member | always |
+| `scorecard.json`, `scorecard.md`, `scorecard.svg` | Per-control states; only passed controls count as active | always |
+| `mutants.json`, `mutants.txt` | Available mutation outcomes, including failures; a text-only skip when no mutants apply | `mutation-test` |
+| `clippy.sarif`, `secrets.sarif` | The same findings as SARIF | `sarif-reports` |
+| `unused-dependencies.txt` | Declared dependencies no source file references | `unused-dependencies` |
+| `dependency-audit.txt` | cargo-vet result against the committed audit set | `dependency-audit` |
+
+A step that runs and chooses to skip records that decision. A step prevented
+from starting cannot write a report; its scorecard state is `not-run` unless
+selection or explicit applicability evidence establishes another state. A
+successful nextest invocation with no JUnit file or an empty one is refused.
+Doctests run separately through Cargo and are not included in this JUnit.
+
+### Licence, dependency-ban and source policy
+
+The gate runs `cargo deny check licenses bans sources advisories` against the
+consumer's own `deny.toml`, so each team keeps its reviewed policy rather than
+inheriting one from this repository. A project with no `deny.toml` still gets the
+line every project must hold, written by the step into a generated
+configuration: dependencies come only from crates.io directly, never from an
+unapproved git repository, and a version requirement cannot be a wildcard. A project that needs a git dependency
+commits its `deny.toml` and says so there. The binary fixture carries one
+crates.io dependency, so the local gate checks the generated policy against a
+real lockfile rather than an empty graph.
+
+Licences are the one part with no default: they are checked against the
+`LICENSE_ALLOWLIST` organization variable when administrators set it
+(comma-separated SPDX identifiers), and the report says `licences NOT APPLIED`
+otherwise. No list is assumed here. The day administrators set the variable, every project
+without a policy is covered without a release. Advisories stay with `cargo audit`, which also denies yanked, unsound
+and unmaintained crates; the two gates are deliberately separate.
+
+`auto` is the default: the source and version policy holds for everyone, and a
+licence list applies as soon as one exists. Choose `enforce` once your policy is
+committed: the workflow then fails when `deny.toml` is absent, so the gate cannot
+be silently lost. `off` skips the whole step, and the report records the skip.
+
+### Mutation testing
+
+Mutation testing builds and tests the workspace once per generated mutant. It
+is on by default, because a golden workflow enforces the standard, and every
+run mutates only its change, so the cost scales with the change: a pull request
+its diff against the base branch, a push or a tag its own commit against the
+parent. Squash-only merges make each default-branch commit exactly one pull
+request's change. Only a repository's first commit, which has no parent,
+mutates the whole workspace. The gate fails on any surviving or
+timed-out mutant. When outcomes exist, it copies `mutants.json` before returning
+the tool's original exit status, including survivors and timeouts. If the pinned
+tool explicitly reports that no mutants apply, the step records `SKIPPED` in
+`mutants.txt` without inventing JSON outcomes. An empty diff, a documentation-only
+diff and changed Rust lines without mutants all qualify. A workspace with no
+mutants also records `not-applicable` after the tool's explicit no-work message.
+A missing or empty
+outcomes file without that explicit successful no-work result still fails.
+Scope a large workspace with a committed `.cargo/mutants.toml`, keep the job
+timeout in mind, and set `mutation-test: false` when the run outgrows the job.
+
+Outputs are strings, available through the final successful gate:
+
+| Output | Meaning |
+| --- | --- |
+| `artifact-id` | Immutable GitHub release artifact ID in the current run |
+| `artifact-name` | Exact artifact name for downstream verification |
+| `revision` | The checked source SHA |
+
+There are no required secrets. No feature, arbitrary shell-command, target or
+`ci-passed` inputs exist. CI sets `CARGO_BUILD_TARGET` to the supported native
+triple, overriding any consumer cross-target default. Prefer Cargo manifests/configuration and the exact
+stable toolchain pin (`1.MINOR.PATCH`) in `rust-toolchain.toml`. Path traversal,
+option-like paths, symlink escapes, unsafe artifact keys and nonnumeric/out-of-range
+coverage are rejected before installation/build commands. Workspace manifests and
+source target paths must also stay inside checkout.
+
+Any exact stable version from the `1.85.0` MSRV up is accepted, read from
+`rust-toolchain.toml` or from a nonempty `rust-version` override that selects the
+compiler for the job without modifying the file; the file is still required and
+must contain an exact stable pin. Channels, minor-only values and anything below
+the MSRV fail before installation. Five pins (`1.85.0`, `1.95.0`, `1.96.1`,
+`1.97.1`, `1.98.1`) are the tested set the consumer matrix proves; see the README.
+Publishers omit this override and use the committed consumer pin.
+
+## Mandatory checks
+
+1. `cargo metadata --locked`, rustfmt, Clippy for all workspace targets with
+   `-D warnings`, unit/integration tests and explicit doc tests.
+2. `cargo llvm-cov --workspace --locked` emits nonempty LCOV and enforces the line
+   threshold. Stable coverage does not include doc-test coverage; doc tests run
+   separately. No implicit `--all-features` is used.
+3. Pinned cargo-audit checks the lockfile against the live RustSec database.
+   Pinned Gitleaks scans an archive of the entire current source revision (not
+   Git history), uses built-in rules without consumer allowlists, and redacts
+   100% of detected secret values. Findings **and scanner execution errors fail**.
+4. Release build and release-mode tests, verified `cargo package --workspace`,
+   per-member CycloneDX 1.5 JSON SBOMs, and release artifact staging. cargo-cyclonedx
+   lacks `--locked`: a before/after lockfile comparison rejects resolution changes.
+5. Dependency sources and versions: `cargo deny check bans sources` against the
+   consumer's `deny.toml`, or against the generated default policy without one.
+6. `Required Rust CI` runs with `always()` and fails on failure, cancellation or
+   unexpected skip of `checks`. Reports cannot convert failures into success.
+
+Auxiliary tools are pinned independently of consumer Rust: cargo-llvm-cov 0.9.0,
+cargo-audit 0.22.2, cargo-deny 0.20.2, cargo-cyclonedx 0.5.7, Gitleaks 8.24.3 and
+jaq 3.1.1 among them, all installed by `rust-gate install-tools` from
+checksum-verified prebuilt releases. The gate uses jaq for JSON; the one TOML
+value it needs, the toolchain pin, is read as one quoted key and refused unless
+it is exact.
+`--locked` fixes dependency resolution; it does **not** mean offline.
+
+## Artifact contract
+
+Release artifact names combine the source SHA, native target, SHA256 of normalized
+working-directory plus `artifact-key` plus selected Rust version, run ID and run
+attempt. Different compiler versions do not collide; use different keys for
+repeated invocations of the same directory and compiler in a run. The consumer matrix uses
+separate keys for CI, binary dry-run and crate dry-run. Duplicate invocations fail
+rather than overwrite immutable artifacts.
+
+Each release artifact contains exactly `payload.tar.gz`, `provenance.json` and
+`SHA256SUMS`. The payload includes compiled release binaries, verified `.crate`
+packages and each workspace member's `<package>.cdx.json`. Provenance records
+revision, target, binary names and SBOM names. Binary names must be safe and unique
+across the workspace. Consumers must supply meaningful integration tests for
+release binaries; the examples test their actual process output.
+
+SBOM validation parses JSON and checks its CycloneDX version/envelope, component
+metadata and containment in checkout; it is not a full external JSON-schema or
+license-policy validation. Empty workspace SBOM output fails. This boundary is
+intentionally smaller than a supply-chain policy engine.
+
+Checksums detect corruption; same-run immutable artifact IDs and required CI
+provide source association. They are not signed provenance attestations. The
+binary publisher downloads by exact ID, checks required checksum selectors,
+revision, native target and binary presence, and uploads the same validated files
+without rebuilding. The protected job re-verifies them before the GitHub upload.
+
+Release artifacts and diagnostic reports retain for **7 days**. Missing required
+files fail. Reports upload on failure where available; earlier failures can mean
+some reports do not exist. The consumer's cross-run caches are the Cargo registry
+and target directory, keyed on the lockfile and compiler as described above.
+The gate binary is rebuilt in a fresh directory and is never cached. GitHub's
+cache scoping includes default-branch fallback; that scope does not authenticate
+cached bytes or replace the separation of privileged jobs.
+The hardening step rebuilds every binary in a fresh directory under the
+runner's temporary directory and requires the same digest, so a cached object
+that no longer matches the source fails the run. Job-local Cargo state can be
+rebuilt and never holds credentials.
+
+## The gate action and the shared commands
+
+The `gate` action under `.github/actions/` builds `rust-gate` from the pinned
+commit and puts it on the PATH of every later step; see
+[rust-gate.md](rust-gate.md). A reusable workflow runs in the consumer's
+checkout, so an action fetched by commit SHA is the one way every workflow gets
+the same binary. Every call site pins the same commit; the pin and its wiring
+are described in [CONTRIBUTING.md](../CONTRIBUTING.md). What every step reads,
+runs and writes is in [steps.md](steps.md), generated from the declarations
+the gate enforces: an input, a tool or a report a step did not declare is
+refused. Two commands serve more than one workflow.
+
+### `rust-gate install-tools`
+
+Downloads release assets from the fixed official GitHub origin, verifies each digest before
+anything is extracted, and installs the executables under the runner's
+temporary directory, on the PATH of every later step. `ci.yml` installs its
+mandatory toolbelt in one step and each optional gate's tool in its own step,
+conditional on that gate; the publishers and the attestation workflow install
+`jaq` with it.
+
+| Variable | Value | Meaning |
+| --- | --- | --- |
+| `TOOLS` | required | One tool per line: `<name> <owner>/<repo>/releases/download/<tag>/<asset> <sha256> [<member>]`; the member is the executable's path inside an archive, omitted for a bare binary; `#` lines are comments |
+
+### `rust-gate verify-payload`
+
+Checks a downloaded release payload in the job about to publish or sign it:
+no symlinks, a checksum manifest naming exactly `payload.tar.gz` and
+`provenance.json`, checksums that hold, and a provenance whose revision is the
+checked-out commit. Both publishers and `attest-binaries.yml` run it.
+
+| Variable | Value | Meaning |
+| --- | --- | --- |
+| `REVISION` | the workflow's `revision` input | The commit SHA the payload was built from; must equal the checked-out revision |
+| `REQUIRE_BINARIES` | `true` or `false` | `true` refuses a payload whose provenance lists no binaries; the binary publisher sets it |
+
+Output: `payload-digest`, the sha256 of `payload.tar.gz` computed from the
+verified bytes; the attestation workflow signs exactly that digest.
+
+## Repository testing
+
+`ci-internal.yml` runs `CHECK_NETWORK=1 just check`: Rust development tests, the
+gate crate's formatting, Clippy, unit tests and strict rustdoc, actionlint, zizmor,
+yamlfmt, taplo, ShellCheck over the Just recipes and the gate action's build step, real
+fixture checks and live advisory lookup. The isolated test crate uses
+pinned jaq to parse YAML and serde_json for JSON. The documentation is checked
+the same way: every input, output and secret has its row, every relative link
+resolves, the Copilot inventory matches the tree, and every test a standard
+cites is defined.
+The same `ci-internal.yml` runs real local reusable-workflow calls for all three examples
+on each of the five compiler pins (15 cases, capped at five concurrent jobs), plus
+both dry-run publishers on each example's committed pin. `Required consumer tests`
+rejects any failed/cancelled/skipped matrix. Configure required statuses only after inspecting their actual
+names in GitHub; this directory has not been run there.
+
+The failing-consumer regression executes the actual extracted `quality` and final
+status steps, under the interpreter each one declares, with controlled failing
+Cargo/status stand-ins. It proves
+command and gate failure propagation, **not** GitHub's reusable-workflow scheduler.
+Other boundary tests execute malformed paths, release configuration, scanner
+errors, checksum corruption, revision mismatches and package selection. Real
+Cargo and workflow lint checks complement those stand-ins.

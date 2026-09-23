@@ -1,0 +1,88 @@
+name: Bug report
+description: Report a reproducible problem in the Rust workflows or repository tooling.
+title: '[Bug]: '
+# Applied on creation so triage starts from a labelled queue instead of from a
+# person reading every new issue to sort it.
+labels: ['bug', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Include a minimal reproduction and sanitized diagnostics. Use the private
+        reporting process in SECURITY.md for vulnerabilities or credential exposure.
+        Never attach tokens, environment dumps or credential-bearing Cargo files.
+  - type: checkboxes
+    id: preparation
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked the README, SUPPORT.md and existing issues.
+          required: true
+        - label: This report contains no credentials or confidential source data.
+          required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      options:
+        - CI checks and release artifacts
+        - Binary publishing
+        - Crate publishing
+        - Consumer compatibility matrix
+        - Repository tooling or documentation
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Workflow revision
+      description: Supply the exact workflow commit SHA, or identify the local change being tested.
+    validations:
+      required: true
+  - type: dropdown
+    id: regression
+    attributes:
+      label: Did this work before?
+      description: A known-good revision turns an investigation into a bisect.
+      options:
+        - Yes, it worked on an earlier revision
+        - No, it has never worked for me
+        - Unknown
+    validations:
+      required: true
+  - type: input
+    id: rust_version
+    attributes:
+      label: Exact Rust version
+      description: Include the selected compiler pin when applicable, not a floating channel.
+      placeholder: '1.98.1'
+  - type: input
+    id: runner
+    attributes:
+      label: Runner and architecture
+      description: >-
+        Its own field because nearly every toolchain and prebuilt-tool failure
+        depends on it, and it is the detail most often missing from a pasted log.
+      placeholder: 'ubuntu-24.04, Linux x86_64'
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Give the caller inputs, consumer type and exact commands or workflow steps.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Explain what should happen, what happened and which gate or artifact was affected.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Include the failing step and error, plus any relevant test output.
+      render: text

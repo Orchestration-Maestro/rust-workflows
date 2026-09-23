@@ -1,0 +1,122 @@
+# What must never reach a commit.
+#
+# Rust repositories are rarely only Rust: an agent runs a helper script, an
+# editor writes a workspace file, a reviewer opens the tree on a different
+# operating system. Every entry below is something a contributor can produce
+# without meaning to, grouped so a reader can tell why each one is here.
+
+# ---------------------------------------------------------------- Rust output
+# Build artifacts are reproducible from source and dwarf the source itself.
+**/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo.lock is deliberately NOT ignored. Both the test harness and the
+# examples commit theirs: an exact dependency set is what makes a supply-chain
+# review, an MSRV check and a reproducible build mean anything.
+
+# --------------------------------------------------------------- Local tools
+# Pinned, checksum-verified binaries installed by `just setup`. They belong to
+# a machine, not to history.
+.tools/
+
+# ------------------------------------------------------------ Run evidence
+# Produced by the local gate and by CI. Published as workflow artifacts, never
+# committed, so a stale report can never be mistaken for a current one.
+**/*.cdx.json
+**/*.sarif
+coverage.lcov
+lcov.info
+audit.json
+clippy.json
+secrets.json
+licenses.txt
+msrv.tsv
+hardening.txt
+scorecard.json
+scorecard.md
+scorecard.svg
+mutants.out/
+mutants.out.old/
+reports/
+
+# ---------------------------------------------------------------- Credentials
+# Never committed, and listed explicitly so an accidental `git add -A` cannot
+# sweep one in. Secret scanning is the backstop, not the first line.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.toml
+.netrc
+.npmrc
+.cargo/credentials
+.cargo/credentials.toml
+
+# ------------------------------------------------------- Other runtimes
+# This repository is Rust, Just and Bash. These directories still appear when a
+# contributor or an agent runs an ad-hoc helper, and none of them should ever be
+# committed here.
+node_modules/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+vendor/
+.bundle/
+
+# ---------------------------------------------------------- Operating systems
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+# WSL writes this alternate data stream beside any file copied from Windows.
+*:Zone.Identifier
+# Linux
+.directory
+.Trash-*
+.fuse_hidden*
+.nfs*
+
+# ----------------------------------------------------------------- Editors
+# Shared settings may be committed deliberately by un-ignoring a specific file;
+# per-user state never is.
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.\#*
+\#*\#
+.session
+Session.vim
+.vim/
+.helix/
+.zed/
+*.sublime-workspace
+*.sublime-project
+.history/
+
+# ------------------------------------------------------------------- Archives
+# Release payloads are built by CI and attached to a run, not stored in Git.
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+SHA256SUMS

@@ -1,0 +1,20 @@
+# The workflow security audit `just check` and the commit hook run: zizmor, in
+# its pedantic persona, offline, over every workflow, the gate action and the
+# Dependabot configuration. Every finding blocks. The one audit ignored below is
+# the one this repository cannot satisfy yet, with its reason; drop the entry
+# the day the blocking tool moves.
+rules:
+  unpinned-uses:
+    # Every action pinned to a commit, GitHub's own included: the bar the
+    # contract tests held before zizmor did.
+    config:
+      policies:
+        "*": hash-pin
+  self-repository:
+    # GitHub's `$/` self-repository form for in-repository workflows and actions.
+    # actionlint 1.7.7 rejects it as a reference without a ref, so the
+    # workspace-relative `./` form stays until actionlint learns the syntax.
+    ignore:
+      - ci-internal.yml
+      - publish-binaries.yml
+      - publish-crate.yml

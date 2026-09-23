@@ -1,0 +1,180 @@
+name: Repository quality
+
+"on":
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Required repository quality
+    # Forks run too: CI takes no secret and a read-only token, and the
+    # organization holds external contributors' runs for approval.
+    if: ${{ github.event_name != 'pull_request_target' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout workflow source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+          # The pin contract inspects the earlier commit that ships the gate.
+          fetch-depth: 0
+      - name: Install verified mise and the pinned toolbelt
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The same one-command provisioning a contributor runs on a fresh clone.
+          ./scripts/bootstrap.sh
+          echo "$PWD/.tools/bin" >> "$GITHUB_PATH"
+      - name: Full local gate with live advisory lookup
+        id: checks
+        shell: bash
+        env:
+          CHECK_NETWORK: "1"
+        run: |
+          set -euo pipefail
+          just check
+      - name: Record CI evidence
+        id: evidence
+        if: ${{ always() }}
+        shell: bash
+        env:
+          CHECK_RESULTS: ${{ steps.checks.outcome }}
+          EVIDENCE_SCOPE: Repository quality including live advisory lookup
+        run: |
+          set -euo pipefail
+          [[ "$CHECK_RESULTS" =~ ^success(\ success)*$ ]] || { echo 'Required checks did not all succeed' >&2; exit 1; }
+          : "${GITHUB_SHA:?}" "${GITHUB_RUN_ID:?}" "${GITHUB_RUN_ATTEMPT:?}" "${GITHUB_SERVER_URL:?}" "${GITHUB_REPOSITORY:?}" "${GITHUB_STEP_SUMMARY:?}" "${EVIDENCE_SCOPE:?}"
+          mkdir -p "${RUNNER_TEMP:?}/ci-evidence"
+          printf '# CI evidence\n\n- Scope: %s\n- Revision: %s\n- Run: %s/%s/actions/runs/%s/attempts/%s\n- Required check outcomes: %s\n\nSuccess covers this scope only. Verify the completed GitHub run conclusion.\n' \
+            "$EVIDENCE_SCOPE" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$CHECK_RESULTS" > "$RUNNER_TEMP/ci-evidence/result.md"
+          tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/ci-evidence/result.md"
+      - name: Upload CI evidence
+        id: upload-evidence
+        if: ${{ success() && steps.evidence.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: repository-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-evidence/result.md
+          if-no-files-found: error
+          retention-days: 7
+  consumers:
+    name: Consumer CI
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        example:
+          - binary
+          - library
+          - workspace
+        rust-version:
+          - '1.85.0'
+          - '1.95.0'
+          - '1.96.1'
+          - '1.97.1'
+          - '1.98.1'
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+    with:
+      working-directory: examples/${{ matrix.example }}
+      artifact-key: matrix-ci
+      coverage-threshold: 90
+      rust-version: ${{ matrix.rust-version }}
+  binary-dry-run:
+    name: Binary publisher dry run
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - binary
+          - workspace
+    uses: ./.github/workflows/publish-binaries.yml
+    permissions:
+      # Static ceiling for the skipped live job; executed dry-run jobs stay read-only.
+      contents: write  # static ceiling for the skipped live release upload
+      actions: read  # inspect release environment reviewers and tag policies
+    with:
+      working-directory: examples/${{ matrix.example }}
+      artifact-key: matrix-binaries
+      dry-run: true
+  crate-dry-run:
+    name: Crate publisher dry run
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - example: library
+            package: bounded-arithmetic
+          - example: workspace
+            package: workspace-arithmetic
+    uses: ./.github/workflows/publish-crate.yml
+    permissions:
+      contents: read
+      actions: read  # inspect release environment reviewers and tag policies
+    with:
+      working-directory: examples/${{ matrix.example }}
+      package: ${{ matrix.package }}
+      artifact-key: matrix-crate
+      dry-run: true
+  required:
+    name: Required consumer tests
+    needs:
+      - consumers
+      - binary-dry-run
+      - crate-dry-run
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require all matrix cases
+        id: required
+        shell: bash
+        env:
+          CI_RESULT: ${{ needs.consumers.result }}
+          BINARY_RESULT: ${{ needs.binary-dry-run.result }}
+          CRATE_RESULT: ${{ needs.crate-dry-run.result }}
+        run: |
+          set -euo pipefail
+          for result in "$CI_RESULT" "$BINARY_RESULT" "$CRATE_RESULT"; do
+            [[ "$result" == success ]] || {
+              echo 'A required consumer workflow failed, was cancelled or was skipped' >&2; exit 1;
+            }
+          done
+      - name: Record CI evidence
+        id: evidence
+        if: ${{ always() }}
+        shell: bash
+        env:
+          CHECK_RESULTS: ${{ needs.consumers.result }} ${{ needs.binary-dry-run.result }} ${{ needs.crate-dry-run.result }}
+          EVIDENCE_SCOPE: All consumer matrix cases and binary/crate dry-run publishers
+        run: |
+          set -euo pipefail
+          [[ "$CHECK_RESULTS" =~ ^success(\ success)*$ ]] || { echo 'Required checks did not all succeed' >&2; exit 1; }
+          : "${GITHUB_SHA:?}" "${GITHUB_RUN_ID:?}" "${GITHUB_RUN_ATTEMPT:?}" "${GITHUB_SERVER_URL:?}" "${GITHUB_REPOSITORY:?}" "${GITHUB_STEP_SUMMARY:?}" "${EVIDENCE_SCOPE:?}"
+          mkdir -p "${RUNNER_TEMP:?}/ci-evidence"
+          printf '# CI evidence\n\n- Scope: %s\n- Revision: %s\n- Run: %s/%s/actions/runs/%s/attempts/%s\n- Required check outcomes: %s\n\nSuccess covers this scope only. Verify the completed GitHub run conclusion.\n' \
+            "$EVIDENCE_SCOPE" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$CHECK_RESULTS" > "$RUNNER_TEMP/ci-evidence/result.md"
+          tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/ci-evidence/result.md"
+      - name: Upload CI evidence
+        id: upload-evidence
+        if: ${{ success() && steps.evidence.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: consumer-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-evidence/result.md
+          if-no-files-found: error
+          retention-days: 7

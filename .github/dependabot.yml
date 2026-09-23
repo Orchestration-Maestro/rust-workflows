@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    # The organization merges only conventional titles: "ci(deps): bump ...".
+    commit-message:
+      prefix: ci
+      include: scope
+  - package-ecosystem: cargo
+    directories:
+      - /gate
+      - /examples/binary
+      - /examples/library
+      - /examples/workspace
+      - /tests
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    # "build(deps): bump ...", a conventional title the organization accepts.
+    commit-message:
+      prefix: build
+      include: scope

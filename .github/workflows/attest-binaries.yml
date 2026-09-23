@@ -1,0 +1,132 @@
+name: Attest Rust binaries
+# Separate from publish-binaries.yml on purpose. GitHub validates the scopes of
+# every job in a called workflow at startup, including jobs an `if:` would skip,
+# so a workflow that declares `attestations: write` imposes that grant on every
+# caller. Artifact attestations additionally require a private repository to be
+# owned by an enterprise, which is a platform capability this repository cannot
+# verify. Keeping the scope in its own file means only callers that opt in carry
+# the requirement, and publication stays available to everyone else.
+'on':
+  workflow_call:
+    inputs:
+      artifact-id:
+        description: Immutable release artifact ID produced by the CI workflow
+        type: string
+        required: true
+      revision:
+        description: Validated source commit that produced the artifact
+        type: string
+        required: true
+      on-unavailable:
+        description: >-
+          `skip` tolerates only GitHub Enterprise Server identified by a successful
+          metadata API response; `fail` blocks it. Unknown availability, missing
+          Cloud entitlement, signing, OIDC and API errors always block.
+        type: string
+        default: skip
+    outputs:
+      subject-digest:
+        description: SHA-256 digest of the verified payload; empty on a platform skip
+        value: ${{ jobs.attest.outputs.subject-digest }}
+      attested:
+        description: >-
+          `true` only when an attestation was recorded and independently
+          verified. Callers that require provenance must gate on this rather
+          than on the job's success.
+        value: ${{ jobs.attest.outputs.attested }}
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  attest:
+    name: Attest the verified payload
+    if: ${{ github.event_name != 'pull_request_target' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write  # Sigstore identity for the attestation
+      attestations: write  # records the attestation against the repository
+    outputs:
+      subject-digest: ${{ steps.verify.outputs.payload-digest }}
+      attested: ${{ steps.outcome.outputs.attested }}
+    steps:
+      - name: Build the gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@0000000000000000000000000000000000000000  # UNPUBLISHED: replace with the actual reviewed provider commit
+      - name: Validate consumer inputs
+        id: validate
+        env:
+          ON_UNAVAILABLE: ${{ inputs.on-unavailable }}
+          GH_TOKEN: ${{ github.token }}
+          GH_ENTERPRISE_TOKEN: ${{ github.token }}
+        run: rust-gate attest-binaries validate
+      - name: Install verified JSON tool
+        if: ${{ steps.validate.outputs.run == 'true' }}
+        # Verification below reads JSON with jaq. Taking it from the runner
+        # image instead would leave this job depending on an unpinned tool to
+        # decide whether a release is safe to sign.
+        run: rust-gate install-tools
+        env:
+          TOOLS: jaq 01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu 5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454
+      - name: Download exact CI artifact
+        if: ${{ steps.validate.outputs.run == 'true' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          artifact-ids: ${{ inputs.artifact-id }}
+          path: rust-release
+          merge-multiple: true
+      - name: Verify payload before attesting
+        id: verify
+        if: ${{ steps.validate.outputs.run == 'true' }}
+        # Verified here rather than trusted from an earlier job, so the
+        # attestation can only ever describe bytes whose checksum and source
+        # revision were confirmed inside this job.
+        run: rust-gate verify-payload
+        env:
+          REVISION: ${{ inputs.revision }}
+          REQUIRE_BINARIES: 'false'
+      - name: Extract the verified bill of materials
+        id: payload-sbom
+        if: ${{ steps.validate.outputs.run == 'true' }}
+        run: rust-gate attest-binaries payload-sbom
+      - name: Attest build provenance
+        id: attest
+        if: ${{ steps.validate.outputs.run == 'true' }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: rust-release/payload.tar.gz
+      - name: Attest the payload bill of materials
+        id: sbom
+        if: ${{ steps.validate.outputs.run == 'true' && steps.attest.outcome == 'success' }}
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e  # v4.1.0
+        with:
+          subject-path: rust-release/payload.tar.gz
+          sbom-path: ${{ runner.temp }}/payload.cdx.json
+      - name: Verify the recorded attestation
+        id: verify-recorded
+        if: ${{ steps.validate.outputs.run == 'true' && steps.attest.outcome == 'success' && steps.sbom.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_ENTERPRISE_TOKEN: ${{ github.token }}
+          EXPECTED_DIGEST: ${{ steps.verify.outputs.payload-digest }}
+        run: rust-gate attest-binaries verify-recorded
+      - name: Record the attestation outcome
+        id: outcome
+        if: ${{ always() }}
+        env:
+          RUN: ${{ steps.validate.outputs.run }}
+          ATTEST: ${{ steps.attest.outcome }}
+          SBOM: ${{ steps.sbom.outcome }}
+          VERIFY: ${{ steps.verify-recorded.outcome }}
+          DIGEST: ${{ steps.verify.outputs.payload-digest }}
+        run: rust-gate attest-binaries outcome
+      - name: Upload verified attestation
+        if: ${{ steps.outcome.outputs.attested == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: rust-attestation-${{ inputs.revision }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/attestation.json
+          if-no-files-found: error
+          retention-days: 7

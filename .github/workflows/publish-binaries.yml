@@ -1,0 +1,177 @@
+name: Publish Rust binaries
+'on':
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Relative Cargo package or workspace directory
+        type: string
+        default: .
+      dry-run:
+        description: Validate and stage only; no publishing credentials or remote writes
+        type: boolean
+        default: true
+      artifact-key:
+        description: Unique invocation key; do not reuse for the same directory in one run
+        type: string
+        default: publish-binaries
+      coverage-threshold:
+        description: Forwarded to ci.yml; see docs/ci.md
+        type: number
+        default: 80
+      license-policy:
+        description: Forwarded to ci.yml; see docs/ci.md
+        type: string
+        default: auto
+      mutation-test:
+        description: Forwarded to ci.yml; see docs/ci.md
+        type: boolean
+        default: true
+      sarif-reports:
+        description: Forwarded to ci.yml; see docs/ci.md
+        type: boolean
+        default: false
+      clippy-level:
+        description: Forwarded to ci.yml; see docs/ci.md
+        type: string
+        default: default
+      dependency-audit:
+        description: Forwarded to ci.yml; see docs/ci.md
+        type: boolean
+        default: false
+      unsafe-policy:
+        description: Forwarded to ci.yml; see docs/ci.md
+        type: string
+        default: deny
+      unused-dependencies:
+        description: Forwarded to ci.yml; see docs/ci.md
+        type: boolean
+        default: true
+    outputs:
+      artifact-id:
+        description: Immutable validated release artifact ID
+        value: ${{ jobs.ci.outputs.artifact-id }}
+      artifact-name:
+        description: Exact validated release artifact name
+        value: ${{ jobs.ci.outputs.artifact-name }}
+      revision:
+        description: Validated source commit
+        value: ${{ jobs.ci.outputs.revision }}
+permissions:
+  contents: read
+concurrency:
+  # One publication per ref at a time and never cancelled: a release must not
+  # be killed halfway by the next push, it waits its turn.
+  group: rust-publish-${{ github.workflow }}-${{ github.ref }}-${{ inputs.working-directory }}-${{ inputs.artifact-key }}
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+jobs:
+  preflight:
+    name: Validate the publication boundary
+    if: ${{ github.event_name != 'pull_request_target' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read  # inspect release environment reviewers and tag policies
+    steps:
+      - name: Build the gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@0000000000000000000000000000000000000000  # UNPUBLISHED: replace with the actual reviewed provider commit
+      - name: Install verified JSON tool
+        run: rust-gate install-tools
+        env:
+          TOOLS: jaq 01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu 5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454
+      - name: Validate publication boundary
+        id: authorize
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          PROTECTED: ${{ github.ref_protected }}
+          GH_TOKEN: ${{ github.token }}
+        run: rust-gate publish-binaries authorize
+  ci:
+    name: Rust CI for the release
+    needs:
+      - preflight
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+    with:
+      working-directory: ${{ inputs.working-directory }}
+      artifact-key: ${{ inputs.artifact-key }}
+      coverage-threshold: ${{ inputs.coverage-threshold }}
+      license-policy: ${{ inputs.license-policy }}
+      mutation-test: ${{ inputs.mutation-test }}
+      sarif-reports: ${{ inputs.sarif-reports }}
+      clippy-level: ${{ inputs.clippy-level }}
+      dependency-audit: ${{ inputs.dependency-audit }}
+      unsafe-policy: ${{ inputs.unsafe-policy }}
+      unused-dependencies: ${{ inputs.unused-dependencies }}
+  stage:
+    name: Stage the release payload
+    needs:
+      - preflight
+      - ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Build the gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@0000000000000000000000000000000000000000  # UNPUBLISHED: replace with the actual reviewed provider commit
+      - name: Install verified JSON tool
+        run: rust-gate install-tools
+        env:
+          TOOLS: jaq 01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu 5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454
+      - name: Download exact CI artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          artifact-ids: ${{ needs.ci.outputs.artifact-id }}
+          path: rust-release
+          merge-multiple: true
+      - name: Verify checksums and source identity
+        run: rust-gate verify-payload
+        env:
+          REVISION: ${{ needs.ci.outputs.revision }}
+          REQUIRE_BINARIES: 'true'
+  publish:
+    name: Publish the binaries
+    needs:
+      - ci
+      - stage
+    if: ${{ !inputs.dry-run }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write  # upload assets to the existing GitHub Release
+      actions: read  # inspect release environment reviewers and tag policies
+    steps:
+      - name: Build the gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@0000000000000000000000000000000000000000  # UNPUBLISHED: replace with the actual reviewed provider commit
+      - name: Install verified JSON tool
+        run: rust-gate install-tools
+        env:
+          TOOLS: jaq 01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu 5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454
+      - name: Download exact CI artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          artifact-ids: ${{ needs.ci.outputs.artifact-id }}
+          path: rust-release
+          merge-multiple: true
+      - name: Verify checksums and source identity
+        run: rust-gate verify-payload
+        env:
+          REVISION: ${{ needs.ci.outputs.revision }}
+          REQUIRE_BINARIES: 'true'
+      - name: Upload verified binaries to the existing release
+        id: publish
+        run: rust-gate publish-binaries publish
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          PROTECTED: ${{ github.ref_protected }}
+          REVISION: ${{ needs.ci.outputs.revision }}
+          GH_TOKEN: ${{ github.token }}

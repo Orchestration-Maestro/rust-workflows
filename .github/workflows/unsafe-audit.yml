@@ -1,0 +1,89 @@
+name: Rust unsafe audit
+# Deliberately separate from ci.yml. Miri is the only way to detect undefined
+# behaviour inside `unsafe`, and it exists only on nightly, which sits outside
+# the exact stable versions ci.yml accepts. Keeping it in its own
+# callable workflow means the supported-version policy stays intact and only a
+# consumer that actually writes `unsafe` pays the cost of running this.
+#
+# Call it on a schedule or before a release rather than on every pull request:
+# Miri interprets the program instead of executing it, so it is orders of
+# magnitude slower than a native test run.
+'on':
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Relative Cargo package or workspace directory
+        type: string
+        default: .
+      toolchain:
+        description: >-
+          Nightly toolchain to interpret with. A dated nightly keeps the run
+          reproducible; plain `nightly` follows whatever is current today.
+        type: string
+        default: nightly-2026-09-14
+      test-filter:
+        description: >-
+          Optional `cargo test` filter. Miri is slow, so narrowing it to the
+          tests that actually exercise `unsafe` is usually the right scope.
+        type: string
+        default: ''
+      strict-provenance:
+        description: >-
+          Also reject pointer-provenance mistakes that compile and run correctly
+          today but are not guaranteed to keep working.
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: rust-unsafe-audit-${{ github.workflow }}-${{ github.ref }}-${{ inputs.working-directory }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+defaults:
+  run:
+    shell: bash
+jobs:
+  miri:
+    name: Miri undefined-behaviour audit
+    if: ${{ github.event_name != 'pull_request_target' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-24.04
+    # Generous because Miri interprets rather than executes; a workspace with a
+    # large test surface should narrow the run with test-filter instead of
+    # raising this further.
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Build the gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@0000000000000000000000000000000000000000  # UNPUBLISHED: replace with the actual reviewed provider commit
+      - name: Checkout consumer revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate consumer inputs
+        id: validate
+        env:
+          DIRECTORY: ${{ inputs.working-directory }}
+          TOOLCHAIN: ${{ inputs.toolchain }}
+          TEST_FILTER: ${{ inputs.test-filter }}
+          STRICT_PROVENANCE: ${{ inputs.strict-provenance }}
+        run: rust-gate unsafe-audit validate
+      - name: Install nightly toolchain and Miri
+        run: rust-gate unsafe-audit toolchain
+      - name: Interpret tests under Miri
+        id: miri
+        env:
+          TEST_FILTER: ${{ inputs.test-filter }}
+          STRICT_PROVENANCE: ${{ inputs.strict-provenance }}
+        run: rust-gate unsafe-audit miri
+      - name: Confirm the audit reached the unsafe code
+        id: reach
+        run: rust-gate unsafe-audit reach
+      - name: Upload audit reports
+        if: ${{ always() && steps.validate.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: rust-unsafe-audit-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/miri-reports/
+          if-no-files-found: error
+          retention-days: 7

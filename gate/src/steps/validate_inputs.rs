@@ -1,0 +1,167 @@
+//! `rust-gate validate`: every `ci.yml` input checked before any side effect,
+//! then the resolved project, toolchain and gate selectors exported to the
+//! rest of the job.
+
+use crate::checks::checkout_paths::{canonical, committed_file, inside, project_directory};
+use crate::checks::inputs::{
+    LicensePolicy, artifact_key, clippy_level, coverage_threshold, license_policy, unsafe_policy,
+};
+use crate::checks::rust_versions::{channel_value, is_exact_stable, parse};
+use crate::runner::{Cmd, Failure, Outcome, Step, export, flag, input, optional, output};
+use std::path::Path;
+
+/// What this step declares: its inputs, its tools and its reports.
+pub(crate) const STEPS: &[Step] = &[Step {
+    workflow: "ci",
+    id: "validate",
+    summary: "Validate consumer inputs",
+    inputs: &[
+        "ARTIFACT_KEY",
+        "CLIPPY_LEVEL",
+        "COVERAGE",
+        "DEPENDENCY_AUDIT",
+        "DIRECTORY",
+        "GITHUB_RUN_ATTEMPT",
+        "GITHUB_RUN_ID",
+        "GITHUB_SHA",
+        "GITHUB_WORKSPACE",
+        "LICENSE_POLICY",
+        "MUTATION_TEST",
+        "REQUESTED_TOOLCHAIN",
+        "SARIF_REPORTS",
+        "UNSAFE_POLICY",
+        "UNUSED_DEPENDENCIES",
+    ],
+    tools: &["sha256sum"],
+    reports: &[],
+    run,
+}];
+
+/// The floor: any exact stable release from here up is accepted.
+const MSRV: (u64, u64, u64) = (1, 85, 0);
+
+/// Run the step: the checks in the order a consumer sees them fail, then
+/// the resolved values exported to the rest of the job.
+fn run() -> Outcome {
+    let root = canonical(Path::new(&input("GITHUB_WORKSPACE")?))?;
+    let project = project_directory()?;
+    for name in ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"] {
+        committed_file(&project, name)?;
+    }
+    let toolchain = selected_toolchain(&project)?;
+    coverage_threshold()?;
+    let artifact_key = artifact_key()?;
+    let license_policy = license_policy()?;
+    let unsafe_policy = unsafe_policy()?;
+    let clippy_level = clippy_level()?;
+    let unused_dependencies = flag("UNUSED_DEPENDENCIES")?.to_string();
+    let mutation_test = flag("MUTATION_TEST")?.to_string();
+    let sarif_reports = flag("SARIF_REPORTS")?.to_string();
+    let dependency_audit = flag("DEPENDENCY_AUDIT")?.to_string();
+    let deny_config = deny_configuration(&project, &root, license_policy)?;
+    output(
+        "artifact-name",
+        &artifact_name(&project, &root, &artifact_key, &toolchain)?,
+    )?;
+    let temp = input("RUNNER_TEMP")?;
+    export(&[
+        ("PROJECT", &project.display().to_string()),
+        ("RUSTUP_TOOLCHAIN", &toolchain),
+        ("REPORTS", &format!("{temp}/rust-reports")),
+        ("CARGO_TARGET_DIR", &format!("{temp}/rust-target")),
+        ("CARGO_BUILD_TARGET", "x86_64-unknown-linux-gnu"),
+        ("LICENSE_POLICY", license_policy.as_str()),
+        ("DENY_CONFIG", &deny_config),
+        ("MUTATION_TEST", &mutation_test),
+        ("SARIF_REPORTS", &sarif_reports),
+        ("UNSAFE_POLICY", unsafe_policy.as_str()),
+        ("DEPENDENCY_AUDIT", &dependency_audit),
+        ("CLIPPY_LEVEL", clippy_level.as_str()),
+        ("UNUSED_DEPENDENCIES", &unused_dependencies),
+    ])
+}
+
+/// The compiler this run uses: the exact stable version the project pins,
+/// or the one the caller requested, either way at or above the MSRV.
+fn selected_toolchain(project: &Path) -> Result<String, Failure> {
+    // One quoted key is all this reads, and the pin check below refuses
+    // anything the read got wrong, so no TOML parser is involved.
+    let toolchain_file = std::fs::read_to_string(project.join("rust-toolchain.toml"))
+        .map_err(|error| format!("rust-toolchain.toml: {error}"))?;
+    let pinned = toolchain_file
+        .lines()
+        .find_map(channel_value)
+        .unwrap_or_default();
+    if !is_exact_stable(&pinned) {
+        return Err("rust-toolchain.toml must pin an exact stable version".into());
+    }
+    // Any exact stable release from the MSRV up is accepted: the project
+    // declares its compiler. The five pins the consumer matrix runs are what is
+    // proven, not a gate a newer patch has to wait behind.
+    let requested = optional("REQUESTED_TOOLCHAIN")?;
+    let toolchain = if requested.is_empty() {
+        pinned
+    } else {
+        requested
+    };
+    if !is_exact_stable(&toolchain) {
+        return Err("rust-version must be an exact stable version, such as 1.98.1".into());
+    }
+    if parse(&toolchain, false) < Some(MSRV) {
+        return Err("rust-version must be at least the 1.85.0 MSRV".into());
+    }
+    Ok(toolchain)
+}
+
+/// The consumer's `deny.toml` as a path when one is committed inside the
+/// checkout and empty otherwise; `enforce` requires one.
+fn deny_configuration(
+    project: &Path,
+    root: &Path,
+    policy: LicensePolicy,
+) -> Result<String, Failure> {
+    let mut deny_config = project.join("deny.toml");
+    if deny_config.exists() {
+        deny_config = canonical(&deny_config)?;
+    }
+    if !inside(&deny_config, root) {
+        return Err("deny.toml escapes checkout".into());
+    }
+    if deny_config.is_file() {
+        return Ok(deny_config.display().to_string());
+    }
+    if policy == LicensePolicy::Enforce {
+        return Err("license-policy=enforce requires a committed deny.toml".into());
+    }
+    Ok(String::new())
+}
+
+/// The artifact name: the working directory, key and toolchain hashed into
+/// one identity, then the revision, run and attempt, so two matrix cases can
+/// never share a name.
+fn artifact_name(
+    project: &Path,
+    root: &Path,
+    artifact_key: &str,
+    toolchain: &str,
+) -> Result<String, Failure> {
+    let relative = match project.strip_prefix(root) {
+        Ok(rest) if rest.as_os_str().is_empty() => ".".to_owned(),
+        Ok(rest) => rest.display().to_string(),
+        Err(_) => return Err("working-directory escapes checkout".into()),
+    };
+    let identity = Cmd::new("sha256sum")
+        .stdin_bytes(format!("{relative}:{artifact_key}:{toolchain}").as_bytes())
+        .capture()?;
+    let digest = identity
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .to_owned();
+    Ok(format!(
+        "rust-{}-x86_64-unknown-linux-gnu-{digest}-{}-{}",
+        input("GITHUB_SHA")?,
+        input("GITHUB_RUN_ID")?,
+        input("GITHUB_RUN_ATTEMPT")?
+    ))
+}

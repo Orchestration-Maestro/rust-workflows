@@ -1,0 +1,10 @@
+[package]
+name = "bounded-sum"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Rust workflow consumer example with one crates.io dependency"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
