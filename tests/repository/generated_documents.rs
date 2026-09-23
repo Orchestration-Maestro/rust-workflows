@@ -4,6 +4,7 @@
 
 use crate::harness::{root, succeeds, temp_dir, tool};
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Output;
 
@@ -123,4 +124,125 @@ fn a_pinned_tool_without_its_description_is_refused() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+#[test]
+fn a_commit_or_a_pull_request_regenerates_the_documents() {
+    // Nobody keeps a table in step by hand: the commit hook runs just docs,
+    // and on a pull request from this repository the bot commits whatever it
+    // rewrote, through the recipe that makes GitHub sign the commit.
+    let hooks = crate::harness::query(
+        &root().join(".pre-commit-config.yaml"),
+        r#".repos[].hooks[] | select(.id == "generated-documents") | .entry"#,
+    );
+    assert_eq!(hooks.trim(), "just docs");
+    let sync = crate::harness::workflow("docs-sync");
+    assert!(sync["on"].get("pull_request").is_some());
+    let job = &sync["jobs"]["sync"];
+    assert!(
+        job["if"]
+            .as_str()
+            .unwrap()
+            .contains("github.event.pull_request.head.repo.full_name == github.repository")
+    );
+    let steps = job["steps"].as_array().unwrap();
+    let runs: Vec<&str> = steps
+        .iter()
+        .filter_map(|step| step["run"].as_str())
+        .collect();
+    assert!(runs.iter().any(|run| run.contains("just docs")));
+    let commit = steps
+        .iter()
+        .find(|step| {
+            step["run"]
+                .as_str()
+                .is_some_and(|run| run.contains("just _commit-as-bot"))
+        })
+        .unwrap();
+    assert_eq!(
+        commit["env"]["BRANCH"],
+        "${{ github.event.pull_request.head.ref }}"
+    );
+    assert_eq!(
+        commit["env"]["HEAD"],
+        "${{ github.event.pull_request.head.sha }}"
+    );
+}
+
+#[test]
+fn the_bot_commits_exactly_the_changed_files_through_the_api() {
+    // A git checkout with one changed file, and a gh that keeps the request.
+    let dir = temp_dir("commit-as-bot");
+    fs::copy(root().join("justfile"), dir.join("justfile")).unwrap();
+    let git = |args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .args([
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "commit.gpgsign=false",
+            ])
+            .args(args)
+            .current_dir(&dir)
+            .output()
+            .unwrap();
+        succeeds(&output);
+    };
+    git(&["init", "-q"]);
+    fs::write(dir.join("notes.md"), "before\n").unwrap();
+    git(&["add", "notes.md", "justfile"]);
+    git(&["commit", "-qm", "base"]);
+    fs::write(dir.join("notes.md"), "after\n").unwrap();
+    fs::write(dir.join("body"), "Why the bot commits.\n").unwrap();
+    let bin = dir.join(".tools/bin");
+    fs::create_dir_all(&bin).unwrap();
+    let gh = bin.join("gh");
+    fs::write(
+        &gh,
+        "#!/bin/bash\nset -euo pipefail\n\
+         while [[ $# -gt 0 ]]; do [[ $1 == --input ]] && cp \"$2\" request.json; shift; done\n\
+         echo 0123abc\n",
+    )
+    .unwrap();
+    fs::set_permissions(&gh, fs::Permissions::from_mode(0o755)).unwrap();
+    let output = tool("just")
+        .arg("--justfile")
+        .arg(dir.join("justfile"))
+        .arg("--working-directory")
+        .arg(&dir)
+        .arg("_commit-as-bot")
+        .envs([
+            ("GH_TOKEN", "token"),
+            ("GITHUB_REPOSITORY", "owner/repo"),
+            ("BRANCH", "feature"),
+            ("HEAD", "abc123"),
+            ("TITLE", "docs: regenerate the generated tables"),
+            ("BODY", "body"),
+        ])
+        .output()
+        .unwrap();
+    succeeds(&output);
+    let request: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(dir.join("request.json")).unwrap()).unwrap();
+    let input = &request["variables"]["input"];
+    assert!(
+        request["query"]
+            .as_str()
+            .unwrap()
+            .contains("createCommitOnBranch")
+    );
+    assert_eq!(input["branch"]["branchName"], "feature");
+    assert_eq!(input["branch"]["repositoryNameWithOwner"], "owner/repo");
+    assert_eq!(input["expectedHeadOid"], "abc123");
+    assert_eq!(
+        input["message"]["headline"],
+        "docs: regenerate the generated tables"
+    );
+    assert_eq!(input["message"]["body"], "Why the bot commits.\n");
+    let additions = input["fileChanges"]["additions"].as_array().unwrap();
+    assert_eq!(additions.len(), 1, "{additions:?}");
+    assert_eq!(additions[0]["path"], "notes.md");
+    assert_eq!(additions[0]["contents"], "YWZ0ZXIK");
 }

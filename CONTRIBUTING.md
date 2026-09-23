@@ -143,7 +143,10 @@ refuses a stale copy. The same command writes every table between
 workflows' input and output descriptions, each reusable workflow's `# Contract:`
 line, the `# tool:` line above each pin in `mise.toml`, and
 [docs/gates.toml](docs/gates.toml); the diagram's control count comes from the
-scorecard. Edit the source, never the table. A contract test never reads the gate's source: it runs
+scorecard. Edit the source, never the table. The commit hook runs `just docs`
+and stops the commit when it rewrote anything, so the regenerated tables go into
+the next attempt; on a pull request from this repository, `docs-sync.yml` has
+the organization's bot commit whatever `just docs` rewrote. A contract test never reads the gate's source: it runs
 the step in a fixture and reads what it wrote, what it declares and the trace
 of every command it ran.
 

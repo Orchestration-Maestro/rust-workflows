@@ -187,6 +187,35 @@ docs:
       > docs/steps.md
     just _tables
 
+# Commit every changed file of the checkout onto $BRANCH as the organization's
+# bot: through createCommitOnBranch, which GitHub signs, where a commit made on
+# the runner would be unsigned and the organization refuses it. The new commit's
+# parent is $HEAD, which must still be the branch's head. Reads GH_TOKEN,
+# GITHUB_REPOSITORY, BRANCH, HEAD, TITLE and BODY, a file.
+_commit-as-bot:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    : "${GH_TOKEN:?}" "${GITHUB_REPOSITORY:?}" "${BRANCH:?}" "${HEAD:?}" "${TITLE:?}" "${BODY:?}"
+    files="$(mktemp)"
+    while IFS= read -r path; do
+      jaq -n --arg path "$path" --arg contents "$(base64 -w0 "$path")" \
+        "{path: \$path, contents: \$contents}" >> "$files"
+    done < <(git diff --name-only)
+    if [[ ! -s "$files" ]]; then
+      echo "Nothing changed; nothing to commit."
+      exit 0
+    fi
+    mutation="mutation(\$input: CreateCommitOnBranchInput!) {"
+    mutation+=" createCommitOnBranch(input: \$input) { commit { oid } } }"
+    input="{branch: {repositoryNameWithOwner: \$repo, branchName: \$branch},"
+    input+=" expectedHeadOid: \$head, message: {headline: \$title, body: \$body},"
+    input+=" fileChanges: {additions: \$files}}"
+    jaq -n --arg query "$mutation" --arg repo "$GITHUB_REPOSITORY" --arg branch "$BRANCH" \
+      --arg head "$HEAD" --arg title "$TITLE" --rawfile body "$BODY" \
+      --slurpfile files "$files" "{query: \$query, variables: {input: ${input}}}" \
+      > "$files.json"
+    gh api graphql --input "$files.json" --jq '.data.createCommitOnBranch.commit.oid'
+
 # Rewrite each table between generated markers in README.md and docs/ from its
 # source: workflow inputs and outputs, `# Contract:` lines, mise.toml's `# tool:`
 # lines and docs/gates.toml. A test runs it on a copy and refuses a stale table.

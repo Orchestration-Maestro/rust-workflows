@@ -48,6 +48,12 @@ repos:
         language: system
         entry: zizmor --offline --persona=pedantic --no-progress --config .github/zizmor.yml
         files: '^(\.github/(workflows/.*|dependabot|actions/.*/action)\.ya?ml|action\.ya?ml)$'
+      - id: generated-documents
+        name: Generated tables match their sources
+        language: system
+        entry: just docs
+        files: '^(\.github/(workflows/.*\.ya?ml|assets/how-it-works\.svg)|mise\.toml|justfile|README\.md|docs/.*|gate/src/.*\.rs)$'
+        pass_filenames: false
       - id: conventional-commit-header
         name: Commit message opens with a conventional header
         language: pygrep

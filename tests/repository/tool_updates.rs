@@ -259,17 +259,8 @@ fn a_weekly_run_opens_one_pull_request_on_the_bot_token() {
     // The organization merges only signed commits, and a commit the runner
     // pushes is unsigned: GitHub creates, and signs, the one it records.
     assert!(!bodies.contains("git push") && !bodies.contains("git commit"));
-    assert!(bodies.contains("gh api graphql --input"));
-    let open = steps
-        .iter()
-        .find(|step| step["name"] == "Open or refresh the pull request")
-        .unwrap();
-    assert!(
-        open["env"]["COMMIT"]
-            .as_str()
-            .unwrap()
-            .contains("createCommitOnBranch")
-    );
+    assert!(bodies.contains("just _commit-as-bot"));
+
     let token = steps
         .iter()
         .find(|step| {

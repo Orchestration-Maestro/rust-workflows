@@ -1,0 +1,70 @@
+name: Generated documents
+# On a pull request from this repository, just docs rewrites every generated
+# table and the organization's bot commits the result to the pull request's
+# branch, so nobody keeps a table in step by hand. The bot's commit is signed,
+# its own run finds nothing left to regenerate, and the required checks run
+# on it.
+"on":
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: generated-documents-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  sync:
+    name: Regenerate the generated documents
+    # The bot cannot push to a fork, and a Dependabot run holds no Actions
+    # variable; neither changes a generated table.
+    if: >-
+      ${{ github.event.pull_request.head.repo.full_name == github.repository
+      && github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      # The branch's own head, not the merge commit: the bot commits on top
+      # of it.
+      - name: Check out the pull request's branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Install the pinned toolbelt
+        run: |
+          set -euo pipefail
+          scripts/bootstrap.sh
+      - name: Regenerate
+        id: regenerate
+        run: |
+          set -euo pipefail
+          export PATH="$PWD/.tools/bin:$PATH"
+          just docs
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git diff --stat
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Mint the bot token
+        id: token
+        if: ${{ steps.regenerate.outputs.changed == 'true' }}
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - name: Commit the regenerated documents
+        if: ${{ steps.regenerate.outputs.changed == 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          TITLE: "docs: regenerate the generated tables"
+        run: |
+          set -euo pipefail
+          export PATH="$PWD/.tools/bin:$PATH"
+          body="$RUNNER_TEMP/body"
+          printf '%s\n' 'just docs rewrote them from their sources.' > "$body"
+          BODY="$body" just _commit-as-bot

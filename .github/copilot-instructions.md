@@ -45,6 +45,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── ci-internal.yml                     # Repository quality, the consumer matrix and both dry-run publishers on every pull request
 │   │   ├── ci.yml                              # The reusable Rust CI a consumer calls
 │   │   ├── dependabot-auto-merge.yml           # Queues Dependabot patch and minor updates to merge on the organization's bot token
+│   │   ├── docs-sync.yml                       # On a pull request from this repository, the bot commits the tables just docs regenerated
 │   │   ├── fuzz.yml                            # Bounded fuzz regression on a nightly toolchain
 │   │   ├── publish-binaries.yml                # Protected binary release, dry-run by default
 │   │   ├── publish-crate.yml                   # Protected crate publication explicitly to public crates.io
