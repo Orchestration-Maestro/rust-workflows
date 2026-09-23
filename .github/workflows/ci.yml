@@ -128,7 +128,7 @@ jobs:
           # push or tag.
           fetch-depth: 2
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@a064dae4efbc2826baf0fb5513cd07eaf1361911  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@6290dc03b70dc67ba024eeef1c23b37e9d927182  # rust-workflows: the commit that ships this gate
       - name: Validate consumer inputs
         id: validate
         env:
@@ -333,8 +333,11 @@ jobs:
       contents: read
     env:
       RUSTUP_TOOLCHAIN: ${{ needs.checks.outputs.toolchain }}
+    # These run defaults replace the workflow's, so Bash is named again: on
+    # Windows the default shell is PowerShell.
     defaults:
       run:
+        shell: bash
         working-directory: ${{ inputs.working-directory }}
     steps:
       - name: Checkout consumer revision
@@ -361,7 +364,7 @@ jobs:
       revision: ${{ needs.checks.outputs.revision }}
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@a064dae4efbc2826baf0fb5513cd07eaf1361911  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@6290dc03b70dc67ba024eeef1c23b37e9d927182  # rust-workflows: the commit that ships this gate
       - name: Require every check
         id: required
         env:
