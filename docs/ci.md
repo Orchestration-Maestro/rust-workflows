@@ -450,6 +450,9 @@ The `api` step compares a pull request's libraries with its base branch through
 cargo-semver-checks, as a minor release: adding API passes, and removing an
 item or changing it incompatibly fails. The comparison builds the base parent
 the checkout already fetched, so it needs no registry and no published crate.
+Only libraries whose manifest the base branch already has are compared; a
+library the pull request adds is named in the report, and when every library is
+new the step is not applicable.
 
 A breaking change is declared the way release-please reads it, with `!` after
 the type in the pull request title, `feat!:` or `fix(api)!:`; release-please
