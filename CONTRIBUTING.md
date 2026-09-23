@@ -150,20 +150,16 @@ workflows call it as `Orchestration-Maestro/rust-workflows/.github/actions/gate@
 and every call site pins the same commit of this repository; a test refuses
 two different pins, and a pinned commit that does not contain the action file.
 
-Until a source commit exists, every call site carries the explicit unpublished
-placeholder `0000000000000000000000000000000000000000`. A hosted run cannot
-resolve it. Prepare the first deployment locally before pushing:
+A gate change ships in two pull requests, because the default branch takes only
+squash merges and a pin must name a commit on it:
 
-1. With explicit Git authorization, create a source commit containing the gate
-   action and crate, then obtain its real SHA with `git rev-parse HEAD`.
-2. Replace all gate-action placeholders and their comments with that exact SHA.
-   Never invent a SHA or substitute a branch/tag.
-3. Run `just check` with all intended source files indexed. The pin test requires
-   the source commit to contain the action. Repository CI fetches history so this
-   check works after checkout too.
-4. Commit the pin update and push both commits only after authorization. Start
-   unprivileged CI and both dry-runs, not application publication. A later gate
-   change repeats this source-commit, repin, validate procedure.
+1. Merge the gate change. Its pins still name the previous gate commit, so its
+   own CI runs the previous gate.
+2. Open a second pull request that replaces every pin with the first one's
+   squash commit, then run `just check`: the pin test requires that commit to
+   contain the action. Never invent a SHA or substitute a branch or tag.
+
+Consumers pin the second merge: its `ci.yml` is the one that calls the new gate.
 
 ## Strict coding standard
 

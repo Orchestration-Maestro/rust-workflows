@@ -237,6 +237,48 @@ fn release_payload_carries_both_sbom_formats_and_auditable_binaries() {
 }
 
 #[test]
+fn packaging_uses_a_cargo_that_can_package_a_workspace() {
+    // Before Cargo 1.90, `cargo package --workspace` looked for a member's
+    // sibling on crates.io, so a workspace whose members depend on each other
+    // could not package on 1.85 to 1.89. The release build keeps the selected
+    // compiler; only the packaging runs on Cargo 1.90.
+    for (selected, packager) in [
+        ("1.85.0", Some("1.90.0")),
+        ("1.89.0", Some("1.90.0")),
+        ("1.90.0", None),
+        ("1.98.1", None),
+    ] {
+        let mut f = Fixture::new();
+        f.set("RUSTUP_TOOLCHAIN", selected);
+        f.stub("cargo", "");
+        f.stub("rustup", "");
+        succeeds(&f.run("ci", "build"));
+        let trace = f.trace();
+        let package = trace
+            .lines()
+            .find(|line| line.ends_with("cargo package --workspace --locked"))
+            .expect("the workspace must be packaged");
+        if let Some(version) = packager {
+            assert!(
+                package.contains(&format!("RUSTUP_TOOLCHAIN={version} ")),
+                "{selected}: {package}"
+            );
+            let install = format!("rustup toolchain install {version} --profile minimal");
+            assert!(trace.contains(&install), "{selected}: {trace}");
+        } else {
+            assert!(
+                !package.contains("RUSTUP_TOOLCHAIN="),
+                "{selected}: {package}"
+            );
+            assert!(
+                !trace.contains("rustup toolchain install"),
+                "{selected}: {trace}"
+            );
+        }
+    }
+}
+
+#[test]
 fn sbom_staging_rejects_malformed_data_and_emits_verifiable_payload() {
     for valid in [false, true] {
         let mut f = Fixture::new();
