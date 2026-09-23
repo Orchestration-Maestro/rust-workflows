@@ -50,13 +50,22 @@ jobs:
           permission-pull-requests: write
           # The moves edit workflow files.
           permission-workflows: write
+      # The organization merges only signed commits, and a commit made on the
+      # runner is unsigned. GitHub signs a commit it creates through the API,
+      # so the branch is pointed at main and the moves arrive as that commit.
       - name: Open or refresh the pull request
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
-          BOT: orchestration-maestro-bot[bot]
-          BOT_ID: "332787522"
           TITLE: "build(deps): move pinned tools to their latest releases"
           BRANCH: tools/update
+          FILE: '{path: $path, contents: $contents}'
+          COMMIT: >-
+            {query: "mutation($input: CreateCommitOnBranchInput!) {
+            createCommitOnBranch(input: $input) { commit { oid } } }",
+            variables: {input: {
+            branch: {repositoryNameWithOwner: $repo, branchName: $branch},
+            expectedHeadOid: $head, message: {headline: $title, body: $body},
+            fileChanges: {additions: $files}}}}
         run: |
           set -euo pipefail
           moves="$RUNNER_TEMP/moves.txt"
@@ -65,12 +74,25 @@ jobs:
             exit 0
           fi
           export PATH="$PWD/.tools/bin:$PATH"
-          git config user.name "$BOT"
-          git config user.email "$BOT_ID+$BOT@users.noreply.github.com"
-          { printf '%s\n\n' "$TITLE"; cat "$moves"; } > "$RUNNER_TEMP/message"
-          git commit --quiet --all --file "$RUNNER_TEMP/message"
-          gh auth setup-git
-          git push --force origin HEAD:refs/heads/tools/update
+          head="$(git rev-parse HEAD)"
+          ref="repos/$GITHUB_REPOSITORY/git/refs/heads/$BRANCH"
+          if gh api "$ref" --silent 2> /dev/null; then
+            gh api -X PATCH "$ref" -f sha="$head" -F force=true --silent
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/heads/$BRANCH" -f sha="$head" --silent
+          fi
+          files="$RUNNER_TEMP/files.json"
+          : > "$files"
+          while IFS= read -r path; do
+            jaq -n --arg path "$path" --arg contents "$(base64 -w0 "$path")" \
+              "$FILE" >> "$files"
+          done < <(git diff --name-only)
+          jaq -n --arg repo "$GITHUB_REPOSITORY" --arg branch "$BRANCH" \
+            --arg head "$head" --arg title "$TITLE" --rawfile body "$moves" \
+            --slurpfile files "$files" "$COMMIT" > "$RUNNER_TEMP/commit.json"
+          gh api graphql --input "$RUNNER_TEMP/commit.json" \
+            --jq '.data.createCommitOnBranch.commit.oid'
           body="$RUNNER_TEMP/body.md"
           cat "$moves" > "$body"
           printf '\n%s %s\n' 'A move marked (major) can change what the gate' \

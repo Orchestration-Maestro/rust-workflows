@@ -1,6 +1,5 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 set windows-shell := ["cmd.exe", "/d", "/s", "/c"]
-set export := true
 
 local_bin := justfile_directory() / ".tools/bin"
 host_path := env_var("PATH")

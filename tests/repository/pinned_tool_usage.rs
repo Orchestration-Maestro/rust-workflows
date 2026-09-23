@@ -47,9 +47,15 @@ fn a_job_installs_every_pinned_tool_it_invokes() {
                 if !invoked {
                     continue;
                 }
-                let installed = steps
-                    .iter()
-                    .any(|step| tool_rows(step).iter().any(|row| row.name == tool));
+                // The pinned table, or the toolbelt bootstrap, which installs
+                // every tool at the version and checksum mise.lock records.
+                let installed = steps.iter().any(|step| {
+                    tool_rows(step).iter().any(|row| row.name == tool)
+                        || step["run"].as_str().is_some_and(|run| {
+                            run.lines()
+                                .any(|line| line.trim() == "scripts/bootstrap.sh")
+                        })
+                });
                 assert!(
                     installed,
                     "{name}/{job} invokes {tool} without installing the pinned copy"
