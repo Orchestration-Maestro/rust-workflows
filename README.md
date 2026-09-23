@@ -11,7 +11,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Rust-2024-CE422B?style=for-the-badge&amp;logo=rust&amp;logoColor=white" alt="Rust 2024" />
   <img src="https://img.shields.io/badge/GitHub-Actions-2088FF?style=for-the-badge&amp;logo=githubactions&amp;logoColor=white" alt="GitHub Actions" />
-  <img src="https://img.shields.io/badge/Runners-ubuntu--24.04-334155?style=for-the-badge&amp;logo=github&amp;logoColor=white" alt="Every gate runs on ubuntu-24.04" />
+  <img src="https://img.shields.io/badge/Gates-ubuntu--24.04-334155?style=for-the-badge&amp;logo=ubuntu&amp;logoColor=white" alt="Every gate runs on ubuntu-24.04" />
+  <img src="https://img.shields.io/badge/Tests-macOS%20%7C%20Windows%20%7C%20Linux%20arm64-334155?style=for-the-badge&amp;logo=githubactions&amp;logoColor=white" alt="Opt-in cargo test on macOS, Windows and Linux arm64" />
 </p>
 
 <p align="center">

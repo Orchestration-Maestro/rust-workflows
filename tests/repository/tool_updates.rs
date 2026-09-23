@@ -59,6 +59,37 @@ fn every_install_row_is_the_asset_mise_locked() {
     }
 }
 
+/// cargo-mutants' version in mise.toml and its locked SHA-256 today, so the
+/// tests follow the pins instead of freezing them.
+fn mutants_pin() -> (String, String) {
+    let output = tool("jaq")
+        .args(["-r", "--from", "toml", r#".tools["cargo-mutants"].version"#])
+        .arg(root().join("mise.toml"))
+        .output()
+        .unwrap();
+    succeeds(&output);
+    let version = String::from_utf8(output.stdout).unwrap().trim().to_owned();
+    let checksum = locked(&root(), "cargo-mutants", "checksum");
+    let sha256 = checksum.strip_prefix("sha256:").unwrap().to_owned();
+    (version, sha256)
+}
+
+/// The Codecov CLI version upload-coverage.yml pins today.
+fn codecov_pin() -> String {
+    let text = fs::read_to_string(root().join(".github/workflows/upload-coverage.yml")).unwrap();
+    let line = text
+        .lines()
+        .find(|line| line.trim().starts_with("version: v"))
+        .unwrap();
+    line.trim().trim_start_matches("version: ").to_owned()
+}
+
+/// The next major release after a version.
+fn next_major(version: &str) -> String {
+    let major: u64 = version.split('.').next().unwrap().parse().unwrap();
+    format!("{}.0.0", major + 1)
+}
+
 /// A copy of what `update-tools` reads and writes, with stand-ins for the
 /// network: mise names the latest releases, curl returns fixed bytes and gh
 /// names the latest Codecov CLI.
@@ -77,6 +108,7 @@ fn sandbox(latest_mutants: &str, codecov: &str) -> PathBuf {
         )
         .unwrap();
     }
+    let (pinned, sha256) = mutants_pin();
     let bin = dir.join(".tools/bin");
     fs::create_dir_all(&bin).unwrap();
     let current = concat!(
@@ -91,10 +123,9 @@ fn sandbox(latest_mutants: &str, codecov: &str) -> PathBuf {
   latest) if [[ "$2" == cargo-mutants ]]; then echo {latest_mutants}; else {current}; fi ;;
   lock) echo '→ Targeting 2 platform(s), as mise prints without a terminal'
         sum=$(printf 'new cargo-mutants' | sha256sum | cut -d' ' -f1)
-        from=cargo-mutants/releases/download/v25.3.1/
+        from=cargo-mutants/releases/download/v{pinned}/
         to=cargo-mutants/releases/download/v{latest_mutants}/
-        sed -i -e "s#$from#$to#" \
-          -e "s#be41e6f74b633452fb17ef3b6b6113e180130f7b5693863b400c58b39e476726#$sum#" mise.lock ;;
+        sed -i -e "s#$from#$to#" -e "s#{sha256}#$sum#" mise.lock ;;
   *) exit 1 ;;
 esac"#
             ),
@@ -130,20 +161,26 @@ fn update(dir: &Path) -> String {
 
 #[test]
 fn update_tools_moves_a_pin_everywhere_it_is_installed() {
-    let dir = sandbox("26.0.0", "v11.4.0");
+    let (pinned, _) = mutants_pin();
+    let next = next_major(&pinned);
+    let used = codecov_pin();
+    let dir = sandbox(&next, "v99.0.0");
     let before = install_rows(&dir);
     let said = update(&dir);
     assert!(
-        said.contains("cargo-mutants 25.3.1 -> 26.0.0 (major)"),
+        said.contains(&format!("cargo-mutants {pinned} -> {next} (major)")),
         "{said}"
     );
-    assert!(said.contains("codecov-cli v11.3.1 -> v11.4.0"), "{said}");
+    assert!(
+        said.contains(&format!("codecov-cli {used} -> v99.0.0")),
+        "{said}"
+    );
     // The moves become a commit message, so mise's progress stays off them.
     assert!(!said.contains("Targeting"), "{said}");
     assert!(
         fs::read_to_string(dir.join("mise.toml"))
             .unwrap()
-            .contains(r#"cargo-mutants = { version = "26.0.0""#)
+            .contains(&format!(r#"cargo-mutants = {{ version = "{next}""#))
     );
     // The digest is computed from the bytes the new asset serves.
     let digest = tool("sha256sum")
@@ -171,7 +208,7 @@ fn update_tools_moves_a_pin_everywhere_it_is_installed() {
         .collect();
     assert!(!mutants.is_empty());
     for (_, asset, sha, member) in mutants {
-        assert!(asset.contains("/v26.0.0/"), "{asset}");
+        assert!(asset.contains(&format!("/v{next}/")), "{asset}");
         assert_eq!(sha, digest);
         assert_eq!(member.as_deref(), Some("cargo-mutants"));
     }
@@ -184,13 +221,13 @@ fn update_tools_moves_a_pin_everywhere_it_is_installed() {
     };
     assert_eq!(others(&before), others(&after));
     let coverage = fs::read_to_string(dir.join(".github/workflows/upload-coverage.yml")).unwrap();
-    assert_eq!(coverage.matches("version: v11.4.0").count(), 2);
-    assert!(!coverage.contains("v11.3.1"));
+    assert_eq!(coverage.matches("version: v99.0.0").count(), 2);
+    assert!(!coverage.contains(&used));
 }
 
 #[test]
 fn update_tools_changes_nothing_when_every_pin_is_current() {
-    let dir = sandbox("25.3.1", "v11.3.1");
+    let dir = sandbox(&mutants_pin().0, &codecov_pin());
     let snapshot = |dir: &Path| -> Vec<String> {
         [
             "mise.toml",
@@ -219,7 +256,20 @@ fn a_weekly_run_opens_one_pull_request_on_the_bot_token() {
         .collect::<Vec<_>>()
         .concat();
     assert!(bodies.contains("just update-tools"));
-    assert!(bodies.contains("git push --force origin HEAD:refs/heads/tools/update"));
+    // The organization merges only signed commits, and a commit the runner
+    // pushes is unsigned: GitHub creates, and signs, the one it records.
+    assert!(!bodies.contains("git push") && !bodies.contains("git commit"));
+    assert!(bodies.contains("gh api graphql --input"));
+    let open = steps
+        .iter()
+        .find(|step| step["name"] == "Open or refresh the pull request")
+        .unwrap();
+    assert!(
+        open["env"]["COMMIT"]
+            .as_str()
+            .unwrap()
+            .contains("createCommitOnBranch")
+    );
     let token = steps
         .iter()
         .find(|step| {
