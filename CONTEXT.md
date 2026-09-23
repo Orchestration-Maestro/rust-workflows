@@ -79,10 +79,10 @@ the run is a report, not a gate, and the distinction is load-bearing throughout
 this repository: `|| true` turns one into the other silently, which is why a test
 rejects it.
 
-**Opt-in gate**: A gate a caller switches on. All but three default to off or
+**Opt-in gate**: A gate a caller switches on. All but four default to off or
 permissive, so upgrading never fails a consumer who did not ask for it; mutation
-testing, the unused-dependency check and the `unsafe` ban default to on because
-a golden workflow enforces the standard, and each is one input to switch off. The dependency source policy and the scaffolding lints
+testing, the unused-dependency check, the `unsafe` ban and SARIF reports default
+to on because a golden workflow enforces the standard, and each is one input to switch off. The dependency source policy and the scaffolding lints
 are not gates a caller selects: they hold for every project. The
 scorecard makes the resulting set visible.
 

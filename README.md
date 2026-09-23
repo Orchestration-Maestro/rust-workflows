@@ -38,12 +38,26 @@ jobs:
       contents: read
 ```
 
+To see Clippy and secret-scan findings in the repository's Security tab, add
+one job; it alone holds `security-events: write`:
+
+```yaml
+  sarif:
+    needs: rust
+    uses: Orchestration-Maestro/rust-workflows/.github/workflows/upload-sarif.yml@<reviewed-sha>
+    permissions:
+      contents: read
+      security-events: write
+    with:
+      artifact-name: ${{ needs.rust.outputs.artifact-name }}
+```
+
 That is the whole adoption. Every run enforces formatting, Clippy, tests,
 rustdoc, 80% line coverage, advisories, a secret scan, the declared MSRV,
 dependency sources and versions, a reproducible hardened release build and both
-SBOM formats. Three more gates are on by default and each is one input to switch
-off: mutation testing, the unused-dependency check and the `unsafe` ban. The full
-list is under [gates](#-gates). Semantic security analysis is CodeQL default
+SBOM formats. Four more gates are on by default and each is one input to switch
+off: mutation testing, the unused-dependency check, the `unsafe` ban and SARIF
+reports. The full list is under [gates](#-gates). Semantic security analysis is CodeQL default
 setup, enabled by organization administrators rather than by this workflow; see
 [platform requirements](docs/platform-requirements.md#administrator-owned-setup).
 
@@ -106,6 +120,7 @@ workflows.
 | [`unsafe-audit.yml`](.github/workflows/unsafe-audit.yml) | Opt-in Miri run detecting undefined behaviour; nightly-only, so kept outside the stable-only policy |
 | [`fuzz.yml`](.github/workflows/fuzz.yml) | Opt-in bounded fuzz regression: replays the committed corpus, then explores for a fixed budget |
 | [`publish-evidence.yml`](.github/workflows/publish-evidence.yml) | Dry-run-first archive of release reports; live assets only on protected-tag GitHub Releases |
+| [`upload-sarif.yml`](.github/workflows/upload-sarif.yml) | Clippy and secret-scan SARIF from the same run into code scanning; isolated so only its job needs `security-events: write`, and skipped for fork pull requests |
 
 Artifact attestations work on the organization's public repositories; a private
 one would need GitHub Enterprise Cloud. The default
@@ -208,13 +223,13 @@ Each is one input to switch off, documented in [docs/ci.md](docs/ci.md).
 | Mutation testing | `mutation-test: false` | A surviving or timed-out mutant in the change: a pull request mutates its diff, a push or tag its own commit | North Star, Quality | `mutation_testing_scopes_a_pull_request_to_its_diff`, `mutation_testing_scopes_a_push_to_its_own_commit`, `example_gate_replays_ci_step_bodies_against_every_fixture` |
 | Unused dependencies | `unused-dependencies: false` | A declared dependency no source file uses | SCH-010 | `unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does` |
 | `unsafe` ban | `unsafe-policy: allow` | An `unsafe` block in your crates; dependencies are unaffected | SST-001 | `clippy_denies_leftover_scaffolding_at_every_level` |
+| SARIF reports | `sarif-reports: false` | A Clippy or secret-scan SARIF report that is missing or empty; `upload-sarif.yml` shows the findings in code scanning | SST-003 | `sarif_reports_are_written_only_when_asked_and_never_empty`, `sarif_reports_are_on_by_default_and_upload_in_their_own_workflow` |
 | Dependency policy | `license-policy: off` | Violations of your `deny.toml`, or the default source/version policy; licence checks apply only with a consumer policy or `LICENSE_ALLOWLIST`. `off` skips the whole gate | SCH-010 | `the_organization_allowlist_adds_licences_and_a_committed_policy_wins`, `the_dependency_policy_holds_by_default_and_licences_only_with_a_list` |
 
 ### Opt-in
 
 | Gate | How | Standard | Proof |
 | --- | --- | --- | --- |
-| SARIF reports | `sarif-reports: true`; showing them needs GitHub Advanced Security | SST-003 | `sarif_reports_are_written_only_when_asked_and_never_empty` |
 | Recorded dependency audits | `dependency-audit: true`, cargo-vet against your committed audits | SCH-007 | `unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does` |
 | Wider Clippy | `clippy-level: pedantic` or `nursery` | SST-001 | `clippy_denies_leftover_scaffolding_at_every_level` |
 | Semantic-version compatibility | `semver-check: true` on `publish-crate.yml`; off for a first publication, which has no baseline | North Star, Quality | `semver_check_fails_the_publication_when_cargo_semver_checks_does` |

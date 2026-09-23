@@ -68,10 +68,10 @@ time are a different measurement.
 ## ⚖️ Defaults a consumer inherits
 
 The owned-fixture coverage floor is 90%; the public `ci.yml` default stays 80
-and callers keep the documented input. Three gates are on by default as
+and callers keep the documented input. Four gates are on by default as
 deliberate exceptions to adoption safety, because a golden workflow enforces
-the standard: mutation testing, the unused-dependency check and the `unsafe`
-ban, each with one input to switch it off. The
+the standard: mutation testing, the unused-dependency check, the `unsafe` ban
+and SARIF reports, each with one input to switch it off. The
 scaffolding lints have no off switch. Dependency policy defaults to
 `license-policy: auto`: a consumer `deny.toml` when present, otherwise the
 source/version policy and the organization allowlist when provided. It says
