@@ -2,9 +2,8 @@
 //! diagram's control count, is what `just docs` writes from its source, so a
 //! reader never has to keep one in step with the other by hand.
 
-use crate::harness::{root, succeeds, temp_dir, tool};
+use crate::harness::{root, succeeds, temp_dir, tool, write_executable};
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Output;
 
@@ -208,15 +207,12 @@ fn the_bot_commits_exactly_the_changed_files_through_the_api() {
     fs::write(dir.join("body"), "Why the bot commits.\n").unwrap();
     let bin = dir.join(".tools/bin");
     fs::create_dir_all(&bin).unwrap();
-    let gh = bin.join("gh");
-    fs::write(
-        &gh,
+    write_executable(
+        &bin.join("gh"),
         "#!/bin/bash\nset -euo pipefail\n\
          while [[ $# -gt 0 ]]; do [[ $1 == --input ]] && cp \"$2\" request.json; shift; done\n\
          echo 0123abc\n",
-    )
-    .unwrap();
-    fs::set_permissions(&gh, fs::Permissions::from_mode(0o755)).unwrap();
+    );
     let output = tool("just")
         .arg("--justfile")
         .arg(dir.join("justfile"))

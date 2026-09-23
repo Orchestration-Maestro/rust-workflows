@@ -2,11 +2,10 @@
 //! against stand-ins the way a hosted runner would run it.
 
 use super::gate_declarations::gate_bin;
-use super::repository::{root, toolbelt_path};
+use super::repository::{root, toolbelt_path, write_executable};
 use super::workflow_yaml::step;
 use std::collections::BTreeMap;
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -175,16 +174,13 @@ impl Fixture {
     }
 
     pub(crate) fn stub(&self, command: &str, body: &str) {
-        let path = self.root.join("bin").join(command);
-        fs::write(
-            &path,
-            format!(
+        write_executable(
+            &self.root.join("bin").join(command),
+            &format!(
                 "#!/bin/bash\nset -euo pipefail\n\
                  printf '%s\\n' '{command}' \"$*\" >> \"$CALLS\"\n{body}\n"
             ),
-        )
-        .unwrap();
-        fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+        );
     }
 
     /// Every command the gate ran in this fixture, one line each, environment

@@ -1,11 +1,12 @@
 //! The repository under test: its root, the toolbelt provisioned beside it,
-//! commands run to completion, private temporary directories, and every Rust
-//! file of these tests.
+//! commands run to completion, private temporary directories, the stand-in
+//! executables tests run, and every Rust file of these tests.
 
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
@@ -71,6 +72,32 @@ pub(crate) fn temp_dir(purpose: &str) -> PathBuf {
     ));
     fs::create_dir(&path).unwrap();
     path
+}
+
+/// Write an executable stand-in a test then runs, through `install` in a
+/// process of its own. Tests run on many threads, and a child one of them
+/// starts inherits every descriptor this process holds until it runs its own
+/// program: had this process held the new file open for writing, running it in
+/// that moment would fail with "Text file busy".
+pub(crate) fn write_executable(path: &Path, contents: &str) {
+    let mut install = Command::new("install")
+        .args(["-m", "0755", "/dev/stdin"])
+        .arg(path)
+        .stdin(Stdio::piped())
+        .spawn()
+        .unwrap();
+    // The pipe closes as the handle drops, and install sees the end.
+    install
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(contents.as_bytes())
+        .unwrap();
+    assert!(
+        install.wait().unwrap().success(),
+        "cannot write {}",
+        path.display()
+    );
 }
 
 /// Every Rust file of the contract tests, the harness included, so a scan of

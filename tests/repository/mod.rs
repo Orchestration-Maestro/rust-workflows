@@ -4,6 +4,7 @@
 mod commit_message_hooks;
 mod documentation_coverage;
 mod evidence_receipt;
+mod executable_stubs;
 mod gate_action;
 mod generated_documents;
 mod metadata_and_inventory;

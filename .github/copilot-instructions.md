@@ -200,7 +200,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── gate_declarations.rs                # The gate built once per test process, and what rust-gate describe declares about its steps
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
 │   │   ├── native_runtime.rs                   # Real native Windows processes, registry boundary and temporary trees
-│   │   ├── repository.rs                       # The repository root, the toolbelt, commands run to completion, temporary directories, every test file
+│   │   ├── repository.rs                       # The repository root, the toolbelt, commands run to completion, temporary directories, stand-in executables, every test file
 │   │   └── workflow_yaml.rs                    # Readers of workflow and action YAML: whole documents, one step's body, tool rows, jaq queries
 │   ├── nightly/                                # The nightly workflows, unsafe-audit.yml and fuzz.yml, outside the stable policy
 │   │   ├── fuzz_regression.rs                  # fuzz.yml: the nightly with rust-src and cargo-fuzz, every committed target replayed with the corpus first
@@ -220,6 +220,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── commit_message_hooks.rs             # The commit-msg hooks: a conventional header first, 80 columns, refused by prek in a fresh repository
 │   │   ├── documentation_coverage.rs           # Every report, input and secret documented; links resolve; cited tests exist
 │   │   ├── evidence_receipt.rs                 # The evidence receipt: produced only when every upstream result succeeded
+│   │   ├── executable_stubs.rs                 # Stand-in executables written outside the test process, so none is refused as Text file busy
 │   │   ├── gate_action.rs                      # The gate action: one pin at every call site, and a commit that ships it
 │   │   ├── generated_documents.rs              # Every generated table and the diagram's count are what just docs writes
 │   │   ├── metadata_and_inventory.rs           # Repository files, hook, editor and release policies, the Copilot inventory

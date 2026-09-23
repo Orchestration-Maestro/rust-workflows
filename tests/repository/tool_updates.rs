@@ -2,9 +2,8 @@
 //! tool, each workflow installs exactly what it locked, and `just update-tools`
 //! moves a pin everywhere at once.
 
-use crate::harness::{root, succeeds, tool, workflow};
+use crate::harness::{root, succeeds, tool, workflow, write_executable};
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 /// Every `rust-gate install-tools` row across the workflows: name, asset,
@@ -139,9 +138,10 @@ printf 'new cargo-mutants' > "$out""#
         ("gh", format!("echo {codecov}")),
     ];
     for (name, body) in stubs {
-        let path = bin.join(name);
-        fs::write(&path, format!("#!/bin/bash\nset -euo pipefail\n{body}\n")).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        write_executable(
+            &bin.join(name),
+            &format!("#!/bin/bash\nset -euo pipefail\n{body}\n"),
+        );
     }
     dir
 }
