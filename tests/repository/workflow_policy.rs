@@ -117,7 +117,11 @@ fn all_jobs_use_github_runners_without_caller_overrides() {
             );
         }
         for (id, job) in data["jobs"].as_object().unwrap() {
-            if job.get("steps").is_some() {
+            // The one exception: ci.yml's portability job runs on the runners
+            // validate derived from the caller's platforms, each pinned.
+            if name == "ci" && id == "portability" {
+                assert_eq!(job["runs-on"], "${{ matrix.runner }}");
+            } else if job.get("steps").is_some() {
                 assert_eq!(job["runs-on"], "ubuntu-24.04", "{name}/{id}");
             }
             if let Some(runner) = job["with"].get("runs-on") {

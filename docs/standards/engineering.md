@@ -175,9 +175,10 @@ allowed; tests MUST use synthetic roots such as `/somewhere`.
 Each claimed platform MUST be covered on every pull request by equivalent fast,
 merge-blocking checks.
 
-**Hosted workflows remain Linux x64.** The separate native Windows Cargo suite
-requires its own execution evidence, distinct from Linux acceptance. No Windows
-hosted coverage or native macOS workflow execution is claimed.
+**Hosted gates remain Linux x64.** The separate native Windows Cargo suite
+requires its own execution evidence, distinct from Linux acceptance. The gate
+claims no Windows or macOS run of its own; the `platforms` input runs a
+consumer's `cargo test` on pinned macOS, Windows and Linux arm64 runners.
 
 ### ENF-003: English only
 

@@ -65,6 +65,13 @@ name: Rust CI
           dependency, or set false.
         type: boolean
         default: true
+      platforms:
+        description: >-
+          Also build and test on these platforms, space-separated: macos,
+          windows, linux-arm. Each runs cargo test on its own pinned runner;
+          the gate itself stays on ubuntu-24.04. Empty by default.
+        type: string
+        default: ''
       api-compatibility:
         description: >-
           Fail a pull request that breaks a library's public API without a `!`
@@ -108,6 +115,8 @@ jobs:
       artifact-id: ${{ steps.upload.outputs.artifact-id }}
       artifact-name: ${{ steps.validate.outputs.artifact-name }}
       revision: ${{ github.sha }}
+      platforms: ${{ steps.validate.outputs.platforms }}
+      toolchain: ${{ steps.validate.outputs.toolchain }}
     steps:
       - name: Checkout consumer revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -130,6 +139,7 @@ jobs:
           LICENSE_POLICY: ${{ inputs.license-policy }}
           MUTATION_TEST: ${{ inputs.mutation-test }}
           API_COMPATIBILITY: ${{ inputs.api-compatibility }}
+          PLATFORMS: ${{ inputs.platforms }}
           SARIF_REPORTS: ${{ inputs.sarif-reports }}
           UNUSED_DEPENDENCIES: ${{ inputs.unused-dependencies }}
           UNSAFE_POLICY: ${{ inputs.unsafe-policy }}
@@ -307,10 +317,40 @@ jobs:
           path: ${{ runner.temp }}/rust-reports/
           if-no-files-found: error
           retention-days: 7
+  portability:
+    name: Portability on ${{ matrix.runner }}
+    # After checks: it validated the directory and toolchain used here.
+    needs:
+      - checks
+    if: ${{ needs.checks.outputs.platforms != '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: ${{ fromJSON(needs.checks.outputs.platforms) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      RUSTUP_TOOLCHAIN: ${{ needs.checks.outputs.toolchain }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout consumer revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install the toolchain
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+      - name: Build and test
+        run: cargo test --locked --workspace
   gate:
     name: Required Rust CI
     needs:
       - checks
+      - portability
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -326,4 +366,6 @@ jobs:
         id: required
         env:
           RESULT: ${{ needs.checks.result }}
+          PORTABILITY: ${{ needs.portability.result }}
+          RUNNERS: ${{ needs.checks.outputs.platforms }}
         run: rust-gate required

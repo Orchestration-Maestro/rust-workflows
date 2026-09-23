@@ -46,6 +46,10 @@ name: Publish Rust crate
         description: Forwarded to ci.yml; see docs/ci.md
         type: boolean
         default: true
+      platforms:
+        description: Forwarded to ci.yml; see docs/ci.md
+        type: string
+        default: ''
       api-compatibility:
         description: Forwarded to ci.yml; see docs/ci.md
         type: boolean
@@ -129,6 +133,7 @@ jobs:
       unsafe-policy: ${{ inputs.unsafe-policy }}
       unused-dependencies: ${{ inputs.unused-dependencies }}
       api-compatibility: ${{ inputs.api-compatibility }}
+      platforms: ${{ inputs.platforms }}
   stage:
     name: Stage the crate package
     needs:

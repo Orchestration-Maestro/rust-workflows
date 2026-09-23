@@ -55,7 +55,10 @@ fn publication_defaults_and_required_dependencies() {
         );
     }
     let ci = workflow("ci");
-    assert_eq!(ci["jobs"]["gate"]["needs"], json!(["checks"]));
+    assert_eq!(
+        ci["jobs"]["gate"]["needs"],
+        json!(["checks", "portability"])
+    );
     assert!(
         ci["jobs"]["gate"]["if"]
             .as_str()
