@@ -9,10 +9,7 @@ use std::process::Command;
 fn helper_actions_are_pinned_to_one_commit_that_contains_them() {
     // A reusable workflow runs in the consumer's checkout, so the only way
     // every workflow gets the same gate binary is a composite action fetched
-    // by commit SHA. Before the first push no such commit exists: the pin is a
-    // visible placeholder, and wiring it is the documented first task after
-    // that push.
-    let placeholder = "0".repeat(40);
+    // by commit SHA, and that commit must ship every action it is called for.
     let (pins, called, sites) = call_sites();
     assert!(sites >= 10, "only {sites} gate action call sites");
     assert_eq!(
@@ -26,14 +23,6 @@ fn helper_actions_are_pinned_to_one_commit_that_contains_them() {
         called, shipped,
         "every shipped action is called, every called action is shipped"
     );
-    if pin == placeholder {
-        let contributing = fs::read_to_string(root().join("CONTRIBUTING.md")).unwrap();
-        assert!(
-            contributing.contains(&placeholder),
-            "the placeholder pin must be documented with its wiring procedure"
-        );
-        return;
-    }
     for name in &shipped {
         let status = Command::new("git")
             .args([

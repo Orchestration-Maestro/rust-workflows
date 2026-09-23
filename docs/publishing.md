@@ -174,8 +174,7 @@ The consumer is the repository holding the attestation, not the reusable signer.
 The [repository workflow](../.github/workflows/ci-internal.yml) is canonical:
 relative references, all fifteen consumer/version cases, unique artifact keys,
 and both binary/crate publisher dry-runs. No publishing secret is required.
-External consumers use the actual reviewed remote SHA once the provider exists;
-see [README](../README.md).
+External consumers pin the commit of a release; see [README](../README.md).
 
 Local tests use controlled GitHub/Cargo stand-ins for live writes. No release,
 crate upload, hosted approval or successful remote integration is claimed here.

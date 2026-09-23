@@ -158,8 +158,8 @@ Plain sentences, no em or en dashes, no bold-label lists. A version is a floor
   are separate integrations. Downloads use direct upstream origins; never infer
   a write destination or authorization from successful dependency reads.
 - Never invent a commit SHA, an organisation variable, a secret or a licence
-  policy. The pin of this repository's own gate action stays the placeholder
-  until the first push; the procedure is in CONTRIBUTING.
+  policy. A gate change repins this repository's own gate action in a second
+  pull request; the procedure is in CONTRIBUTING.
 - Live publication, remote writes, credentials, Git operations and releases need
   explicit authorization in the request.
 - Local checks establish local behaviour. Nothing here exercises a hosted

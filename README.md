@@ -61,8 +61,10 @@ reports. The full list is under [gates](#-gates). Semantic security analysis is 
 setup, enabled by organization administrators rather than by this workflow; see
 [platform requirements](docs/platform-requirements.md#administrator-owned-setup).
 
-Replace `<reviewed-sha>` with a 40-character commit SHA. **No release exists yet**,
-so there is no tag to cite.
+Replace `<reviewed-sha>` with the commit of the latest
+[release](https://github.com/Orchestration-Maestro/rust-workflows/releases) and
+keep its tag as a comment, `@<sha>  # v1.0.0`: Dependabot then proposes each new
+release as a pull request. The organization's Rust CI template is pinned this way.
 
 Your project needs a `rust-toolchain.toml` pinning
 [an exact stable version](#-rust-versions). Point at a subdirectory with

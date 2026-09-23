@@ -221,7 +221,7 @@ fn security_policy_documents_how_to_verify_a_release() {
     // The procedure has never been run against a published asset. Saying so is
     // part of the instruction, not a disclaimer to be dropped later.
     assert!(
-        text.contains("No release has been published"),
+        text.contains("No release with binary\nassets has been published"),
         "unexercised verification steps must say they are unexercised"
     );
 }

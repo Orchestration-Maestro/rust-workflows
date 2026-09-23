@@ -159,7 +159,8 @@ squash merges and a pin must name a commit on it:
    squash commit, then run `just check`: the pin test requires that commit to
    contain the action. Never invent a SHA or substitute a branch or tag.
 
-Consumers pin the second merge: its `ci.yml` is the one that calls the new gate.
+Consumers pin a release, so cut one after the second merge: its `ci.yml` is the
+one that calls the new gate.
 
 ## Strict coding standard
 
@@ -181,9 +182,8 @@ Consumers pin the second merge: its `ci.yml` is the one that calls the new gate.
    including binary process output. Commit generated Cargo lockfiles. Do not
    enable all features implicitly.
 3. Pin external actions to verified 40-character SHAs with version comments;
-   this repository's `gate` action is pinned the same way, and until the first
-   push its pin is the placeholder described under "The gate action and its
-   pin". Pin tools/download checksums, keep the Just recipes and the action's
+   this repository's `gate` action is pinned the same way, as "The gate action
+   and its pin" describes. Pin tools/download checksums, keep the Just recipes and the action's
    build step under Bash `set -euo pipefail`, and pass expressions through
    `env`. Validate paths/names/registry/ref boundaries;
    never use `eval`, unchecked downloads, scanner error suppression or broad
