@@ -308,7 +308,7 @@ fn every_just_recipe_carries_its_own_description() {
             .iter()
             .map(|recipe| recipe.split_whitespace().next().unwrap())
             .collect::<Vec<_>>(),
-        ["help", "setup", "check", "docs"],
+        ["help", "setup", "check", "update-tools", "docs"],
         "the local entry points must list only native repository tooling:\n{listed}"
     );
     for recipe in recipes {
