@@ -37,14 +37,17 @@ jobs:
           scripts/bootstrap.sh
       - name: Regenerate
         id: regenerate
+        env:
+          PATHS: README.md docs .github/assets/how-it-works.svg
         run: |
           set -euo pipefail
           export PATH="$PWD/.tools/bin:$PATH"
           just docs
-          if git diff --quiet; then
+          read -r -a paths <<< "$PATHS"
+          if git diff --quiet -- "${paths[@]}"; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            git diff --stat
+            git diff --stat -- "${paths[@]}"
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Mint the bot token
@@ -62,6 +65,9 @@ jobs:
           BRANCH: ${{ github.event.pull_request.head.ref }}
           HEAD: ${{ github.event.pull_request.head.sha }}
           TITLE: "docs: regenerate the generated tables"
+          # Only what just docs writes: installing the toolbelt never reaches
+          # the commit.
+          PATHS: README.md docs .github/assets/how-it-works.svg
         run: |
           set -euo pipefail
           export PATH="$PWD/.tools/bin:$PATH"

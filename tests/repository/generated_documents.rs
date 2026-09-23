@@ -167,6 +167,12 @@ fn a_commit_or_a_pull_request_regenerates_the_documents() {
         commit["env"]["HEAD"],
         "${{ github.event.pull_request.head.sha }}"
     );
+    // Only what just docs writes: installing the toolbelt must never reach a
+    // commit.
+    assert_eq!(
+        commit["env"]["PATHS"],
+        "README.md docs .github/assets/how-it-works.svg"
+    );
 }
 
 #[test]
@@ -192,9 +198,13 @@ fn the_bot_commits_exactly_the_changed_files_through_the_api() {
     };
     git(&["init", "-q"]);
     fs::write(dir.join("notes.md"), "before\n").unwrap();
-    git(&["add", "notes.md", "justfile"]);
+    fs::write(dir.join("mise.lock"), "before\n").unwrap();
+    git(&["add", "notes.md", "mise.lock", "justfile"]);
     git(&["commit", "-qm", "base"]);
     fs::write(dir.join("notes.md"), "after\n").unwrap();
+    // A change outside PATHS, such as a toolbelt install touching the lock,
+    // stays out of the commit.
+    fs::write(dir.join("mise.lock"), "after\n").unwrap();
     fs::write(dir.join("body"), "Why the bot commits.\n").unwrap();
     let bin = dir.join(".tools/bin");
     fs::create_dir_all(&bin).unwrap();
@@ -220,6 +230,7 @@ fn the_bot_commits_exactly_the_changed_files_through_the_api() {
             ("HEAD", "abc123"),
             ("TITLE", "docs: regenerate the generated tables"),
             ("BODY", "body"),
+            ("PATHS", "notes.md docs"),
         ])
         .output()
         .unwrap();

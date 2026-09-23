@@ -25,7 +25,7 @@ setup:
     # bytes that differ from the lock; mise itself is the one download that
     # scripts/bootstrap.sh verifies by hand, into .tools/bin.
     mise trust mise.toml
-    mise install
+    mise install --locked
     # Links keep the gate, the commit hooks and the documentation on the one
     # PATH entry they already use, wherever mise keeps its store.
     mkdir -p .tools/bin
@@ -191,16 +191,18 @@ docs:
 # bot: through createCommitOnBranch, which GitHub signs, where a commit made on
 # the runner would be unsigned and the organization refuses it. The new commit's
 # parent is $HEAD, which must still be the branch's head. Reads GH_TOKEN,
-# GITHUB_REPOSITORY, BRANCH, HEAD, TITLE and BODY, a file.
+# GITHUB_REPOSITORY, BRANCH, HEAD, TITLE, BODY, a file, and PATHS, the pathspecs
+# a commit may take; unset, every changed file.
 _commit-as-bot:
     #!/usr/bin/env bash
     set -euo pipefail
     : "${GH_TOKEN:?}" "${GITHUB_REPOSITORY:?}" "${BRANCH:?}" "${HEAD:?}" "${TITLE:?}" "${BODY:?}"
+    read -r -a paths <<< "${PATHS:-}"
     files="$(mktemp)"
     while IFS= read -r path; do
       jaq -n --arg path "$path" --arg contents "$(base64 -w0 "$path")" \
         "{path: \$path, contents: \$contents}" >> "$files"
-    done < <(git diff --name-only)
+    done < <(git diff --name-only -- "${paths[@]}")
     if [[ ! -s "$files" ]]; then
       echo "Nothing changed; nothing to commit."
       exit 0
