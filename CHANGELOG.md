@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v1.1.0...v1.2.0) (2026-09-23)
+
+
+### Features
+
+* test on macOS, Windows and Linux arm64 when asked ([#16](https://github.com/Orchestration-Maestro/rust-workflows/issues/16)) ([6290dc0](https://github.com/Orchestration-Maestro/rust-workflows/commit/6290dc03b70dc67ba024eeef1c23b37e9d927182))
+
 ## [1.1.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v1.0.1...v1.1.0) (2026-09-23)
 
 
