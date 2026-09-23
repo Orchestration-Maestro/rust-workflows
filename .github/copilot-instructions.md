@@ -171,6 +171,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── input_validation.rs                 # unsafe-audit.yml and fuzz.yml: every malformed input refused before a toolchain is touched
 │   │   ├── install_tools.rs                    # rust-gate install-tools: what it refuses, honours, and ci.yml installs
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
+│   │   ├── platform_portability.rs             # ci.yml: named platforms become pinned runners that the required status holds
 │   │   ├── quality_gates.rs                    # ci.yml: lint, documentation, coverage and analysis gates, each proven to fail
 │   │   ├── quality_reports.rs                  # ci.yml: diagnostics survive failing tools without changing their verdict
 │   │   ├── release_payload.rs                  # ci.yml: release build, payload, bills of materials, and the example gate

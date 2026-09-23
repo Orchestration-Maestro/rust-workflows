@@ -28,6 +28,7 @@ pub(crate) const STEPS: &[Step] = &[Step {
         "GITHUB_WORKSPACE",
         "LICENSE_POLICY",
         "MUTATION_TEST",
+        "PLATFORMS",
         "REQUESTED_TOOLCHAIN",
         "SARIF_REPORTS",
         "UNSAFE_POLICY",
@@ -60,11 +61,14 @@ fn run() -> Outcome {
     let api_compatibility = flag("API_COMPATIBILITY")?.to_string();
     let sarif_reports = flag("SARIF_REPORTS")?.to_string();
     let dependency_audit = flag("DEPENDENCY_AUDIT")?.to_string();
+    let runners = platform_runners()?;
     let deny_config = deny_configuration(&project, &root, license_policy)?;
     output(
         "artifact-name",
         &artifact_name(&project, &root, &artifact_key, &toolchain)?,
     )?;
+    output("platforms", &runners)?;
+    output("toolchain", &toolchain)?;
     let temp = input("RUNNER_TEMP")?;
     export(&[
         ("PROJECT", &project.display().to_string()),
@@ -114,6 +118,29 @@ fn selected_toolchain(project: &Path) -> Result<String, Failure> {
         return Err("rust-version must be at least the 1.85.0 MSRV".into());
     }
     Ok(toolchain)
+}
+
+/// The runners the portability job tests on, one pinned image per platform
+/// the caller names, as the JSON array its matrix reads; empty when none is
+/// named, which skips the job.
+fn platform_runners() -> Result<String, Failure> {
+    let mut runners: Vec<&str> = Vec::new();
+    for name in input("PLATFORMS")?.split_whitespace() {
+        let runner = match name {
+            "macos" => "macos-15",
+            "windows" => "windows-2025",
+            "linux-arm" => "ubuntu-24.04-arm",
+            _ => return Err("platforms may name only macos, windows and linux-arm".into()),
+        };
+        if runners.contains(&runner) {
+            return Err(format!("platforms names {name} twice").into());
+        }
+        runners.push(runner);
+    }
+    if runners.is_empty() {
+        return Ok(String::new());
+    }
+    Ok(format!("[\"{}\"]", runners.join("\",\"")))
 }
 
 /// The consumer's `deny.toml` as a path when one is committed inside the

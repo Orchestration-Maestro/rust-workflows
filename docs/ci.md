@@ -32,6 +32,7 @@ committed `deny.toml` applies the same way to every pull request. See [runner se
 | `mutation-test` | boolean | `true` | Run cargo-mutants and fail on surviving mutants; a pull request mutates its diff, a push or tag its own commit; set `false` when run time exceeds the job |
 | `sarif-reports` | boolean | `true` | Also emit Clippy and secret findings as SARIF, for `upload-sarif.yml` to show in code scanning |
 | `unused-dependencies` | boolean | `true` | Fail when a workspace member declares a dependency it never uses; remove it or set `false` |
+| `platforms` | string | Empty | Also build and test on `macos`, `windows` and `linux-arm`, space-separated; see [platform portability](#platform-portability) |
 | `api-compatibility` | boolean | `true` | Fail a pull request that breaks a library's public API without `!` after the type in its title; see [public API compatibility](#public-api-compatibility) |
 | `dependency-audit` | boolean | `false` | Require a recorded cargo-vet audit for every dependency; opt-in because it commits the team to reviewing third-party source on each bump |
 | `unsafe-policy` | string | `deny` | Refuses an `unsafe` block in any workspace member; `allow` leaves the decision to a project that needs it |
@@ -426,6 +427,22 @@ A missing or empty
 outcomes file without that explicit successful no-work result still fails.
 Scope a large workspace with a committed `.cargo/mutants.toml`, keep the job
 timeout in mind, and set `mutation-test: false` when the run outgrows the job.
+
+### Platform portability
+
+Every gate runs on `ubuntu-24.04`. `platforms` adds a `portability` job per
+named platform, on a pinned runner: `macos` on `macos-15` (Apple silicon),
+`windows` on `windows-2025` and `linux-arm` on `ubuntu-24.04-arm`. Each checks
+out the same commit, installs the toolchain `checks` validated and runs
+`cargo test --locked --workspace` in `working-directory`; it starts after
+`checks`, which validated both. `Required Rust CI` fails when a named platform
+did not pass. The job builds and tests only: release binaries, their bills of
+materials and the scorecard stay Linux x86_64.
+
+```yaml
+    with:
+      platforms: macos windows linux-arm
+```
 
 ### Public API compatibility
 

@@ -7,6 +7,7 @@ mod duplication_report;
 mod feature_combinations;
 mod input_validation;
 mod install_tools;
+mod platform_portability;
 mod quality_gates;
 mod quality_reports;
 mod release_payload;

@@ -11,7 +11,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Rust-2024-CE422B?style=for-the-badge&amp;logo=rust&amp;logoColor=white" alt="Rust 2024" />
   <img src="https://img.shields.io/badge/GitHub-Actions-2088FF?style=for-the-badge&amp;logo=githubactions&amp;logoColor=white" alt="GitHub Actions" />
-  <img src="https://img.shields.io/badge/Runners-ubuntu--24.04-334155?style=for-the-badge&amp;logo=github&amp;logoColor=white" alt="Runs exclusively on ubuntu-24.04" />
+  <img src="https://img.shields.io/badge/Runners-ubuntu--24.04-334155?style=for-the-badge&amp;logo=github&amp;logoColor=white" alt="Every gate runs on ubuntu-24.04" />
 </p>
 
 <p align="center">
@@ -89,8 +89,9 @@ Your project needs a `rust-toolchain.toml` pinning
 `working-directory:` if your package is not at the repository root. Everything
 else is opt-in.
 
-Every job runs on `ubuntu-24.04`; runner selection is enforced, not
-caller-configurable. A fork pull request runs CI with no secret and a read-only
+Every gate job runs on `ubuntu-24.04`; runner selection is enforced, not
+caller-configurable. The only other runners are the pinned macOS, Windows and
+Linux arm64 images a caller's `platforms` names, which build and test. A fork pull request runs CI with no secret and a read-only
 token once an owner approves the run; publishers refuse fork pull requests, and
 `pull_request_target` is refused everywhere. Administrators still owe the
 [runner access controls](docs/platform-requirements.md#administrator-owned-setup).
@@ -254,6 +255,7 @@ Each is one input to switch off, documented in [docs/ci.md](docs/ci.md).
 | --- | --- | --- | --- |
 | Recorded dependency audits | `dependency-audit: true`, cargo-vet against your committed audits | SCH-007 | `unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does` |
 | Wider Clippy | `clippy-level: pedantic` or `nursery` | SST-001 | `clippy_denies_leftover_scaffolding_at_every_level` |
+| Platform portability | `platforms: macos windows linux-arm`; `cargo test` on each pinned runner, held by the required status | North Star, Quality | `named_platforms_become_a_matrix_of_pinned_runners`, `requested_platforms_must_pass_for_the_required_status` |
 | Semantic-version compatibility | `semver-check: true` on `publish-crate.yml`; off for a first publication, which has no baseline | North Star, Quality | `semver_check_fails_the_publication_when_cargo_semver_checks_does` |
 | Signed build provenance | `attest-binaries.yml`, see below | SCH-001, SCH-002 | `attestation_signs_only_bytes_it_verified_itself`, `provenance_attestation_is_isolated_and_reverifies_the_payload` |
 | Undefined-behaviour audit | `unsafe-audit.yml`, Miri on nightly, see below | SST-006 | `the_undefined_behaviour_audit_refuses_to_pass_without_running_anything` |

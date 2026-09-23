@@ -15,8 +15,9 @@ The separate native Windows target requires an already-provisioned Windows x64
 host, PowerShell, rustup, a native linker, Rust 1.98.1 with rustfmt and Clippy,
 Rust 1.85.0 and locked dependencies. See the
 [contributor procedure](../CONTRIBUTING.md#native-windows-checks). Native execution
-remains unverified. Linux ELF policy stays in Linux acceptance; no Windows hosted
-runner or native macOS suite is claimed.
+remains unverified. Linux ELF policy stays in Linux acceptance; the gate claims no
+Windows or macOS run of its own. A consumer's `platforms` tests that consumer
+there, nothing more.
 
 ## Administrator-owned setup
 
@@ -25,7 +26,7 @@ runner or native macOS suite is claimed.
 | GitHub provider | Allow the pinned upstream actions in the organization's allowed-actions policy, `codecov/codecov-action` included. |
 | Codecov | Install the Codecov GitHub App on the organization. Uploads log in through OIDC; no Codecov token is stored. |
 | Release and update bot | An organization-owned GitHub App with Contents, Issues, Pull requests and Workflows write, its client ID and private key stored for Actions and again as Dependabot secrets; see [CONTRIBUTING](../CONTRIBUTING.md). |
-| Runners | GitHub-hosted `ubuntu-24.04`, with the image's Bash, Git, curl, tar, SHA256, rustup, GitHub CLI and native linker. No runner override or self-hosted runner group is used. |
+| Runners | GitHub-hosted `ubuntu-24.04`, with the image's Bash, Git, curl, tar, SHA256, rustup, GitHub CLI and native linker; when a caller names `platforms`, also `macos-15`, `windows-2025` and `ubuntu-24.04-arm` for `cargo test` alone. No runner override or self-hosted runner group is used. |
 | Supply-chain reads | Direct upstream Rust distributions, sparse crates.io, RustSec advisories and checksum-pinned official GitHub tool release assets. No Cargo read credential is used. |
 | Code scanning | Enable CodeQL default setup, which supports Rust, through an organization security configuration. Add a ruleset requiring code scanning results if alerts must block merges. Private and internal repositories need GitHub Code Security. |
 | Repository governance | Confirm CODEOWNERS access, require review and required status checks, hold every external contributor's workflow run for approval, and protect release tags with rulesets. |
