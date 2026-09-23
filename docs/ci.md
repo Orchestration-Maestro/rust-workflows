@@ -429,6 +429,9 @@ Publishers omit this override and use the committed consumer pin.
 4. Release build and release-mode tests, verified `cargo package --workspace`,
    per-member CycloneDX 1.5 JSON SBOMs, and release artifact staging. cargo-cyclonedx
    lacks `--locked`: a before/after lockfile comparison rejects resolution changes.
+   With a compiler older than 1.90, packaging alone runs on Cargo 1.90.0: older
+   Cargo looks a member's dependency on another member up on crates.io, so a
+   workspace whose members depend on each other could not package.
 5. Dependency sources and versions: `cargo deny check bans sources` against the
    consumer's `deny.toml`, or against the generated default policy without one.
 6. `Required Rust CI` runs with `always()` and fails on failure, cancellation or
