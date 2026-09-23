@@ -89,7 +89,8 @@ fn sandbox(latest_mutants: &str, codecov: &str) -> PathBuf {
             format!(
                 r#"case "$1" in
   latest) if [[ "$2" == cargo-mutants ]]; then echo {latest_mutants}; else {current}; fi ;;
-  lock) sum=$(printf 'new cargo-mutants' | sha256sum | cut -d' ' -f1)
+  lock) echo '→ Targeting 2 platform(s), as mise prints without a terminal'
+        sum=$(printf 'new cargo-mutants' | sha256sum | cut -d' ' -f1)
         from=cargo-mutants/releases/download/v25.3.1/
         to=cargo-mutants/releases/download/v{latest_mutants}/
         sed -i -e "s#$from#$to#" \
@@ -137,6 +138,8 @@ fn update_tools_moves_a_pin_everywhere_it_is_installed() {
         "{said}"
     );
     assert!(said.contains("codecov-cli v11.3.1 -> v11.4.0"), "{said}");
+    // The moves become a commit message, so mise's progress stays off them.
+    assert!(!said.contains("Targeting"), "{said}");
     assert!(
         fs::read_to_string(dir.join("mise.toml"))
             .unwrap()

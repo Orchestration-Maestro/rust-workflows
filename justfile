@@ -125,7 +125,8 @@ update-tools:
       '.tools | to_entries[] | "\(.key) \(.value | if type == "object" then .version else . end)"' \
       mise.toml)
     if (( ${#was[@]} )); then
-      mise lock --platform linux-x64,linux-x64-musl "${!was[@]}"
+      # Progress goes to stderr: stdout is the list of moves, a commit message.
+      mise lock --platform linux-x64,linux-x64-musl "${!was[@]}" >&2
       # $1 is a checked tool name, $2 a literal field.
       locked() {
         jaq -r --from toml ".tools[\"$1\"][0][\"platforms.linux-x64\"].$2 // \"\"" mise.lock
