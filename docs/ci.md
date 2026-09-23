@@ -84,6 +84,24 @@ and it skips fork pull requests, whose token cannot write security events.
 A run with `sarif-reports: false` writes no SARIF, and the upload then fails
 rather than report a clean scan it never made.
 
+### Codecov upload
+
+`upload-coverage.yml` sends the run's `coverage.lcov` and `tests.xml` to
+Codecov, which shows line coverage on each pull request and flags flaky or
+failing tests. It logs in through OIDC, so no Codecov token is stored; that login
+needs `id-token: write`, which is why it is a separate workflow like the SARIF
+upload. It downloads the same `<artifact-name>-reports` artifact, checks out the
+tested commit so Codecov can map report paths onto files, and skips fork pull
+requests, which get no OIDC token. The Codecov CLI version is pinned, and the
+action verifies its signature before running it.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `artifact-name` | required | The `artifact-name` output of `ci.yml` in the same run |
+
+The coverage floor stays the `coverage-threshold` gate in `ci.yml`: Codecov
+reports, it does not decide whether the run passes.
+
 ### Function and file sizes
 
 The `complexity` step measures every function's cognitive complexity, length

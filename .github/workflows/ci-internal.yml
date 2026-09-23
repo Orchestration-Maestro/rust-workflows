@@ -129,25 +129,36 @@ jobs:
       package: ${{ matrix.package }}
       artifact-key: matrix-crate
       dry-run: true
-  # upload-sarif.yml end to end: one CI run, then its SARIF into code scanning.
-  sarif-ci:
-    name: SARIF source run
+  # upload-sarif.yml and upload-coverage.yml end to end: one CI run, then its
+  # SARIF into code scanning and its coverage and test results into Codecov.
+  reports-ci:
+    name: Reports source run
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
     with:
       working-directory: examples/workspace
-      artifact-key: sarif
+      artifact-key: reports
   sarif-upload:
     name: SARIF upload
     needs:
-      - sarif-ci
+      - reports-ci
     uses: ./.github/workflows/upload-sarif.yml
     permissions:
       contents: read
       security-events: write  # the upload workflow's one write scope
     with:
-      artifact-name: ${{ needs.sarif-ci.outputs.artifact-name }}
+      artifact-name: ${{ needs.reports-ci.outputs.artifact-name }}
+  coverage-upload:
+    name: Coverage upload
+    needs:
+      - reports-ci
+    uses: ./.github/workflows/upload-coverage.yml
+    permissions:
+      contents: read
+      id-token: write  # the upload workflow's OIDC login to Codecov
+    with:
+      artifact-name: ${{ needs.reports-ci.outputs.artifact-name }}
   required:
     name: Required consumer tests
     needs:

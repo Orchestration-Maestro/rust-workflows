@@ -50,6 +50,8 @@ fn permissions_timeouts_and_shell_policy_hold_in_every_workflow() {
         "publish-crate",
         "ci-internal",
         "dependabot-auto-merge",
+        "upload-sarif",
+        "upload-coverage",
     ] {
         let data = workflow(name);
         assert!(data.get("permissions").is_some());
@@ -103,6 +105,8 @@ fn all_jobs_use_github_runners_without_caller_overrides() {
         "unsafe-audit",
         "fuzz",
         "dependabot-auto-merge",
+        "upload-sarif",
+        "upload-coverage",
     ] {
         let data = workflow(name);
         for input in ["runs-on", "publish-runs-on"] {
@@ -229,7 +233,13 @@ fn security_policy_documents_how_to_verify_a_release() {
 #[test]
 fn the_consumer_matrix_calls_every_local_workflow_and_fixture() {
     let matrix = workflow("ci-internal");
-    for name in ["ci", "publish-binaries", "publish-crate"] {
+    for name in [
+        "ci",
+        "publish-binaries",
+        "publish-crate",
+        "upload-sarif",
+        "upload-coverage",
+    ] {
         assert!(
             matrix["jobs"]
                 .as_object()
