@@ -38,7 +38,7 @@ measured, never estimated.
 | Axis | KPI | Current | Target | Measured by |
 | --- | --- | --- | --- | --- |
 | Quality | Line coverage floor on the owned fixtures | 90%, verified on every run | 90% | The example gate, `COVERAGE=90` |
-| Speed | `just check` wall time, tools cached | 31 s, read 2026-09-18 | 40 s or less | The SPEED line of `just check` |
+| Speed | `just check` wall time, tools cached | 54 s, read 2026-09-23 | 40 s or less | The SPEED line of `just check` |
 | Security | Silenced lints in the gate and the fixtures | 0, verified on every run | 0 | `no_lint_is_silenced_in_the_gate_or_the_fixtures` |
 | Maintainability | Undocumented items in the gate crate | 0, verified on every run | 0 | Clippy `clippy::missing_docs_in_private_items`, denied |
 

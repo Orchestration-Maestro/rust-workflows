@@ -32,9 +32,10 @@ material before approving.
 
 ## Verifying release assets
 
-These steps describe what a release produces. **No release has been published
-yet**, so the commands below have not been run against a real asset. A procedure
-nobody has run is not yet evidence.
+These steps describe what a binary release produces. **No release with binary
+assets has been published yet**: this repository's own releases are source only,
+and no consumer has published a release run, so the commands below have not been
+run against a real asset. A procedure nobody has run is not yet evidence.
 
 A release run produces `payload.tar.gz` and `SHA256SUMS`. The payload contains the
 built binaries and both bills of materials.

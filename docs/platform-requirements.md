@@ -22,7 +22,8 @@ runner or native macOS suite is claimed.
 
 | Boundary | Required setup |
 | --- | --- |
-| GitHub provider | Create the public remote and allow the pinned upstream actions in the organization's allowed-actions policy. Replace every unpublished gate pin with a real reachable source commit before starting hosted CI. |
+| GitHub provider | Allow the pinned upstream actions in the organization's allowed-actions policy. |
+| Release and update bot | An organization-owned GitHub App with Contents, Issues, Pull requests and Workflows write, its client ID and private key stored for Actions and again as Dependabot secrets; see [CONTRIBUTING](../CONTRIBUTING.md). |
 | Runners | GitHub-hosted `ubuntu-24.04`, with the image's Bash, Git, curl, tar, SHA256, rustup, GitHub CLI and native linker. No runner override or self-hosted runner group is used. |
 | Supply-chain reads | Direct upstream Rust distributions, sparse crates.io, RustSec advisories and checksum-pinned official GitHub tool release assets. No Cargo read credential is used. |
 | Code scanning | Enable CodeQL default setup, which supports Rust, through an organization security configuration. Add a ruleset requiring code scanning results if alerts must block merges. Private and internal repositories need GitHub Code Security. |
