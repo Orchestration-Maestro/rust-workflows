@@ -97,6 +97,89 @@ check:
     echo "SPEED: $elapsed s wall, target $SPEED_TARGET_SECONDS s"
     echo 'PASS: local gate. GitHub/registry integration is not exercised locally.'
 
+# Move every pinned tool to its latest release wherever it is installed (network, gh).
+[linux]
+update-tools:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # mise.toml first, mise.lock through mise, then each workflow install row
+    # from the lock with the digest of the bytes the new asset serves, and the
+    # Codecov CLI version. One line per move; no output means all current.
+    declare -A was=() now=() asset=() digest=()
+    version='^[0-9A-Za-z][0-9A-Za-z.+-]*$'
+    while read -r name current; do
+      [[ "$name" =~ ^[a-z0-9-]+$ ]] || { echo "unexpected tool name: ${name}" >&2; exit 1; }
+      latest="$(mise latest "$name")"
+      [[ "$latest" =~ $version ]] || { echo "${name}: no release version from mise" >&2; exit 1; }
+      [[ "$latest" != "$current" ]] || continue
+      sed -i -E "s/^(${name} = (\{ version = )?\")${current//./\\.}\"/\1${latest}\"/" mise.toml
+      grep -q "^${name} = .*\"${latest}\"" mise.toml || {
+        echo "${name}: cannot move its version in mise.toml" >&2; exit 1;
+      }
+      was[$name]="$current"
+      now[$name]="$latest"
+      major=''
+      [[ "${current%%.*}" == "${latest%%.*}" ]] || major=' (major)'
+      echo "${name} ${current} -> ${latest}${major}"
+    done < <(jaq -r --from toml \
+      '.tools | to_entries[] | "\(.key) \(.value | if type == "object" then .version else . end)"' \
+      mise.toml)
+    if (( ${#was[@]} )); then
+      mise lock --platform linux-x64,linux-x64-musl "${!was[@]}"
+      # $1 is a checked tool name, $2 a literal field.
+      locked() {
+        jaq -r --from toml ".tools[\"$1\"][0][\"platforms.linux-x64\"].$2 // \"\"" mise.lock
+      }
+      downloads="$(mktemp -d)"
+      trap 'rm -rf "$downloads"' EXIT
+      for name in "${!was[@]}"; do
+        url="$(locked "$name" url)"
+        [[ "$url" == https://github.com/*/releases/download/*/* ]] || {
+          echo "${name}: mise.lock names no GitHub release asset" >&2; exit 1;
+        }
+        path="${url#https://github.com/}"
+        rest="${path#*/releases/download/}"
+        tag="${rest%/*}"
+        # A tag with a slash is one path segment in a workflow row.
+        repository="${path%%/releases/download/*}"
+        asset[$name]="${repository}/releases/download/${tag//\//%2F}/${rest##*/}"
+        curl --fail --silent --show-error --location --retry 4 --retry-all-errors \
+          -o "$downloads/$name" "$url"
+        digest[$name]="$(sha256sum "$downloads/$name" | cut -d' ' -f1)"
+        checksum="$(locked "$name" checksum)"
+        sha256="${checksum#sha256:}"
+        if [[ "$checksum" == sha256:* && "$sha256" != "${digest[$name]}" ]]; then
+          echo "${name}: the download differs from mise.lock" >&2; exit 1
+        fi
+      done
+      row='^([[:space:]]*(TOOLS:[[:space:]])?)([a-z0-9-]+) [^ ]+/releases/download/[^ ]+'
+      row+=' [0-9a-f]{64}( ([^ ]+))?$'
+      for file in .github/workflows/*.yml; do
+        moved="$(mktemp)"
+        while IFS= read -r line; do
+          if [[ "$line" =~ $row ]] && [[ -n "${was[${BASH_REMATCH[3]}]:-}" ]]; then
+            name="${BASH_REMATCH[3]}"
+            member="${BASH_REMATCH[5]}"
+            member="${member//"${was[$name]}"/"${now[$name]}"}"
+            line="${BASH_REMATCH[1]}${name} ${asset[$name]} ${digest[$name]}"
+            line+="${member:+ $member}"
+          fi
+          printf '%s\n' "$line"
+        done < "$file" > "$moved"
+        cat "$moved" > "$file"
+        rm "$moved"
+      done
+    fi
+    coverage=.github/workflows/upload-coverage.yml
+    used="$(grep -oE 'version: v[0-9][0-9.]*$' "$coverage" | head -1)"
+    used="${used#version: }"
+    cli="$(gh api repos/codecov/codecov-cli/releases/latest --jq .tag_name)"
+    [[ "$cli" =~ ^v[0-9]+(\.[0-9]+)*$ ]] || { echo "codecov-cli: no release tag" >&2; exit 1; }
+    if [[ "$cli" != "$used" ]]; then
+      sed -i "s/version: ${used}\$/version: ${cli}/" "$coverage"
+      echo "codecov-cli ${used} -> ${cli}"
+    fi
+
 # Regenerate the canonical Linux document about the gate's steps.
 [linux]
 docs:

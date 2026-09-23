@@ -236,3 +236,12 @@ patch and minor updates of the week; the required checks still
 decide whether it merges. A major update, or one whose type Dependabot did not
 record, waits for a person. The App's Workflows permission is what lets an
 action update, which edits workflow files, merge.
+
+Dependabot does not read the tools the workflows download. `mise.lock` is their
+one record, and a test holds every workflow install row to the asset it locked.
+`just update-tools` moves every pin to its latest release: `mise.toml`, then
+`mise.lock` through mise, then each install row with the digest of the bytes the
+new asset serves, and the Codecov CLI version. `tool-updates.yml` runs it every
+Monday and opens, or refreshes, one pull request on the same App; a person
+merges it, because a new scanner or test runner can change what the gate
+refuses. A move marked `(major)` needs its release notes read first.

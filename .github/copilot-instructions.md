@@ -51,6 +51,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── publish-evidence.yml                # Verifies release reports, dry-run first, then uploads GitHub Release assets
 │   │   ├── release-please.yml                  # Release pull request and tag on a GitHub App token, skipped until the app is set up
 │   │   ├── scorecard.yml                       # Weekly OpenSSF Scorecard of this repository, published for the badge and shown in code scanning
+│   │   ├── tool-updates.yml                    # Weekly pull request moving every pinned tool to its latest release, on the bot token
 │   │   ├── unsafe-audit.yml                    # Undefined-behaviour audit under Miri
 │   │   ├── upload-coverage.yml                 # Line coverage and test results into Codecov, the one job with id-token: write
 │   │   └── upload-sarif.yml                    # Clippy and secret-scan SARIF into code scanning, the one job with security-events: write
@@ -219,6 +220,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── pinned_tool_usage.rs                # Every job installs every pinned tool it invokes before a step reads it
 │   │   ├── secret_and_advisory_scans.rs        # Gitleaks over the tree; RustSec audits under CHECK_NETWORK=1
 │   │   ├── size_limits.rs                      # The size limits: Clippy thresholds, 300-line files, 100-column lines
+│   │   ├── tool_updates.rs                     # Every install row is what mise locked; update-tools moves a pin everywhere at once
 │   │   ├── toolbelt_and_shellcheck.rs          # Toolbelt links to the locked builds; ShellCheck over every Bash line left
 │   │   ├── version_pins.rs                     # Tool versions, the toolchain pin and the speed target, one copy each
 │   │   └── workflow_policy.rs                  # Permissions, timeouts, runners, trust boundaries, shell policy and the local calls

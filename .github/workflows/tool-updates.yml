@@ -1,0 +1,84 @@
+name: Tool updates
+# Weekly, every pinned tool moves to its latest release in one pull request,
+# opened by the organization's bot so the required checks run on it. It is not
+# merged automatically: a new scanner or test runner can change what the gate
+# refuses, so a person reads the moves, majors first.
+"on":
+  schedule:
+    - cron: "37 5 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tool-updates
+  cancel-in-progress: false
+jobs:
+  update:
+    name: Move pinned tools to their latest releases
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned toolbelt
+        run: |
+          set -euo pipefail
+          scripts/bootstrap.sh
+      - name: Move every pin
+        env:
+          # mise and gh read releases through the API; a token lifts the
+          # anonymous rate limit.
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          export PATH="$PWD/.tools/bin:$PATH"
+          just update-tools | tee "$RUNNER_TEMP/moves.txt"
+      # The organization's bot, not GITHUB_TOKEN: a pull request GITHUB_TOKEN
+      # opened would run none of the checks a merge requires.
+      - name: Mint the bot token
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          # The moves edit workflow files.
+          permission-workflows: write
+      - name: Open or refresh the pull request
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          BOT: orchestration-maestro-bot[bot]
+          BOT_ID: "332787522"
+          TITLE: "build(deps): move pinned tools to their latest releases"
+          BRANCH: tools/update
+        run: |
+          set -euo pipefail
+          moves="$RUNNER_TEMP/moves.txt"
+          if [[ ! -s "$moves" ]]; then
+            echo "Every pinned tool is current."
+            exit 0
+          fi
+          export PATH="$PWD/.tools/bin:$PATH"
+          git config user.name "$BOT"
+          git config user.email "$BOT_ID+$BOT@users.noreply.github.com"
+          { printf '%s\n\n' "$TITLE"; cat "$moves"; } > "$RUNNER_TEMP/message"
+          git commit --quiet --all --file "$RUNNER_TEMP/message"
+          gh auth setup-git
+          git push --force origin HEAD:refs/heads/tools/update
+          body="$RUNNER_TEMP/body.md"
+          cat "$moves" > "$body"
+          printf '\n%s %s\n' 'A move marked (major) can change what the gate' \
+            'refuses: read its release notes before merging.' >> "$body"
+          open="$(gh pr list --head "$BRANCH" --state open --json number)"
+          if [[ "$open" == "[]" ]]; then
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" \
+              --body-file "$body"
+          else
+            gh pr edit "$BRANCH" --body-file "$body"
+          fi
