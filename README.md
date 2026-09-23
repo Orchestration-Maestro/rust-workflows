@@ -109,7 +109,7 @@ workflows.
 ## 🔄 How it works
 
 <p align="center">
-  <img src=".github/assets/how-it-works.svg" alt="A consumer repository calls the reusable Rust CI on every commit or pull request. Publishing runs that same CI with one job in front of it: a preflight job authorises the boundary before any build, the same revision runs CI, a staging job re-verifies the exact artifact, and the publishing job runs only once the dry run is turned off. Signing and evidence upload are opt-in workflows because they hold elevated scopes. There is no route into publication that skips CI." width="100%" />
+  <img src=".github/assets/how-it-works.svg" alt="A consumer repository calls the reusable Rust CI on every commit or pull request. Publishing runs that same CI with one job in front of it: a preflight job authorises the boundary before any build, the same revision runs CI, a staging job re-verifies the exact artifact, and the publishing job runs only once the dry run is turned off. Signing and evidence upload are opt-in workflows because they hold elevated scopes. There is no route into publication that skips CI." width="100% From the same run, opt-in jobs upload SARIF findings to code scanning and coverage to Codecov, and test on macOS, Windows and Linux arm64." />
 </p>
 
 1. A consumer calls a reviewed workflow revision. The job runs on
@@ -117,9 +117,13 @@ workflows.
    binary that holds every step body, from this repository's pinned commit.
 2. Every commit and pull request runs CI directly. CI validates every input,
    then runs the [gates](#-gates): formatting, Clippy, tests, coverage,
-   advisories, secret scan, declared MSRV, dependency policy, mutation testing
-   and the reproducible release build. Successful checks produce release
-   binaries or packages, SBOMs, source-revision metadata and checksums.
+   advisories, secret scan, declared MSRV, dependency policy, unused
+   dependencies, public API compatibility, mutation testing and the
+   reproducible release build. Successful checks produce release binaries or
+   packages, SBOMs, source-revision metadata and checksums. From the same run,
+   opt-in jobs send the SARIF findings to code scanning and the coverage and
+   test results to Codecov, and test the project on macOS, Windows and Linux
+   arm64.
 3. Publishing runs that same CI after preflight. A live run requires a
    protected release tag and API-verified required reviewers on the `release`
    environment, restricted to `v*` tags. Dry-run needs neither approval nor
