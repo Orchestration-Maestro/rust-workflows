@@ -32,13 +32,14 @@ material before approving.
 
 ## Verifying release assets
 
-These steps describe what a binary release produces. **No release with binary
-assets has been published yet**: this repository's own releases are source only,
-and no consumer has published a release run, so the commands below have not been
-run against a real asset. A procedure nobody has run is not yet evidence.
+These steps were run, as written, against the assets of
+[release-canary v0.1.0](https://github.com/Orchestration-Maestro/release-canary/releases/tag/v0.1.0),
+the organization's canary consumer, on 2026-09-23: every step passed. This
+repository's own releases are source only.
 
-A release run produces `payload.tar.gz` and `SHA256SUMS`. The payload contains the
-built binaries and both bills of materials.
+A release run attaches `payload.tar.gz`, `provenance.json`, `SHA256SUMS` and, with
+`publish-evidence.yml`, `evidence.tar.gz`. The payload contains the built binaries,
+each crate's `.crate` package and the bills of materials.
 
 ### 1. Checksums
 
@@ -82,16 +83,19 @@ arguments and subprocess output are not secret-safe logging channels.
 
 ### 3. Bills of materials
 
-Both are inside the payload, describing the same dependency set:
+They are inside the payload, next to the binaries:
 
 ```bash
-tar -xzf payload.tar.gz ./payload.cdx.json ./payload.spdx.json
+tar -xzf payload.tar.gz
+ls ./*.cdx.json ./*.spdx.json
 ```
 
 - `payload.cdx.json` is CycloneDX 1.5, hierarchical: one root component with each
   workspace member nested under it.
-- `payload.spdx.json` is SPDX 2.3, converted from the CycloneDX document so the two
-  cannot disagree.
+- `<binary>.spdx.json` is SPDX 2.3, one per released binary, written natively by
+  cargo-sbom: converting the CycloneDX document instead loses packages and drops
+  the relationship graph.
+- `<binary>.cdx.json` is the same binary's CycloneDX document.
 
 Use whichever your tooling reads.
 

@@ -141,7 +141,7 @@ This is where the repository does most of its work.
 | SCH-008 | Embedded dependency metadata | **Met.** Both release builds run through `cargo auditable`, embedding the resolved dependency list in a `.dep-v0` ELF section, and the hardening step fails when that section is missing rather than assuming the tool ran. |
 | SCH-009 | Reproducibility | **Met, and claimed only because it is measured.** The release build runs a second time into a different target directory and the digests must match. The claim rests on that comparison, not on a successful build. |
 | SCH-010 | Third-party and vendored policy | **Deterministic.** A committed `deny.toml` binds licences, bans and sources; without one the default policy still refuses git dependencies, unknown registries and wildcard versions, and the organization allowlist binds licences when set. Nothing is vendored. |
-| SCH-011 | Published artifact verification | **Met, and honest about its limit.** [SECURITY.md](../../SECURITY.md) documents checksums, attestation identity and subject, both SBOM formats and the embedded dependency list. It states that no release with binary assets has been published yet, so the procedure is unexercised. |
+| SCH-011 | Published artifact verification | **Met, and exercised.** [SECURITY.md](../../SECURITY.md) documents checksums, attestation identity and subject, both SBOM formats and the embedded dependency list. The procedure was run, every step passing, on the assets of release-canary v0.1.0. |
 
 ### What is left
 

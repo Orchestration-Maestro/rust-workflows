@@ -176,5 +176,9 @@ relative references, all fifteen consumer/version cases, unique artifact keys,
 and both binary/crate publisher dry-runs. No publishing secret is required.
 External consumers pin the commit of a release; see [README](../README.md).
 
-Local tests use controlled GitHub/Cargo stand-ins for live writes. No release,
-crate upload, hosted approval or successful remote integration is claimed here.
+Local tests use controlled GitHub/Cargo stand-ins for live writes. The live
+binary path runs on
+[release-canary](https://github.com/Orchestration-Maestro/release-canary): its
+v0.1.0 tag went through preflight, CI, staging, two approved `release`
+deployments, the upload, the attestation and the evidence, and SECURITY.md's
+verification passed on the result. No crate upload to crates.io is claimed.
