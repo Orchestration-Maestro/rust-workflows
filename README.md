@@ -21,6 +21,12 @@
   <img src="https://img.shields.io/badge/JSON%20and%20YAML-jaq-CE422B?style=for-the-badge&amp;logo=rust&amp;logoColor=white" alt="jaq reads the JSON and the YAML" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/Orchestration-Maestro/rust-workflows/actions/workflows/ci-internal.yml"><img src="https://github.com/Orchestration-Maestro/rust-workflows/actions/workflows/ci-internal.yml/badge.svg?branch=main" alt="Repository quality on main" /></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/Orchestration-Maestro/rust-workflows"><img src="https://api.scorecard.dev/projects/github.com/Orchestration-Maestro/rust-workflows/badge" alt="OpenSSF Scorecard" /></a>
+  <a href="https://codecov.io/gh/Orchestration-Maestro/rust-workflows"><img src="https://codecov.io/gh/Orchestration-Maestro/rust-workflows/graph/badge.svg" alt="Codecov coverage of the example fixtures" /></a>
+</p>
+
 ## ⚡ Quick start
 
 Add one file to your Rust repository:

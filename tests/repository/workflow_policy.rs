@@ -52,6 +52,7 @@ fn permissions_timeouts_and_shell_policy_hold_in_every_workflow() {
         "dependabot-auto-merge",
         "upload-sarif",
         "upload-coverage",
+        "scorecard",
     ] {
         let data = workflow(name);
         assert!(data.get("permissions").is_some());
@@ -365,4 +366,50 @@ fn dependabot_updates_merge_through_the_bot_unless_one_is_major() {
             "{types:?}"
         );
     }
+}
+
+/// The `OpenSSF` Scorecard publishes this repository's score, and its API rejects a
+/// run whose workflow breaks its rules: no workflow-level env, defaults or
+/// write scope; `id-token: write` only on the scoring job; that job on a hosted
+/// Ubuntu runner with no env, container or service, running only approved
+/// actions. The findings also land in code scanning.
+#[test]
+fn the_repository_is_scored_within_the_scorecard_publishing_rules() {
+    let data = workflow("scorecard");
+    assert!(data.get("env").is_none() && data.get("defaults").is_none());
+    assert_eq!(data["permissions"], serde_json::json!({"contents": "read"}));
+    let jobs = data["jobs"].as_object().unwrap();
+    assert_eq!(jobs.len(), 1);
+    let job = &jobs["analysis"];
+    assert_eq!(job["runs-on"], "ubuntu-24.04");
+    for forbidden in ["env", "defaults", "container", "services"] {
+        assert!(job.get(forbidden).is_none(), "{forbidden}");
+    }
+    assert_eq!(
+        job["permissions"],
+        serde_json::json!({
+            "contents": "read",
+            "security-events": "write",
+            "id-token": "write"
+        })
+    );
+    let steps = job["steps"].as_array().unwrap();
+    let actions: Vec<&str> = steps
+        .iter()
+        .map(|step| step["uses"].as_str().unwrap().split('@').next().unwrap())
+        .collect();
+    assert_eq!(
+        actions,
+        [
+            "actions/checkout",
+            "ossf/scorecard-action",
+            "github/codeql-action/upload-sarif"
+        ]
+    );
+    assert_eq!(steps[0]["with"]["persist-credentials"], false);
+    assert_eq!(steps[1]["with"]["publish_results"], true);
+    assert_eq!(
+        steps[1]["with"]["results_file"],
+        steps[2]["with"]["sarif_file"]
+    );
 }

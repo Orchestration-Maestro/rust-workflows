@@ -50,6 +50,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── publish-crate.yml                   # Protected crate publication explicitly to public crates.io
 │   │   ├── publish-evidence.yml                # Verifies release reports, dry-run first, then uploads GitHub Release assets
 │   │   ├── release-please.yml                  # Release pull request and tag on a GitHub App token, skipped until the app is set up
+│   │   ├── scorecard.yml                       # Weekly OpenSSF Scorecard of this repository, published for the badge and shown in code scanning
 │   │   ├── unsafe-audit.yml                    # Undefined-behaviour audit under Miri
 │   │   ├── upload-coverage.yml                 # Line coverage and test results into Codecov, the one job with id-token: write
 │   │   └── upload-sarif.yml                    # Clippy and secret-scan SARIF into code scanning, the one job with security-events: write
