@@ -1,94 +1,102 @@
 name: Rust CI
+# Contract: Locked Rust checks, 80% line coverage, security scans, SBOMs and release artifacts
 'on':
   workflow_call:
     inputs:
       working-directory:
-        description: Relative Cargo package or workspace directory
+        description: >-
+          Relative package/workspace directory inside checkout; must contain
+          `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`
         type: string
         default: .
       rust-version:
-        description: Exact stable Rust version, 1.85.0 or newer; empty selects rust-toolchain.toml
+        description: >-
+          Exact stable version, `1.85.0` or newer; empty uses
+          `rust-toolchain.toml`
         type: string
         default: ''
       coverage-threshold:
-        description: Minimum line coverage percentage (0 through 100)
+        description: >-
+          Finite minimum line percentage, inclusive range 0 to 100
         type: number
         default: 80
       artifact-key:
-        description: Unique invocation key within this run and working directory
+        description: >-
+          Invocation identity, 1 to 40 alphanumeric/underscore/hyphen
+          characters, starting alphanumeric
         type: string
         default: ci
       license-policy:
         description: >-
-          Licence and dependency-source policy: auto applies the consumer
-          deny.toml when present, enforce requires one, off skips the gate
+          `auto` applies a consumer `deny.toml` when present, else the default
+          source and version policy plus the `LICENSE_ALLOWLIST` organization
+          allowlist when set; `enforce` requires a consumer file; `off` skips
+          the gate
         type: string
         default: auto
       mutation-test:
         description: >-
-          Run cargo-mutants over the consumer workspace and fail on surviving or
-          timed-out mutants. On by default; set false when run time exceeds the job,
-          or scope it with the consumer mutants config.
+          Run cargo-mutants and fail on surviving mutants; a pull request
+          mutates its diff, a push or tag its own commit; set `false` when run
+          time exceeds the job
         type: boolean
         default: true
       sarif-reports:
         description: >-
-          Emit Clippy and secret-scan findings as SARIF alongside the run reports,
-          for upload-sarif.yml to show in code scanning.
+          Also emit Clippy and secret findings as SARIF, for `upload-sarif.yml`
+          to show in code scanning
         type: boolean
         default: true
       clippy-level:
         description: >-
-          `default` denies every warning from Clippy's default groups.
-          `pedantic` and `nursery` additionally deny those groups, which catch
-          more but also report style opinions that a codebase may reject.
+          `pedantic` or `nursery` also deny those Clippy groups
         type: string
         default: default
       dependency-audit:
         description: >-
-          Require every dependency to carry a recorded cargo-vet audit. Opt-in:
-          it commits the project to reviewing third-party source on every bump.
+          Require a recorded cargo-vet audit for every dependency; opt-in
+          because it commits the team to reviewing third-party source on each
+          bump
         type: boolean
         default: false
       unsafe-policy:
         description: >-
-          `deny` (the default) refuses an `unsafe` block in any workspace member;
-          `allow` leaves the decision to a project that needs it, such as an FFI
-          crate. Applies to the consumer's own crates only, never to its
-          dependencies.
+          Refuses an `unsafe` block in any workspace member; `allow` leaves the
+          decision to a project that needs it
         type: string
         default: deny
       unused-dependencies:
         description: >-
-          Fail when a workspace member declares a dependency it never uses. On by
-          default, as a golden workflow enforces the standard; remove the
-          dependency, or set false.
+          Fail when a workspace member declares a dependency it never uses;
+          remove it or set `false`
         type: boolean
         default: true
       platforms:
         description: >-
-          Also build and test on these platforms, space-separated: macos,
-          windows, linux-arm. Each runs cargo test on its own pinned runner;
-          the gate itself stays on ubuntu-24.04. Empty by default.
+          Also build and test on `macos`, `windows` and `linux-arm`,
+          space-separated; see [platform portability](#platform-portability)
         type: string
         default: ''
       api-compatibility:
         description: >-
-          Fail a pull request that breaks a library's public API without a `!`
-          after the type in its title, through cargo-semver-checks against the
-          base branch. On by default; it needs Rust 1.93 or newer, and a project
-          without a library has no API to check.
+          Fail a pull request that breaks a library's public API without `!`
+          after the type in its title; see [public API
+          compatibility](#public-api-compatibility)
         type: boolean
         default: true
     outputs:
       artifact-id:
-        description: Immutable release artifact ID; available only after required gate
+        description: >-
+          Immutable GitHub release artifact ID in the current run; available
+          only after the required gate
         value: ${{ jobs.gate.outputs.artifact-id }}
       artifact-name:
-        description: Exact release artifact name in this run
+        description: >-
+          Exact artifact name for downstream verification
         value: ${{ jobs.gate.outputs.artifact-name }}
       revision:
-        description: Validated source commit
+        description: >-
+          The checked source SHA
         value: ${{ jobs.gate.outputs.revision }}
 permissions:
   contents: read

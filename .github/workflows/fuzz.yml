@@ -1,4 +1,5 @@
 name: Rust fuzz regression
+# Contract: Opt-in bounded fuzz regression: replays the committed corpus, then explores for a fixed budget
 # Fuzzing has no natural stopping point, so an unbounded run does not belong in
 # CI. What does belong is a bounded regression pass: replay the committed corpus
 # so a previously found crash cannot come back unnoticed, then explore for a
@@ -11,19 +12,23 @@ name: Rust fuzz regression
   workflow_call:
     inputs:
       working-directory:
-        description: Relative Cargo package or workspace directory containing fuzz/
+        description: >-
+          Relative package or workspace directory containing the `fuzz` crate
         type: string
         default: .
       toolchain:
-        description: Nightly toolchain; a dated value keeps the run reproducible
+        description: >-
+          Dated nightly keeps the run reproducible
         type: string
         default: nightly-2026-09-14
       target:
-        description: Fuzz target name; empty runs every target in fuzz/fuzz_targets
+        description: >-
+          One fuzz target name; empty runs every target in `fuzz/fuzz_targets`
         type: string
         default: ''
       max-total-time:
-        description: Seconds of exploration per target, after the corpus replay
+        description: >-
+          Seconds of exploration per target after the corpus replay, 10 to 1800
         type: number
         default: 120
 permissions:

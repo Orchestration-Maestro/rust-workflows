@@ -1,4 +1,5 @@
 name: Upload coverage
+# Contract: The same run's LCOV coverage and JUnit test results into Codecov, through OIDC; isolated so only its job needs `id-token: write`, and skipped for fork pull requests
 # A separate workflow, as for SARIF: logging in to Codecov through OIDC needs
 # id-token: write, and GitHub checks every job's scopes at startup, so holding
 # the upload in ci.yml would force that grant on every CI caller.
@@ -6,7 +7,8 @@ name: Upload coverage
   workflow_call:
     inputs:
       artifact-name:
-        description: The artifact-name output of ci.yml in the same run
+        description: >-
+          The `artifact-name` output of `ci.yml` in the same run
         type: string
         required: true
 permissions:

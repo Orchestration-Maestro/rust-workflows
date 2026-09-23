@@ -51,7 +51,8 @@ rustup toolchain install "$TOOLCHAIN" --profile minimal \
 
 echo 'Installing pinned tools'
 mise trust mise.toml
-mise install
+# --locked installs exactly the URLs mise.lock records and never rewrites it.
+mise install --locked
 # Just is one of the tools mise just installed. Run it from there once, so it
 # can link the toolbelt into .tools/bin and wire the commit hook.
 mise exec -- just setup

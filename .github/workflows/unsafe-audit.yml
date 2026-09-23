@@ -1,4 +1,5 @@
 name: Rust unsafe audit
+# Contract: Opt-in Miri run detecting undefined behaviour; nightly-only, so kept outside the stable-only policy
 # Deliberately separate from ci.yml. Miri is the only way to detect undefined
 # behaviour inside `unsafe`, and it exists only on nightly, which sits outside
 # the exact stable versions ci.yml accepts. Keeping it in its own
@@ -12,25 +13,24 @@ name: Rust unsafe audit
   workflow_call:
     inputs:
       working-directory:
-        description: Relative Cargo package or workspace directory
+        description: >-
+          Relative package or workspace directory
         type: string
         default: .
       toolchain:
         description: >-
-          Nightly toolchain to interpret with. A dated nightly keeps the run
-          reproducible; plain `nightly` follows whatever is current today.
+          Dated nightly keeps the run reproducible; plain `nightly` follows
+          today's
         type: string
         default: nightly-2026-09-14
       test-filter:
         description: >-
-          Optional `cargo test` filter. Miri is slow, so narrowing it to the
-          tests that actually exercise `unsafe` is usually the right scope.
+          Narrow the run to the tests that exercise `unsafe`
         type: string
         default: ''
       strict-provenance:
         description: >-
-          Also reject pointer-provenance mistakes that compile and run correctly
-          today but are not guaranteed to keep working.
+          Also reject pointer-provenance mistakes that work today by accident
         type: boolean
         default: false
 permissions:

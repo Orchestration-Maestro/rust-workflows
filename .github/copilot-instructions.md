@@ -45,6 +45,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── ci-internal.yml                     # Repository quality, the consumer matrix and both dry-run publishers on every pull request
 │   │   ├── ci.yml                              # The reusable Rust CI a consumer calls
 │   │   ├── dependabot-auto-merge.yml           # Queues Dependabot patch and minor updates to merge on the organization's bot token
+│   │   ├── docs-sync.yml                       # On a pull request from this repository, the bot commits the tables just docs regenerated
 │   │   ├── fuzz.yml                            # Bounded fuzz regression on a nightly toolchain
 │   │   ├── publish-binaries.yml                # Protected binary release, dry-run by default
 │   │   ├── publish-crate.yml                   # Protected crate publication explicitly to public crates.io
@@ -62,12 +63,19 @@ generated SBOM output and local download markers are intentionally excluded.
 │   ├── pull_request_template.md                # Review checklist and release-impact prompt
 │   └── zizmor.yml                              # Workflow audit exceptions, each with its reason
 ├── docs/                                       # Contracts, standards and platform boundaries
+│   ├── generators/                             # The jaq filters just docs renders the generated tables with
+│   │   ├── gates.jq                            # The README's three gate tables from gates.toml
+│   │   ├── inputs.jq                           # A workflow's inputs as a Markdown table
+│   │   ├── outputs.jq                          # A workflow's outputs as a Markdown table
+│   │   ├── own-inputs.jq                       # The inputs one publisher has and the other lacks
+│   │   └── shared-inputs.jq                    # The inputs both publishers share, the forwarded ones in one row
 │   ├── standards/                              # The bars this repository holds itself to
 │   │   ├── engineering.md                      # Engineering rules, each with its enforcement status
 │   │   ├── northstar.md                        # The motto, four axes, the KPI table and the test behind each bar
 │   │   └── security.md                         # Security requirements and how they are enforced
 │   ├── README.md                               # Complete workflow contracts and usage examples
 │   ├── ci.md                                   # Every CI input, output, gate and report
+│   ├── gates.toml                              # Every gate the README lists: what fails it, its switch, its standard and proof
 │   ├── platform-requirements.md                # Runners, registries, identity and their unknowns
 │   ├── publishing.md                           # Dry-run and protected publication procedures
 │   ├── rust-gate.md                            # The gate: why one binary holds the step bodies, its invariants and layout
@@ -213,6 +221,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── documentation_coverage.rs           # Every report, input and secret documented; links resolve; cited tests exist
 │   │   ├── evidence_receipt.rs                 # The evidence receipt: produced only when every upstream result succeeded
 │   │   ├── gate_action.rs                      # The gate action: one pin at every call site, and a commit that ships it
+│   │   ├── generated_documents.rs              # Every generated table and the diagram's count are what just docs writes
 │   │   ├── metadata_and_inventory.rs           # Repository files, hook, editor and release policies, the Copilot inventory
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
 │   │   ├── naming_rules.rs                     # Every test module names what it proves in two words at least, every test function in four, no test_ prefix, no _works, _ok or _test suffix

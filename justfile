@@ -25,7 +25,7 @@ setup:
     # bytes that differ from the lock; mise itself is the one download that
     # scripts/bootstrap.sh verifies by hand, into .tools/bin.
     mise trust mise.toml
-    mise install
+    mise install --locked
     # Links keep the gate, the commit hooks and the documentation on the one
     # PATH entry they already use, wherever mise keeps its store.
     mkdir -p .tools/bin
@@ -180,8 +180,125 @@ update-tools:
       echo "codecov-cli ${used} -> ${cli}"
     fi
 
-# Regenerate the canonical Linux document about the gate's steps.
+# Regenerate every generated document: the steps, then every generated table.
 [linux]
 docs:
     cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- describe \
       > docs/steps.md
+    just _tables
+
+# Commit every changed file of the checkout onto $BRANCH as the organization's
+# bot: through createCommitOnBranch, which GitHub signs, where a commit made on
+# the runner would be unsigned and the organization refuses it. The new commit's
+# parent is $HEAD, which must still be the branch's head. Reads GH_TOKEN,
+# GITHUB_REPOSITORY, BRANCH, HEAD, TITLE, BODY, a file, and PATHS, the pathspecs
+# a commit may take; unset, every changed file.
+_commit-as-bot:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    : "${GH_TOKEN:?}" "${GITHUB_REPOSITORY:?}" "${BRANCH:?}" "${HEAD:?}" "${TITLE:?}" "${BODY:?}"
+    read -r -a paths <<< "${PATHS:-}"
+    files="$(mktemp)"
+    while IFS= read -r path; do
+      jaq -n --arg path "$path" --arg contents "$(base64 -w0 "$path")" \
+        "{path: \$path, contents: \$contents}" >> "$files"
+    done < <(git diff --name-only -- "${paths[@]}")
+    if [[ ! -s "$files" ]]; then
+      echo "Nothing changed; nothing to commit."
+      exit 0
+    fi
+    mutation="mutation(\$input: CreateCommitOnBranchInput!) {"
+    mutation+=" createCommitOnBranch(input: \$input) { commit { oid } } }"
+    input="{branch: {repositoryNameWithOwner: \$repo, branchName: \$branch},"
+    input+=" expectedHeadOid: \$head, message: {headline: \$title, body: \$body},"
+    input+=" fileChanges: {additions: \$files}}"
+    jaq -n --arg query "$mutation" --arg repo "$GITHUB_REPOSITORY" --arg branch "$BRANCH" \
+      --arg head "$HEAD" --arg title "$TITLE" --rawfile body "$BODY" \
+      --slurpfile files "$files" "{query: \$query, variables: {input: ${input}}}" \
+      > "$files.json"
+    gh api graphql --input "$files.json" --jq '.data.createCommitOnBranch.commit.oid'
+
+# Rewrite each table between generated markers in README.md and docs/ from its
+# source: workflow inputs and outputs, `# Contract:` lines, mise.toml's `# tool:`
+# lines and docs/gates.toml. A test runs it on a copy and refuses a stale table.
+_tables:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    workflows=.github/workflows
+    # A Markdown code span, kept out of single quotes where ShellCheck reads a
+    # backtick as a command substitution.
+    tick=$'\x60'
+    generate() {
+      local kind="$1" file name contract first group language does
+      shift
+      case "$kind" in
+        inputs)
+          jaq -r --from yaml --arg columns "$2" -f docs/generators/inputs.jq "$workflows/$1" ;;
+        shared-inputs | own-inputs)
+          jaq -r --from yaml --slurpfile other <(jaq --from yaml -c . "$workflows/$2") \
+            -f "docs/generators/$kind.jq" "$workflows/$1" ;;
+        outputs)
+          jaq -r --from yaml -f docs/generators/outputs.jq "$workflows/$1" ;;
+        gates)
+          jaq -r --from toml --arg kind "$1" -f docs/generators/gates.jq docs/gates.toml ;;
+        workflows)
+          printf '%s\n' '| Workflow | Contract |' '| --- | --- |'
+          # ci.yml first: it is the workflow every consumer calls.
+          first=1
+          for file in "$workflows/ci.yml" "$workflows"/*.yml; do
+            if [[ "$file" == "$workflows/ci.yml" ]]; then
+              (( first )) || continue
+              first=0
+            fi
+            grep -q '^  workflow_call:' "$file" || continue
+            contract="$(grep -m1 '^# Contract: ' "$file")" || {
+              echo "${file}: a reusable workflow needs a '# Contract:' line" >&2; return 1;
+            }
+            name="${file##*/}"
+            printf '| [%s](%s) | %s |\n' "${tick}${name}${tick}" "$file" \
+              "${contract#\# Contract: }"
+          done ;;
+        toolbelt)
+          printf '%s\n' '| Tool | What it does | Built with |' '| --- | --- | --- |'
+          while IFS='|' read -r name group language does; do
+            read -r name <<< "${name#\# tool: }"
+            read -r group <<< "$group"
+            read -r language <<< "$language"
+            read -r does <<< "$does"
+            [[ "$group" == "$1" ]] || continue
+            printf '| %s | %s | %s |\n' "${tick}${name}${tick}" "$does" "$language"
+          done < <(grep '^# tool: ' mise.toml) ;;
+        *)
+          echo "unknown generated table: ${kind}" >&2; return 1 ;;
+      esac
+    }
+    # A tool pinned without its `# tool:` line would vanish from the README.
+    while read -r pinned; do
+      grep -q "^# tool: ${pinned} |" mise.toml || {
+        echo "mise.toml pins ${pinned} without a '# tool:' line above it" >&2; exit 1;
+      }
+    done < <(jaq -r --from toml '.tools | keys[]' mise.toml)
+    # The diagram quotes how many controls the scorecard reports; a test runs
+    # the scorecard and holds this count to it.
+    controls="$(grep -oE '"(enforced|optional)"' gate/src/steps/quality_scorecard/mod.rs | wc -l)"
+    sed -i -E "s/>[0-9]+ controls</>${controls} controls</" .github/assets/how-it-works.svg
+    for document in README.md docs/*.md; do
+      rendered="$(mktemp)"
+      inside=0
+      while IFS= read -r line; do
+        if [[ "$line" =~ ^'<!-- generated by just docs: '(.+)' -->'$ ]]; then
+          read -r -a spec <<< "${BASH_REMATCH[1]}"
+          printf '%s\n\n' "$line"
+          generate "${spec[@]}"
+          printf '\n'
+          inside=1
+        elif [[ "$line" == '<!-- end generated -->' ]]; then
+          printf '%s\n' "$line"
+          inside=0
+        elif (( ! inside )); then
+          printf '%s\n' "$line"
+        fi
+      done < "$document" > "$rendered"
+      cat "$rendered" > "$document"
+      rm "$rendered"
+    done
