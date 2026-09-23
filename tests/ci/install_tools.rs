@@ -99,6 +99,25 @@ fn tool_installation_verifies_every_download_and_fetches_nothing_unasked() {
 }
 
 #[test]
+fn a_dropped_connection_is_retried_before_a_download_fails() {
+    // A connection GitHub's release storage reset once failed a whole run
+    // (curl exit 35). curl retries only timeouts and server errors unless it
+    // is told to retry every error.
+    let mut f = Fixture::new();
+    prepare(&f, true);
+    f.set("TOOLS", TABLE);
+    succeeds(&f.run("ci", "install"));
+    assert_eq!(downloads(&f), 2);
+    for call in f
+        .calls()
+        .lines()
+        .filter(|line| line.contains("releases/download/"))
+    {
+        assert!(call.contains("--retry 4 --retry-all-errors "), "{call}");
+    }
+}
+
+#[test]
 fn every_download_comes_directly_from_github_releases() {
     let mut f = Fixture::new();
     prepare(&f, true);
