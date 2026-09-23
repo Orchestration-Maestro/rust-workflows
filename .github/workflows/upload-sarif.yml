@@ -1,0 +1,40 @@
+name: Upload SARIF
+# A separate workflow, as for attestation: code scanning needs
+# security-events: write, and GitHub checks every job's scopes at startup, so
+# holding the upload in ci.yml would force that grant on every CI caller.
+"on":
+  workflow_call:
+    inputs:
+      artifact-name:
+        description: The artifact-name output of ci.yml in the same run
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  upload:
+    name: Upload Clippy and secret-scan SARIF
+    # A fork pull request's token cannot write security events; its SARIF
+    # stays in the reports artifact.
+    if: ${{ github.event_name != 'pull_request_target' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write  # upload SARIF to code scanning
+    steps:
+      - name: Download this run's reports
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: ${{ inputs.artifact-name }}-reports
+          path: reports
+      - name: Upload Clippy findings
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd  # v4.38.1
+        with:
+          sarif_file: reports/clippy.sarif
+          category: clippy
+      - name: Upload secret-scan findings
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd  # v4.38.1
+        with:
+          sarif_file: reports/secrets.sarif
+          category: gitleaks

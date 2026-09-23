@@ -33,10 +33,10 @@ name: Rust CI
         default: true
       sarif-reports:
         description: >-
-          Emit Clippy and secret-scan findings as SARIF alongside the run reports.
-          Uploading them to code scanning needs GitHub Advanced Security.
+          Emit Clippy and secret-scan findings as SARIF alongside the run reports,
+          for upload-sarif.yml to show in code scanning.
         type: boolean
-        default: false
+        default: true
       clippy-level:
         description: >-
           `default` denies every warning from Clippy's default groups.

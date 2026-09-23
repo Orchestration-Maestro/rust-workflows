@@ -30,7 +30,7 @@ committed `deny.toml` applies the same way to every pull request. See [runner se
 | `artifact-key` | string | `ci` | Invocation identity, 1 to 40 alphanumeric/underscore/hyphen characters, starting alphanumeric |
 | `license-policy` | string | `auto` | `auto` applies a consumer `deny.toml` when present, else the default source and version policy plus the `LICENSE_ALLOWLIST` organization allowlist when set; `enforce` requires a consumer file; `off` skips the gate |
 | `mutation-test` | boolean | `true` | Run cargo-mutants and fail on surviving mutants; a pull request mutates its diff, a push or tag its own commit; set `false` when run time exceeds the job |
-| `sarif-reports` | boolean | `false` | Also emit Clippy and secret findings as SARIF; uploading them to code scanning needs GitHub Advanced Security |
+| `sarif-reports` | boolean | `true` | Also emit Clippy and secret findings as SARIF, for `upload-sarif.yml` to show in code scanning |
 | `unused-dependencies` | boolean | `true` | Fail when a workspace member declares a dependency it never uses; remove it or set `false` |
 | `dependency-audit` | boolean | `false` | Require a recorded cargo-vet audit for every dependency; opt-in because it commits the team to reviewing third-party source on each bump |
 | `unsafe-policy` | string | `deny` | Refuses an `unsafe` block in any workspace member; `allow` leaves the decision to a project that needs it |
@@ -59,14 +59,30 @@ a codebase may legitimately reject, which is why the default stays at the groups
 Rust itself treats as correctness-relevant. Two lints are denied at every level:
 `todo!()` and `dbg!()` are scaffolding and do not belong in release code.
 
-Clippy runs once: its JSON diagnostics and optional SARIF are saved before its
-exit status is propagated, including when warnings fail the gate.
+Clippy runs once: its JSON diagnostics and SARIF are saved before its exit
+status is propagated, including when warnings fail the gate.
 
 CodeQL adds taint tracking on top of Clippy. It is not a step of this workflow:
 uploading its results needs `security-events: write`, which would become a
 requirement on every caller. Organization administrators enable CodeQL default
 setup instead; see
 [platform requirements](platform-requirements.md#administrator-owned-setup).
+
+### Code scanning upload
+
+`upload-sarif.yml` shows the run's Clippy and secret-scan SARIF in the
+repository's Security tab, under the categories `clippy` and `gitleaks`, next to
+CodeQL. It is a separate workflow for the same reason CodeQL is not a step here:
+only its job holds `security-events: write`. It downloads the
+`<artifact-name>-reports` artifact of the same run, so it runs after `ci.yml`,
+and it skips fork pull requests, whose token cannot write security events.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `artifact-name` | required | The `artifact-name` output of `ci.yml` in the same run |
+
+A run with `sarif-reports: false` writes no SARIF, and the upload then fails
+rather than report a clean scan it never made.
 
 ### Function and file sizes
 

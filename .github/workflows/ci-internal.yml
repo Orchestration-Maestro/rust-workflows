@@ -129,6 +129,25 @@ jobs:
       package: ${{ matrix.package }}
       artifact-key: matrix-crate
       dry-run: true
+  # upload-sarif.yml end to end: one CI run, then its SARIF into code scanning.
+  sarif-ci:
+    name: SARIF source run
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+    with:
+      working-directory: examples/workspace
+      artifact-key: sarif
+  sarif-upload:
+    name: SARIF upload
+    needs:
+      - sarif-ci
+    uses: ./.github/workflows/upload-sarif.yml
+    permissions:
+      contents: read
+      security-events: write  # the upload workflow's one write scope
+    with:
+      artifact-name: ${{ needs.sarif-ci.outputs.artifact-name }}
   required:
     name: Required consumer tests
     needs:

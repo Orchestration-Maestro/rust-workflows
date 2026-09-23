@@ -29,7 +29,7 @@ name: Publish Rust crate
       sarif-reports:
         description: Forwarded to ci.yml; see docs/ci.md
         type: boolean
-        default: false
+        default: true
       clippy-level:
         description: Forwarded to ci.yml; see docs/ci.md
         type: string

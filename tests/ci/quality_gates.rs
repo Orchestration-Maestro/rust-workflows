@@ -1,7 +1,7 @@
 //! `ci.yml`: the lint, documentation, coverage and analysis gates, each proven
 //! to fail when its tool does.
 
-use crate::harness::{Fixture, refused, succeeds};
+use crate::harness::{Fixture, refused, succeeds, workflow};
 use serde_json::{Value, json};
 use std::fs;
 
@@ -107,6 +107,62 @@ printf '{}' > "$out""#,
     assert!(
         !f.run("ci", "quality").status.success(),
         "an empty SARIF report must fail the step"
+    );
+}
+
+#[test]
+fn sarif_reports_are_on_by_default_and_upload_in_their_own_workflow() {
+    // Every run writes SARIF. Showing it in code scanning needs
+    // security-events: write, which only the separate upload workflow asks
+    // for, so an ordinary CI caller keeps a read-only token. A fork pull
+    // request's token cannot write security events, so the upload skips it.
+    let ci = workflow("ci");
+    assert_eq!(
+        ci["on"]["workflow_call"]["inputs"]["sarif-reports"]["default"],
+        true
+    );
+    let upload = workflow("upload-sarif");
+    let input = &upload["on"]["workflow_call"]["inputs"]["artifact-name"];
+    assert_eq!(input["required"], true);
+    let job = &upload["jobs"]["upload"];
+    assert_eq!(
+        job["permissions"],
+        json!({"contents": "read", "security-events": "write"})
+    );
+    assert_eq!(
+        job["if"],
+        "${{ github.event_name != 'pull_request_target' && \
+         (!github.event.pull_request || \
+         github.event.pull_request.head.repo.full_name == github.repository) }}"
+    );
+    let steps = job["steps"].as_array().unwrap();
+    assert!(
+        steps[0]["uses"]
+            .as_str()
+            .unwrap()
+            .starts_with("actions/download-artifact@")
+    );
+    assert_eq!(
+        steps[0]["with"]["name"],
+        "${{ inputs.artifact-name }}-reports"
+    );
+    let uploads: Vec<(&str, &str, &str)> = steps[1..]
+        .iter()
+        .map(|step| {
+            (
+                step["uses"].as_str().unwrap().split('@').next().unwrap(),
+                step["with"]["sarif_file"].as_str().unwrap(),
+                step["with"]["category"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    let action = "github/codeql-action/upload-sarif";
+    assert_eq!(
+        uploads,
+        [
+            (action, "reports/clippy.sarif", "clippy"),
+            (action, "reports/secrets.sarif", "gitleaks"),
+        ]
     );
 }
 

@@ -98,7 +98,7 @@ permission, a token or an exemption.
 | ID | Status |
 | --- | --- |
 | SDL-001 | Judgement. The trust boundary is a consumer-supplied input reaching a GitHub-hosted runner; each workflow's `validate` step is the mitigation. |
-| SDL-002 | **Deterministic.** Every optional gate but three defaults to off or permissive; mutation testing, unused dependencies and the `unsafe` ban are on by default, as a golden workflow enforces the standard, and each is one input to switch off. The dependency source policy and the scaffolding lints hold for every project and have no input. No unsafe behaviour activates implicitly. |
+| SDL-002 | **Deterministic.** Every optional gate but four defaults to off or permissive; mutation testing, unused dependencies, the `unsafe` ban and SARIF reports are on by default, as a golden workflow enforces the standard, and each is one input to switch off. The dependency source policy and the scaffolding lints hold for every project and have no input. No unsafe behaviour activates implicitly. |
 | SDL-003 | **Deterministic.** The `validate` step of every workflow. This is the single most-tested behaviour in the repository. |
 | SDL-004 | **Deterministic.** Consumer input reaches the gate only through environment variables, never through `${{ }}` interpolation inside a `run:` body, which is the script-injection path in GitHub Actions; every `run:` body is one fixed `rust-gate` command. |
 | SDL-005 | **Deterministic.** Publication requires a protected environment; the workflow cannot self-authorize. |

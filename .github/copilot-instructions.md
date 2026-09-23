@@ -49,7 +49,8 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── publish-crate.yml                   # Protected crate publication explicitly to public crates.io
 │   │   ├── publish-evidence.yml                # Verifies release reports, dry-run first, then uploads GitHub Release assets
 │   │   ├── release-please.yml                  # Release pull request and tag on a GitHub App token, skipped until the app is set up
-│   │   └── unsafe-audit.yml                    # Undefined-behaviour audit under Miri
+│   │   ├── unsafe-audit.yml                    # Undefined-behaviour audit under Miri
+│   │   └── upload-sarif.yml                    # Clippy and secret-scan SARIF into code scanning, the one job with security-events: write
 │   ├── CODEOWNERS                              # Required reviewers for every change
 │   ├── actionlint.yml                          # Uses the built-in GitHub-hosted runner labels
 │   ├── copilot-instructions.md                 # This file: the maintained-file map
