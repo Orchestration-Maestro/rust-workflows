@@ -65,10 +65,14 @@ fn run() -> Outcome {
         }
         let file_name = asset.rsplit('/').next().unwrap_or(asset);
         let archive = downloads.join(file_name);
-        Cmd::new("curl --fail --silent --show-error --location --output")
-            .arg(&archive)
-            .arg(format!("{RELEASES}/{asset}"))
-            .run()?;
+        // A reset connection is transient; retrying every error also retries
+        // a missing asset, which only delays the same refusal.
+        Cmd::new(
+            "curl --retry 4 --retry-all-errors --fail --silent --show-error --location --output",
+        )
+        .arg(&archive)
+        .arg(format!("{RELEASES}/{asset}"))
+        .run()?;
         // Verified before extraction: a tarball is parsed by tar, and bytes
         // nobody vouched for must not reach a parser.
         Cmd::new("sha256sum --check --strict")
