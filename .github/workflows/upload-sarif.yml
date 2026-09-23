@@ -1,4 +1,5 @@
 name: Upload SARIF
+# Contract: Clippy and secret-scan SARIF from the same run into code scanning; isolated so only its job needs `security-events: write`, and skipped for fork pull requests
 # A separate workflow, as for attestation: code scanning needs
 # security-events: write, and GitHub checks every job's scopes at startup, so
 # holding the upload in ci.yml would force that grant on every CI caller.
@@ -6,7 +7,8 @@ name: Upload SARIF
   workflow_call:
     inputs:
       artifact-name:
-        description: The artifact-name output of ci.yml in the same run
+        description: >-
+          The `artifact-name` output of `ci.yml` in the same run
         type: string
         required: true
 permissions:

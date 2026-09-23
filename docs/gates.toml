@@ -1,0 +1,229 @@
+# The gates the README lists, one entry each, rendered into its three
+# tables by `just docs`. kind: always, default or opt-in. `switch` is the
+# input that turns a default gate off, or how an opt-in gate is turned on.
+# Every proof names a test; a test checks that it exists.
+
+[[gate]]
+name = "Formatting, Clippy, tests"
+kind = "always"
+fails = "`cargo fmt --check`; Clippy with every warning denied, plus `todo!()` and `dbg!()`; unit, integration and doc tests"
+standard = "SST-001"
+proofs = [
+  "example_gate_replays_ci_step_bodies_against_every_fixture",
+  "a_failing_consumer_command_fails_the_step_with_its_own_status",
+]
+
+[[gate]]
+name = "Strict rustdoc"
+kind = "always"
+fails = "A public item without documentation, or a broken intra-doc link"
+standard = "North Star, Maintainability"
+proofs = [
+  "strict_rustdoc_fails_the_run_when_cargo_doc_does",
+  "example_gate_replays_ci_step_bodies_against_every_fixture",
+]
+
+[[gate]]
+name = "Line coverage"
+kind = "always"
+fails = "Below `coverage-threshold`, `80` by default"
+standard = "North Star, Quality"
+proofs = [
+  "line_coverage_below_the_threshold_fails_the_run",
+  "example_gate_replays_ci_step_bodies_against_every_fixture",
+]
+
+[[gate]]
+name = "Advisories"
+kind = "always"
+fails = "A RustSec vulnerability, or a yanked, unsound or unmaintained crate"
+standard = "SST-002"
+proofs = ["scanners_propagate_findings_execution_errors_and_missing_tools"]
+
+[[gate]]
+name = "Secret scan"
+kind = "always"
+fails = "A secret anywhere in the source revision; the report is redacted"
+standard = "SEC-001, SST-003"
+proofs = ["scanners_propagate_findings_execution_errors_and_missing_tools"]
+
+[[gate]]
+name = "Declared MSRV"
+kind = "always"
+fails = "A workspace member without `rust-version`, one the selected compiler cannot satisfy, or a workspace that does not compile with the oldest compiler its declarations allow"
+standard = "North Star, Quality"
+proofs = [
+  "the_declared_msrv_must_be_real_and_reachable",
+  "the_declared_msrv_is_the_compiler_the_workspace_is_checked_with",
+]
+
+[[gate]]
+name = "Feature combinations"
+kind = "always"
+fails = "A declared feature that does not compile alone, the default set, no features, or all features together; not a powerset or every feature added to defaults"
+standard = "North Star, Quality"
+proofs = [
+  "every_declared_feature_is_compiled_and_a_broken_one_fails",
+  "real_features_reject_broken_isolated_and_combined_builds",
+]
+
+[[gate]]
+name = "Release build"
+kind = "always"
+fails = "A release build or release-mode test failure, a binary that does not rebuild to the same digest, one without PIE, RELRO, BIND_NOW and a non-executable stack, or one missing its embedded dependency list"
+standard = "SCH-008, SCH-009"
+proofs = ["the_release_build_must_be_reproducible_and_auditable_or_fail"]
+
+[[gate]]
+name = "Payload and SBOMs"
+kind = "always"
+fails = "A lockfile that changes during SBOM generation, an invalid CycloneDX or SPDX document, or a payload whose checksums do not verify"
+standard = "SCH-003, SCH-004"
+proofs = [
+  "release_payload_carries_both_sbom_formats_and_auditable_binaries",
+  "sbom_staging_rejects_malformed_data_and_emits_verifiable_payload",
+]
+
+[[gate]]
+name = "Input validation"
+kind = "always"
+fails = "Any input the workflow cannot prove safe, before a job does any work: paths, versions, keys, publication boundaries"
+standard = "SEC-002, SEC-003"
+proofs = [
+  "ci_rejects_unsafe_paths_and_symlinks",
+  "ci_validates_toolchain_threshold_and_artifact_identity",
+]
+
+[[gate]]
+name = "Mutation testing"
+kind = "default"
+switch = "`mutation-test: false`"
+fails = "A surviving or timed-out mutant in the change: a pull request mutates its diff, a push or tag its own commit"
+standard = "North Star, Quality"
+proofs = [
+  "mutation_testing_scopes_a_pull_request_to_its_diff",
+  "mutation_testing_scopes_a_push_to_its_own_commit",
+  "example_gate_replays_ci_step_bodies_against_every_fixture",
+]
+
+[[gate]]
+name = "Unused dependencies"
+kind = "default"
+switch = "`unused-dependencies: false`"
+fails = "A declared dependency no source file uses"
+standard = "SCH-010"
+proofs = [
+  "unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does",
+]
+
+[[gate]]
+name = "`unsafe` ban"
+kind = "default"
+switch = "`unsafe-policy: allow`"
+fails = "An `unsafe` block in your crates; dependencies are unaffected"
+standard = "SST-001"
+proofs = ["clippy_denies_leftover_scaffolding_at_every_level"]
+
+[[gate]]
+name = "SARIF reports"
+kind = "default"
+switch = "`sarif-reports: false`"
+fails = "A Clippy or secret-scan SARIF report that is missing or empty; `upload-sarif.yml` shows the findings in code scanning"
+standard = "SST-003"
+proofs = [
+  "sarif_reports_are_written_only_when_asked_and_never_empty",
+  "sarif_reports_are_on_by_default_and_upload_in_their_own_workflow",
+]
+
+[[gate]]
+name = "Public API compatibility"
+kind = "default"
+switch = "`api-compatibility: false`"
+fails = "A pull request that breaks a library's public API without `!` after the type in its title; not applicable to a push, a project without a library or Rust older than 1.93"
+standard = "North Star, Quality"
+proofs = [
+  "an_undeclared_break_fails_the_pull_request",
+  "a_declared_break_and_what_has_no_api_are_not_checked",
+]
+
+[[gate]]
+name = "Dependency policy"
+kind = "default"
+switch = "`license-policy: off`"
+fails = "Violations of your `deny.toml`, or the default source/version policy; licence checks apply only with a consumer policy or `LICENSE_ALLOWLIST`. `off` skips the whole gate"
+standard = "SCH-010"
+proofs = [
+  "the_organization_allowlist_adds_licences_and_a_committed_policy_wins",
+  "the_dependency_policy_holds_by_default_and_licences_only_with_a_list",
+]
+
+[[gate]]
+name = "Recorded dependency audits"
+kind = "opt-in"
+switch = "`dependency-audit: true`, cargo-vet against your committed audits"
+standard = "SCH-007"
+proofs = [
+  "unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does",
+]
+
+[[gate]]
+name = "Wider Clippy"
+kind = "opt-in"
+switch = "`clippy-level: pedantic` or `nursery`"
+standard = "SST-001"
+proofs = ["clippy_denies_leftover_scaffolding_at_every_level"]
+
+[[gate]]
+name = "Platform portability"
+kind = "opt-in"
+switch = "`platforms: macos windows linux-arm`; `cargo test` on each pinned runner, held by the required status"
+standard = "North Star, Quality"
+proofs = [
+  "named_platforms_become_a_matrix_of_pinned_runners",
+  "requested_platforms_must_pass_for_the_required_status",
+]
+
+[[gate]]
+name = "Semantic-version compatibility"
+kind = "opt-in"
+switch = "`semver-check: true` on `publish-crate.yml`; off for a first publication, which has no baseline"
+standard = "North Star, Quality"
+proofs = ["semver_check_fails_the_publication_when_cargo_semver_checks_does"]
+
+[[gate]]
+name = "Signed build provenance"
+kind = "opt-in"
+switch = "`attest-binaries.yml`, see below"
+standard = "SCH-001, SCH-002"
+proofs = [
+  "attestation_signs_only_bytes_it_verified_itself",
+  "provenance_attestation_is_isolated_and_reverifies_the_payload",
+]
+
+[[gate]]
+name = "Undefined-behaviour audit"
+kind = "opt-in"
+switch = "`unsafe-audit.yml`, Miri on nightly, see below"
+standard = "SST-006"
+proofs = [
+  "the_undefined_behaviour_audit_refuses_to_pass_without_running_anything",
+]
+
+[[gate]]
+name = "Fuzz regression"
+kind = "opt-in"
+switch = "`fuzz.yml`, bounded, from the committed corpus"
+standard = "SST-006"
+proofs = [
+  "nightly_workflows_reject_every_malformed_input_before_touching_a_toolchain",
+]
+
+[[gate]]
+name = "Release evidence"
+kind = "opt-in"
+switch = "`publish-evidence.yml`, release reports on a protected-tag GitHub Release"
+standard = "SEC-008"
+proofs = [
+  "evidence_upload_requires_verified_files_and_the_existing_release",
+  "evidence_publication_refuses_unverifiable_or_escaping_reports",
+]

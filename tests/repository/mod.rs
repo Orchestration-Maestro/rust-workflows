@@ -5,6 +5,7 @@ mod commit_message_hooks;
 mod documentation_coverage;
 mod evidence_receipt;
 mod gate_action;
+mod generated_documents;
 mod metadata_and_inventory;
 mod naming_rules;
 mod north_star;

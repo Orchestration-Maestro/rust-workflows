@@ -1,57 +1,91 @@
 name: Publish Rust binaries
+# Contract: Same-revision CI, artifact verification, dry-run by default; existing GitHub Release when explicitly enabled
 'on':
   workflow_call:
     inputs:
       working-directory:
-        description: Relative Cargo package or workspace directory
+        description: >-
+          Validated Cargo package/workspace path
         type: string
         default: .
       dry-run:
-        description: Validate and stage only; no publishing credentials or remote writes
+        description: >-
+          Validate/stage only, no authorization API or live publication
         type: boolean
         default: true
       artifact-key:
-        description: Unique invocation key; do not reuse for the same directory in one run
+        description: >-
+          Unique CI invocation key for this directory/run
         type: string
         default: publish-binaries
       coverage-threshold:
-        description: Forwarded to ci.yml; see docs/ci.md
+        description: >-
+          Forwarded unchanged to the CI run, so a release passes the same gates
+          as the project's own CI. `rust-version` is not: a release builds with
+          the committed pin
         type: number
         default: 80
       license-policy:
-        description: Forwarded to ci.yml; see docs/ci.md
+        description: >-
+          Forwarded unchanged to the CI run, so a release passes the same gates
+          as the project's own CI. `rust-version` is not: a release builds with
+          the committed pin
         type: string
         default: auto
       mutation-test:
-        description: Forwarded to ci.yml; see docs/ci.md
+        description: >-
+          Forwarded unchanged to the CI run, so a release passes the same gates
+          as the project's own CI. `rust-version` is not: a release builds with
+          the committed pin
         type: boolean
         default: true
       sarif-reports:
-        description: Forwarded to ci.yml; see docs/ci.md
+        description: >-
+          Forwarded unchanged to the CI run, so a release passes the same gates
+          as the project's own CI. `rust-version` is not: a release builds with
+          the committed pin
         type: boolean
         default: true
       clippy-level:
-        description: Forwarded to ci.yml; see docs/ci.md
+        description: >-
+          Forwarded unchanged to the CI run, so a release passes the same gates
+          as the project's own CI. `rust-version` is not: a release builds with
+          the committed pin
         type: string
         default: default
       dependency-audit:
-        description: Forwarded to ci.yml; see docs/ci.md
+        description: >-
+          Forwarded unchanged to the CI run, so a release passes the same gates
+          as the project's own CI. `rust-version` is not: a release builds with
+          the committed pin
         type: boolean
         default: false
       unsafe-policy:
-        description: Forwarded to ci.yml; see docs/ci.md
+        description: >-
+          Forwarded unchanged to the CI run, so a release passes the same gates
+          as the project's own CI. `rust-version` is not: a release builds with
+          the committed pin
         type: string
         default: deny
       unused-dependencies:
-        description: Forwarded to ci.yml; see docs/ci.md
+        description: >-
+          Forwarded unchanged to the CI run, so a release passes the same gates
+          as the project's own CI. `rust-version` is not: a release builds with
+          the committed pin
         type: boolean
         default: true
       platforms:
-        description: Forwarded to ci.yml; see docs/ci.md
+        description: >-
+          Forwarded unchanged to the CI run, so a release passes the same gates
+          as the project's own CI. `rust-version` is not: a release builds with
+          the committed pin
         type: string
         default: ''
       api-compatibility:
-        description: Forwarded to ci.yml; see docs/ci.md
+        description: >-
+          Forwarded unchanged to the CI run, so a release passes the same gates
+          as the project's own CI. `rust-version` is not: a release builds with
+          the committed pin
         type: boolean
         default: true
     outputs:

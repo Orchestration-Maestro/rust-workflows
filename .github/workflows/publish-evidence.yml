@@ -1,19 +1,24 @@
 name: Publish Rust release evidence
+# Contract: Dry-run-first archive of release reports; live assets only on protected-tag GitHub Releases
 # Ordinary CI artifacts expire. This opt-in workflow archives release reports
 # as assets on an existing GitHub Release, not as durable evidence for every run.
 'on':
   workflow_call:
     inputs:
       artifact-name:
-        description: Reports artifact produced by CI, without the -reports suffix
+        description: >-
+          CI artifact name, without its `-reports` suffix; downloaded from this
+          run
         type: string
         required: true
       revision:
-        description: Validated source commit that produced the reports
+        description: >-
+          Immutable source SHA, equal to `github.sha` and the scorecard revision
         type: string
         required: true
       dry-run:
-        description: Validate and archive locally; no authorization API or remote writes
+        description: >-
+          Validate reports and create a local archive only
         type: boolean
         default: true
 permissions:

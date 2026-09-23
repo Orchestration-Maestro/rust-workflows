@@ -1,4 +1,5 @@
 name: Attest Rust binaries
+# Contract: Opt-in signed build provenance for a re-verified payload; isolated so its scopes bind only its callers
 # Separate from publish-binaries.yml on purpose. GitHub validates the scopes of
 # every job in a called workflow at startup, including jobs an `if:` would skip,
 # so a workflow that declares `attestations: write` imposes that grant on every
@@ -10,18 +11,21 @@ name: Attest Rust binaries
   workflow_call:
     inputs:
       artifact-id:
-        description: Immutable release artifact ID produced by the CI workflow
+        description: >-
+          Immutable release artifact ID produced by the CI workflow
         type: string
         required: true
       revision:
-        description: Validated source commit that produced the artifact
+        description: >-
+          Validated source commit that produced the artifact; must equal the
+          checked-out SHA
         type: string
         required: true
       on-unavailable:
         description: >-
-          `skip` tolerates only GitHub Enterprise Server identified by a successful
-          metadata API response; `fail` blocks it. Unknown availability, missing
-          Cloud entitlement, signing, OIDC and API errors always block.
+          Only Enterprise Server identified by a successful metadata response
+          may be skipped; `fail` rejects it. Unknown availability and signing,
+          OIDC, API or verification errors always block
         type: string
         default: skip
     outputs:
