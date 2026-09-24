@@ -1,6 +1,8 @@
 //! The gate action: one pin at every call site, and a commit that ships it.
 
-use crate::harness::{Fixture, action, helper_action, root, succeeds, workflow, workflow_steps};
+use crate::harness::{
+    Fixture, action, helper_action, root, rust_files, succeeds, workflow, workflow_steps,
+};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
@@ -189,4 +191,38 @@ fn an_unknown_command_is_refused_by_name() {
         stderr.contains("unknown gate command: nonsense"),
         "{stderr}"
     );
+}
+
+#[test]
+fn every_file_the_gate_reads_when_built_ships_in_the_action_archive() {
+    // GitHub fetches the action as the repository's archive, which leaves out
+    // every export-ignore path; a file the gate reads at build time and the
+    // archive leaves out fails every call site's build.
+    let mut read = 0;
+    for source in rust_files(&root().join("gate/src")) {
+        let text = fs::read_to_string(&source).unwrap();
+        let directory = source.parent().unwrap();
+        for (index, _) in text.match_indices("include_str!(\"") {
+            let rest = &text[index + "include_str!(\"".len()..];
+            let relative = rest.split('"').next().unwrap();
+            let Ok(file) = directory.join(relative).canonicalize() else {
+                // A fixture inside a test's string, not a file of the gate.
+                continue;
+            };
+            let path = file.strip_prefix(root()).unwrap().display().to_string();
+            let attribute = Command::new("git")
+                .args(["check-attr", "export-ignore", "--", &path])
+                .current_dir(root())
+                .output()
+                .unwrap();
+            let attribute = String::from_utf8_lossy(&attribute.stdout).into_owned();
+            assert!(
+                attribute.ends_with(": unspecified\n"),
+                "the gate reads {path} when built, and the action archive leaves it out: \
+                 {attribute}"
+            );
+            read += 1;
+        }
+    }
+    assert!(read >= 6, "only {read} files the gate reads were checked");
 }

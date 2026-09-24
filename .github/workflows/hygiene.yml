@@ -53,4 +53,8 @@ jobs:
         run: rust-gate managed-files
       - name: Commit hooks over every file
         id: hooks
+        env:
+          # mise asks GitHub's API for each hook's release; an anonymous
+          # runner shares its rate limit with every other job on its address.
+          MISE_GITHUB_TOKEN: ${{ github.token }}
         run: rust-gate hooks

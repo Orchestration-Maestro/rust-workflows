@@ -269,3 +269,11 @@ Rulings taken while executing, newest last.
     changes two defaults a caller meets on moving its pin, the coverage floor
     and the dependency audit. Release-please proposes 2.0.0 from it, and phase
     E's repin joins that release rather than opening it.
+21. The first run of phase E's pin showed two faults, fixed in a pull request of
+    their own before the repin moves to it: the action is fetched as the
+    repository's archive, which left out `.editorconfig` and `.gitattributes`,
+    two files the gate reads when built, so neither is export-ignore any more
+    and a test holds every file the gate reads to the archive; and mise, even
+    through the aqua backend, asks GitHub's API for each release, so the
+    `hooks` step and the live hooks test pass it the job's read-only token as
+    `MISE_GITHUB_TOKEN`, which no hook reads.
