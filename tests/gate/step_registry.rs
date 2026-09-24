@@ -250,7 +250,7 @@ fn names_used(text: &str, checks: &BTreeMap<String, String>) -> [BTreeSet<String
     ];
     let body = text.split("#[cfg(test)]").next().unwrap_or_default();
     // The declaration is the claim under test, not evidence for itself.
-    let start = body.find("pub(crate) const STEPS").unwrap_or(body.len());
+    let start = body.find("const STEPS: &[Step]").unwrap_or(body.len());
     let end = body[start..]
         .find("];")
         .map_or(body.len(), |offset| start + offset + 2);
@@ -319,14 +319,14 @@ fn every_step_module_declares_what_its_source_uses_and_nothing_else() {
     for entry in fs::read_dir(root().join("gate/src/steps")).unwrap() {
         let path = entry.unwrap().path();
         let module = path.file_name().unwrap().to_string_lossy().into_owned();
-        if module == "mod.rs" {
+        if module == "mod.rs" || module == "registry.rs" {
             continue;
         }
         let text = step_source(&path);
         // A module is named after what it does; its declaration names the
         // steps, so the described steps of this module are the ones whose
         // workflow and id the declaration spells.
-        let start = text.find("pub(crate) const STEPS").unwrap_or(text.len());
+        let start = text.find("const STEPS: &[Step]").unwrap_or(text.len());
         let end = text[start..]
             .find("];")
             .map_or(text.len(), |offset| start + offset + 2);
@@ -347,7 +347,7 @@ fn every_step_module_declares_what_its_source_uses_and_nothing_else() {
         );
         let [inputs, tools, reports] = names_used(&text, &checks);
         let body = text.split("#[cfg(test)]").next().unwrap_or_default();
-        let start = body.find("pub(crate) const STEPS").unwrap_or(body.len());
+        let start = body.find("const STEPS: &[Step]").unwrap_or(body.len());
         let end = body[start..]
             .find("];")
             .map_or(body.len(), |offset| start + offset + 2);

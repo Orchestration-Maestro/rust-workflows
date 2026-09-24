@@ -73,7 +73,7 @@ The steps door holds the registry and the scorecard's door holds its step, both 
 - Modify: tests/gate/step_registry.rs, tests/gate/layer_boundaries.rs, justfile, docs/rust-gate.md, .github/copilot-instructions.md
 
 **Interfaces:**
-- Produces: `crate::steps::run(command: &str, step: &str) -> Outcome` and `crate::steps::describe() -> String`, unchanged for `main.rs`; directory steps declare `pub(in crate::steps) const STEPS: &[Step]` and their door re-exports it with `pub(super) use step::STEPS;`.
+- Produces: `crate::steps::run(command: &str, step: &str) -> Outcome` and `crate::steps::describe() -> String`, unchanged for `main.rs`; directory steps declare `pub(crate) const STEPS: &[Step]` in `step.rs` and their door re-exports it with `pub(super) use step::STEPS;`. A `pub(in crate::steps)` visibility would read as an import of `crate::steps` to the repository's current layer scanner.
 
 - [ ] **Step 1: Create the registry module**
 
@@ -81,16 +81,9 @@ The steps door holds the registry and the scorecard's door holds its step, both 
 
 ```rust
 //! The registry of every step: the declarations in the order the workflows
-//! run them, and the two doors `main.rs` calls, `run` and `describe`.
+//! run them, each named by its path so the list reads as the modules it
+//! reaches, and the two doors `main.rs` calls, `run` and `describe`.
 
-use super::{
-    api_compatibility, attest_binaries, binary_hardening, configure_cargo_registry,
-    declared_msrv, dependency_policy, feature_combinations, format_lint_test, fuzz_regression,
-    install_toolchain, install_tools, line_coverage, mutation_testing, publish_binaries,
-    publish_crate, publish_evidence, quality_scorecard, recorded_audits, release_build,
-    report_duplicates, report_sizes, require_every_check, secret_scan, stage_payload,
-    unsafe_audit, unused_dependencies, validate_inputs, verify_payload, vulnerability_audit,
-};
 use crate::runner::{Failure, Outcome, Step, enter};
 use std::fmt::Write as _;
 
@@ -98,39 +91,39 @@ use std::fmt::Write as _;
 /// `ci.yml` first, then the commands several workflows share, then the other
 /// workflows.
 const REGISTRY: &[&[Step]] = &[
-    validate_inputs::STEPS,
-    configure_cargo_registry::STEPS,
-    install_toolchain::STEPS,
-    format_lint_test::STEPS,
-    report_sizes::STEPS,
-    report_duplicates::STEPS,
-    line_coverage::STEPS,
-    vulnerability_audit::STEPS,
-    dependency_policy::STEPS,
-    mutation_testing::STEPS,
-    api_compatibility::STEPS,
-    secret_scan::STEPS,
-    declared_msrv::STEPS,
-    feature_combinations::STEPS,
-    unused_dependencies::STEPS,
-    recorded_audits::STEPS,
-    release_build::STEPS,
-    binary_hardening::STEPS,
-    stage_payload::STEPS,
-    quality_scorecard::STEPS,
-    require_every_check::STEPS,
-    install_tools::STEPS,
-    verify_payload::STEPS,
-    publish_binaries::STEPS,
-    publish_crate::STEPS,
-    publish_evidence::STEPS,
-    attest_binaries::STEPS,
-    fuzz_regression::STEPS,
-    unsafe_audit::STEPS,
+    super::validate_inputs::STEPS,
+    super::configure_cargo_registry::STEPS,
+    super::install_toolchain::STEPS,
+    super::format_lint_test::STEPS,
+    super::report_sizes::STEPS,
+    super::report_duplicates::STEPS,
+    super::line_coverage::STEPS,
+    super::vulnerability_audit::STEPS,
+    super::dependency_policy::STEPS,
+    super::mutation_testing::STEPS,
+    super::api_compatibility::STEPS,
+    super::secret_scan::STEPS,
+    super::declared_msrv::STEPS,
+    super::feature_combinations::STEPS,
+    super::unused_dependencies::STEPS,
+    super::recorded_audits::STEPS,
+    super::release_build::STEPS,
+    super::binary_hardening::STEPS,
+    super::stage_payload::STEPS,
+    super::quality_scorecard::STEPS,
+    super::require_every_check::STEPS,
+    super::install_tools::STEPS,
+    super::verify_payload::STEPS,
+    super::publish_binaries::STEPS,
+    super::publish_crate::STEPS,
+    super::publish_evidence::STEPS,
+    super::attest_binaries::STEPS,
+    super::fuzz_regression::STEPS,
+    super::unsafe_audit::STEPS,
 ];
 ```
 
-Then append, unchanged, the four items that follow `REGISTRY` in the current `gate/src/steps/mod.rs`: `fn steps()`, `pub(crate) fn run`, `pub(crate) fn describe` and `fn cell`, with their doc comments.
+Then append, unchanged, the four items that follow `REGISTRY` in the current `gate/src/steps/mod.rs`: `fn steps()`, `pub(crate) fn run`, `pub(crate) fn describe` and `fn cell`, with their doc comments. Each step is named by its path, not through a `use super::{...}` group: the repository's current cycle scanner does not expand braces and would report `steps/mod.rs` and `registry.rs` naming each other.
 
 - [ ] **Step 2: Reduce the steps door to declarations**
 
@@ -179,7 +172,7 @@ pub(crate) use registry::{describe, run};
 - [ ] **Step 3: Move the scorecard step out of its door**
 
 1. `git mv gate/src/steps/quality_scorecard/mod.rs gate/src/steps/quality_scorecard/step.rs`
-2. In `step.rs`: delete the line `mod scorecard;` and the blank line after it; replace `use self::scorecard::{Control, Scorecard, State};` with `use super::scorecard::{Control, Scorecard, State};`; replace `pub(crate) const STEPS: &[Step]` with `pub(in crate::steps) const STEPS: &[Step]`.
+2. In `step.rs`: delete the line `mod scorecard;` and the blank line after it; replace `use self::scorecard::{Control, Scorecard, State};` with `use super::scorecard::{Control, Scorecard, State};`. The declaration keeps `pub(crate)`.
 3. Create `gate/src/steps/quality_scorecard/mod.rs`:
 
 ```rust
@@ -195,13 +188,34 @@ pub(super) use step::STEPS;
 
 - [ ] **Step 4: Teach the repository tests the new shape**
 
-1. tests/gate/step_registry.rs: replace each of the three occurrences of `"pub(crate) const STEPS"` with `"const STEPS: &[Step]"`, so a directory step's `pub(in crate::steps)` declaration is found; and replace `if module == "mod.rs" {` with `if module == "mod.rs" || module == "registry.rs" {`.
+1. tests/gate/step_registry.rs: replace each of the three occurrences of `"pub(crate) const STEPS"` with `"const STEPS: &[Step]"`, so a declaration is found whatever its visibility; and replace `if module == "mod.rs" {` with `if module == "mod.rs" || module == "registry.rs" {`.
 2. tests/gate/layer_boundaries.rs, in `imports_flow_one_way_through_the_layer_gates`: replace `if layer != "steps" || name == "mod.rs" {` with:
 
 ```rust
             // The registry is the steps door's implementation: the one module
             // that names every step, and the only one allowed to.
             if layer != "steps" || name == "mod.rs" || name == "registry.rs" {
+```
+
+   and, in the same test, let a file inside a step's directory hold the step's own declaration: replace
+
+```rust
+                assert!(
+                    !body.contains("pub(crate) "),
+                    "{name} is a step's internal seam; pub(super) is as far as it reaches"
+                );
+```
+
+   with
+
+```rust
+                let offered = body.lines().find(|line| {
+                    line.starts_with("pub(crate) ") && !line.starts_with("pub(crate) const STEPS:")
+                });
+                assert!(
+                    offered.is_none(),
+                    "{name} is a step's internal seam; pub(super) is as far as it reaches"
+                );
 ```
 
 3. justfile, in `_tables`: replace `gate/src/steps/quality_scorecard/mod.rs` with `gate/src/steps/quality_scorecard/step.rs`.
@@ -740,6 +754,15 @@ mod tests {
     }
 
     #[test]
+    fn a_visibility_path_is_not_an_import() {
+        assert!(paths("pub(in crate::steps) const STEPS: u8 = crate::a::B;\n")
+            .iter()
+            .all(|path| path.segments.first().is_some_and(|first| first == "crate")
+                && path.segments.get(1).is_some_and(|second| second == "a")));
+        assert!(paths("pub(in crate::steps) fn f() {}\n").is_empty());
+    }
+
+    #[test]
     fn chains_outside_use_declarations_come_with_their_line() {
         let code =
             "use std::fs;\nfn f() {\n    crate::a::b(super::c::D::new());\n    x.y::<u8>();\n}\n";
@@ -800,8 +823,27 @@ pub(crate) fn paths(code: &str) -> Vec<NamedPath> {
         );
         blank(rest.get_mut(start..end).unwrap_or_default());
     }
+    blank_visibilities(&mut rest);
     found.extend(chains(&String::from_utf8(rest).unwrap_or_default()));
     found
+}
+
+/// Blank every `pub(in path)` group: a visibility names a module without
+/// depending on it.
+fn blank_visibilities(code: &mut [u8]) {
+    let mut index = 0;
+    while let Some(offset) = code
+        .get(index..)
+        .and_then(|rest| rest.windows(4).position(|window| window == b"pub("))
+    {
+        let open = index + offset;
+        let close = code
+            .get(open..)
+            .and_then(|rest| rest.iter().position(|&byte| byte == b')'))
+            .map_or(code.len(), |length| open + length + 1);
+        blank(code.get_mut(open..close).unwrap_or_default());
+        index = close;
+    }
 }
 
 /// The leaves of one `use` declaration: `use a::{b, c::d};` gives `a::b` and
@@ -1837,7 +1879,7 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 /// What this step declares: its inputs, its tools and its reports.
-pub(in crate::steps) const STEPS: &[Step] = &[Step {
+pub(crate) const STEPS: &[Step] = &[Step {
     workflow: "ci",
     id: "architecture",
     summary: "Module structure rules ARC-001 to ARC-007",
@@ -3399,8 +3441,11 @@ fn a_step_offers_only_its_declaration_and_reaches_no_sibling() {
         let body = text.split("#[cfg(test)]").next().unwrap_or_default();
         checked += 1;
         if name.contains('/') {
+            let offered = body.lines().find(|line| {
+                line.starts_with("pub(crate) ") && !line.starts_with("pub(crate) const STEPS:")
+            });
             assert!(
-                !body.contains("pub(crate) "),
+                offered.is_none(),
                 "{name} is a step's internal seam; it reaches no further than the step"
             );
             continue;

@@ -85,16 +85,23 @@ fn imports_flow_one_way_through_the_layer_gates() {
                 );
                 checked += 1;
             }
-            if layer != "steps" || name == "mod.rs" {
+            // The registry is the steps door's implementation: the one module
+            // that names every step, and the only one allowed to.
+            if layer != "steps" || name == "mod.rs" || name == "registry.rs" {
                 continue;
             }
             let body = text.split("#[cfg(test)]").next().unwrap_or_default();
             // A file inside a step's directory is that step's internal seam: it
             // splits an implementation without offering the crate a name, which
             // is what a file split for its size used to do from a shared layer.
+            // The one exception is the step's own declaration, which its
+            // directory's door hands to the registry.
             if name.contains('/') && !name.ends_with("/mod.rs") {
+                let offered = body.lines().find(|line| {
+                    line.starts_with("pub(crate) ") && !line.starts_with("pub(crate) const STEPS:")
+                });
                 assert!(
-                    !body.contains("pub(crate) "),
+                    offered.is_none(),
                     "{name} is a step's internal seam; pub(super) is as far as it reaches"
                 );
                 continue;

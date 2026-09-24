@@ -139,8 +139,9 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   └── step_declaration.rs             # A step as data: what it declares, and the refusal of anything undeclared
 │   │   ├── steps/                              # One module per step, private to the directory; mod.rs is the one door
 │   │   │   ├── quality_scorecard/              # rust-gate scorecard: the step and the value it renders
-│   │   │   │   ├── mod.rs                      # rust-gate scorecard: what ran, as JSON, Markdown and a self-contained badge
-│   │   │   │   └── scorecard.rs                # A run's scorecard as a value: its controls, and the JSON, Markdown and badge of them
+│   │   │   │   ├── mod.rs                      # The step's door: its two modules and its declaration
+│   │   │   │   ├── scorecard.rs                # A run's scorecard as a value: its controls, and the JSON, Markdown and badge of them
+│   │   │   │   └── step.rs                     # rust-gate scorecard: what ran, as JSON, Markdown and a self-contained badge
 │   │   │   ├── api_compatibility.rs            # rust-gate api: cargo-semver-checks against the base branch unless the title declares a break
 │   │   │   ├── attest_binaries.rs              # rust-gate attest-binaries: validate, extract the SBOM, verify, record the outcome
 │   │   │   ├── binary_hardening.rs             # rust-gate hardening: reproducible, PIE, RELRO, no executable stack, auditable
@@ -153,12 +154,13 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── install_toolchain.rs            # rust-gate install-tools: what it refuses, honours, and ci.yml installs
 │   │   │   ├── install_tools.rs                # rust-gate install-tools: official release assets, digests verified before extraction
 │   │   │   ├── line_coverage.rs                # rust-gate coverage: LCOV line coverage, failing below the threshold
-│   │   │   ├── mod.rs                          # The registry of every step, run and describe, the two doors main.rs calls
+│   │   │   ├── mod.rs                          # One module per step, the registry among them; run and describe are its doors
 │   │   │   ├── mutation_testing.rs             # rust-gate mutants: cargo-mutants scoped to the change, a diff or the last commit
 │   │   │   ├── publish_binaries.rs             # rust-gate publish-binaries: the publication boundary of the binary publisher
 │   │   │   ├── publish_crate.rs                # rust-gate publish-crate: boundary, toolchain, package, semver, publish
 │   │   │   ├── publish_evidence.rs             # rust-gate publish-evidence: validate reports and upload release assets
 │   │   │   ├── recorded_audits.rs              # rust-gate vet: cargo-vet against the committed ledger
+│   │   │   ├── registry.rs                     # Every step's declaration in workflow order, and the two doors main.rs calls
 │   │   │   ├── release_build.rs                # rust-gate build: release tests, auditable build, packages, per-member SBOMs
 │   │   │   ├── report_duplicates.rs            # rust-gate duplication: functions whose syntax trees look alike, reported and never enforced
 │   │   │   ├── report_sizes.rs                 # rust-gate complexity: function and file sizes, reported and never enforced
