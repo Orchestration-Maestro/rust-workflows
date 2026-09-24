@@ -284,3 +284,7 @@ Rulings taken while executing, newest last.
     `hooks`, an `applied` output on each new step, and one scorecard control
     per rule family. The repin and the removal of `quality-preview` follow,
     pinned to that commit.
+23. The repin names `12f8b53`, the gate of rulings 21 and 22 on top of phases A
+    to D, and removes `quality-preview` with every guard it held: from here on
+    every call runs every rule, and a caller that still passes the input fails
+    to start.

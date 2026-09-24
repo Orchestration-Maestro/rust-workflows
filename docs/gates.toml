@@ -187,8 +187,8 @@ proofs = [
 
 [[gate]]
 name = "Source rules"
-kind = "opt-in"
-switch = "`quality-preview: true`, until v2.0.0 runs it always"
+kind = "always"
+fails = "A finding of ARC, SIZE, NAME, DOC, LIB, TST, WSP or LNT: an import cycle, a door that does more than declare, a file or line past its limit, a name out of form, a lint not denied"
 standard = "ARC, SIZE, NAME, DOC, LIB, TST, WSP and LNT"
 proofs = [
   "an_import_cycle_between_two_files_is_refused_by_name",
@@ -218,8 +218,8 @@ proofs = [
 
 [[gate]]
 name = "Repository hygiene"
-kind = "opt-in"
-switch = "`quality-preview: true`, until v2.0.0 runs it always"
+kind = "always"
+fails = "A marker without its issue, a pending snapshot, a large file, a mode or link fault, a missing README, LICENSE or CHANGELOG, a wide shell line"
 standard = "HYG-001 to HYG-005, SIZE-003"
 proofs = [
   "unlinked_markers_in_comments_are_refused_and_linked_ones_pass",
@@ -230,8 +230,8 @@ proofs = [
 
 [[gate]]
 name = "Managed files"
-kind = "opt-in"
-switch = "`quality-preview: true`, until v2.0.0 runs it always"
+kind = "always"
+fails = "A managed file whose bytes differ from the gate's rendering, missing ones included"
 standard = "The generated files of every repository, TST-004, DEP-001"
 proofs = [
   "init_writes_every_managed_file_and_the_check_finds_them_equal",
@@ -241,8 +241,8 @@ proofs = [
 
 [[gate]]
 name = "Commit hooks"
-kind = "opt-in"
-switch = "`quality-preview: true`, until v2.0.0 runs it always"
+kind = "always"
+fails = "A commit hook that fails over every file"
 standard = "The universal set, UNI"
 proofs = [
   "the_hooks_step_runs_prek_over_every_file_and_skips_what_ci_runs_itself",
@@ -253,8 +253,8 @@ proofs = [
 
 [[gate]]
 name = "Pull request rules"
-kind = "opt-in"
-switch = "`quality-preview: true`, until v2.0.0 runs it always"
+kind = "always"
+fails = "New lines under their coverage floor, or a feat or fix pull request that touches no test"
 standard = "COV-002, PRL-001, PRL-002"
 proofs = [
   "new_lines_that_never_run_are_refused_past_the_allowance",
@@ -264,7 +264,7 @@ proofs = [
 [[gate]]
 name = "Performance budget"
 kind = "opt-in"
-switch = "`[performance] benches` in maestro-quality.toml, with `quality-preview: true` until v2.0.0"
+switch = "`[performance] benches` in maestro-quality.toml"
 standard = "PRF-001"
 proofs = [
   "a_benchmark_past_its_budget_is_refused_unless_excused",

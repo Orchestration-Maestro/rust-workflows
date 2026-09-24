@@ -88,13 +88,6 @@ name: Publish Rust crate
           the committed pin
         type: boolean
         default: true
-      quality-preview:
-        description: >-
-          Forwarded unchanged to the CI run, so a release passes the same gates
-          as the project's own CI. `rust-version` is not: a release builds with
-          the committed pin
-        type: boolean
-        default: false
       semver-check:
         description: >-
           Compare against the newest published version; leave off for a first
@@ -141,7 +134,7 @@ jobs:
       actions: read  # inspect release environment reviewers and tag policies
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@75807b0f9d6fc3f3389f43d3890342b23943b3cb  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@12f8b536457153e7e1285ccee2d77eb3c804b3a6  # rust-workflows: the commit that ships this gate
       - name: Install verified JSON tool
         run: rust-gate install-tools
         env:
@@ -175,7 +168,6 @@ jobs:
       unsafe-policy: ${{ inputs.unsafe-policy }}
       unused-dependencies: ${{ inputs.unused-dependencies }}
       api-compatibility: ${{ inputs.api-compatibility }}
-      quality-preview: ${{ inputs.quality-preview }}
       platforms: ${{ inputs.platforms }}
   stage:
     name: Stage the crate package
@@ -193,7 +185,7 @@ jobs:
       toolchain: ${{ steps.toolchain.outputs.channel }}
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@75807b0f9d6fc3f3389f43d3890342b23943b3cb  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@12f8b536457153e7e1285ccee2d77eb3c804b3a6  # rust-workflows: the commit that ships this gate
       - name: Checkout validated consumer revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -255,7 +247,7 @@ jobs:
     environment: release
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@75807b0f9d6fc3f3389f43d3890342b23943b3cb  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@12f8b536457153e7e1285ccee2d77eb3c804b3a6  # rust-workflows: the commit that ships this gate
       - name: Checkout validated consumer revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
