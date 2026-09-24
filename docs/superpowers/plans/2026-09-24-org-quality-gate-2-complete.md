@@ -292,3 +292,10 @@ Rulings taken while executing, newest last.
     had no assets. The `hooks` step of `ci.yml` and `hygiene.yml` gets the mise
     `scripts/bootstrap.sh` pins, installed with its digest like every other
     tool; the version test reads mise's pin from `bootstrap.sh`.
+25. Phase G's first sync left release-canary's `release.yml` at v1.2.1: `sync`
+    moved the caller alone, and Dependabot ignores rust-workflows. `sync` now
+    moves every call to rust-workflows in `.github/workflows/` and the
+    organization's workflow templates to the caller's release, and
+    `sync --check` refuses one left behind. release-please, on creating a
+    Release, sends `rust-workflows-release` to `.github`, whose quality-sync
+    workflow starts on it; the daily run stays as the net.

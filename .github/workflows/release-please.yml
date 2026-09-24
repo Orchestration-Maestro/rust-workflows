@@ -30,8 +30,31 @@ jobs:
           permission-issues: write
           permission-pull-requests: write
       - name: Open the release pull request, or tag the merged one
+        id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7  # v5.0.0
         with:
           token: ${{ steps.token.outputs.token }}
           config-file: .github/release-please/config.json
           manifest-file: .github/release-please/manifest.json
+      # A new release reaches every repository now, not at the next daily run:
+      # the quality-sync workflow of the organization's .github repository
+      # starts on this event and opens one sync pull request per repository.
+      - name: Mint the token that starts the organization's sync
+        id: sync-token
+        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: .github
+          permission-contents: write
+      - name: Start the organization's sync to the new release
+        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.sync-token.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/${OWNER}/.github/dispatches" \
+            -f event_type=rust-workflows-release

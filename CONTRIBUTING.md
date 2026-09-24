@@ -236,7 +236,10 @@ The workflow then keeps a release pull request open from the conventional
 titles merged to `main`; merging it tags `vMAJOR.MINOR.PATCH` and creates the
 GitHub Release. An App token, not `GITHUB_TOKEN`, opens that pull request: the
 organization forbids `GITHUB_TOKEN` from opening one, and a pull request it
-opened would trigger none of the checks a merge requires.
+opened would trigger none of the checks a merge requires. A Release it creates
+sends the event `rust-workflows-release` to the organization's `.github`
+repository, whose quality-sync workflow then opens a sync pull request in every
+repository at once rather than at its next daily run.
 
 `.github/workflows/dependabot-auto-merge.yml` uses the same App to queue a
 squash merge of each Dependabot pull request, which groups an ecosystem's

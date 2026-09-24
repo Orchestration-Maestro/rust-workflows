@@ -170,7 +170,9 @@ fn release_manifest_matches_the_version(root: &Path) {
 
 /// release-please runs as an Action on a GitHub App token: the organization
 /// forbids `GITHUB_TOKEN` from opening pull requests, and a pull request it
-/// opened would trigger none of the checks a merge requires.
+/// opened would trigger none of the checks a merge requires. A release it
+/// creates starts the organization's sync at once, through an event to the
+/// `.github` repository only.
 fn release_workflow_uses_an_app_token(root: &Path) {
     assert!(!root.join(".github/release-please.yml").exists());
     let workflow = root.join(".github/workflows/release-please.yml");
@@ -189,6 +191,22 @@ fn release_workflow_uses_an_app_token(root: &Path) {
         step(".with[\"manifest-file\"]"),
         ".github/release-please/manifest.json"
     );
+    let created = "${{ steps.release.outputs.releases_created == 'true' }}";
+    let later = |index: usize, field: &str| {
+        query(&workflow, &format!(".jobs.release.steps[{index}]{field}"))
+    };
+    assert_eq!(step(".id"), "release");
+    assert!(later(2, ".uses").starts_with("actions/create-github-app-token@"));
+    assert_eq!(later(2, ".with.repositories"), ".github");
+    assert_eq!(later(2, ".with[\"permission-contents\"]"), "write");
+    assert_eq!(
+        later(3, ".env.GH_TOKEN"),
+        "${{ steps.sync-token.outputs.token }}"
+    );
+    assert!(later(3, ".run").contains("-f event_type=rust-workflows-release"));
+    for index in [2, 3] {
+        assert_eq!(later(index, ".if"), created);
+    }
 }
 
 /// Dependabot covers what is actually here, with titles the organization's

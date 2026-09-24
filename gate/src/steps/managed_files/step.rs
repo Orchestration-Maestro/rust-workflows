@@ -1,8 +1,9 @@
-//! The steps: `sync` writes every managed file, `sync --check` and the
+//! The steps: `sync` writes every managed file, and moves every other call to
+//! rust-workflows to the caller's release; `sync --check` and the
 //! `managed-files` step of `ci.yml` refuse any difference, and `init` writes
 //! them for a repository whose caller pins no release yet.
 
-use super::pin::{caller_pin, parse_pin};
+use super::pin::{Pin, caller_pin, parse_pin, repinned};
 use super::render::{Repository, managed_files};
 use crate::checks::quality_config::read_config;
 use crate::checks::workflow_home::is_workflow_home;
@@ -165,14 +166,47 @@ fn rendered(root: &Path, pin: Option<&str>) -> Result<Vec<(String, String)>, Fai
         }
         Err(_) => None,
     };
+    let home = is_workflow_home(root);
+    let others = match (&pin, home) {
+        (Some(pin), false) => repinned_workflows(root, pin),
+        _ => Vec::new(),
+    };
     let repository = Repository {
         rust: manifest.is_some() || root.join("rust-toolchain.toml").is_file(),
-        home: is_workflow_home(root),
+        home,
         manifest,
         config: read_config(root)?,
         pin,
     };
-    Ok(managed_files(&repository)?)
+    let mut files = managed_files(&repository)?;
+    files.extend(others);
+    files.sort();
+    Ok(files)
+}
+
+/// Where a repository keeps workflows that may call rust-workflows: its own,
+/// and the organization's workflow templates in `.github`.
+const WORKFLOW_DIRECTORIES: [&str; 2] = [".github/workflows", "workflow-templates"];
+
+/// Every other workflow of the repository at `root` that calls
+/// rust-workflows, each call moved to `pin`: a release pinned in `ci.yml` and
+/// an older one in `release.yml` would test one gate and release with another.
+fn repinned_workflows(root: &Path, pin: &Pin) -> Vec<(String, String)> {
+    let mut found = Vec::new();
+    for directory in WORKFLOW_DIRECTORIES {
+        let Ok(entries) = fs::read_dir(root.join(directory)) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = format!("{directory}/{}", entry.file_name().to_string_lossy());
+            let text = fs::read_to_string(entry.path()).unwrap_or_default();
+            let moved = repinned(&text, pin);
+            if path != CALLER && moved != text {
+                found.push((path, moved));
+            }
+        }
+    }
+    found
 }
 
 /// `path` resolved, or a refusal naming it.
@@ -182,7 +216,46 @@ fn canonical(path: &Path) -> Result<PathBuf, Failure> {
 
 #[cfg(test)]
 mod tests {
-    use super::refuse;
+    use super::{CALLER, Pin, refuse, repinned_workflows};
+    use std::{env, fs, process};
+
+    #[test]
+    fn every_workflow_but_the_caller_moves_to_the_caller_release() {
+        let root = env::temp_dir().join(format!("repinned-workflows-{}", process::id()));
+        fs::remove_dir_all(&root).ok();
+        fs::create_dir_all(root.join(".github/workflows")).unwrap();
+        fs::create_dir_all(root.join("workflow-templates")).unwrap();
+        let old = format!(
+            "uses: Orchestration-Maestro/rust-workflows/.github/workflows/ci.yml@{}  # v1.2.1\n",
+            "a".repeat(40)
+        );
+        for path in [
+            CALLER,
+            ".github/workflows/release.yml",
+            "workflow-templates/rust-ci.yml",
+        ] {
+            fs::write(root.join(path), &old).unwrap();
+        }
+        fs::write(root.join(".github/workflows/scorecard.yml"), "on: push\n").unwrap();
+        let pin = Pin {
+            commit: "b".repeat(40),
+            version: "2.1.0".to_owned(),
+        };
+        let mut found = repinned_workflows(&root, &pin);
+        found.sort();
+        let new = old
+            .replace(&"a".repeat(40), &"b".repeat(40))
+            .replace("1.2.1", "2.1.0");
+        assert_eq!(
+            found,
+            [
+                (".github/workflows/release.yml".to_owned(), new.clone()),
+                ("workflow-templates/rust-ci.yml".to_owned(), new)
+            ]
+        );
+        fs::remove_dir_all(&root).unwrap();
+        assert!(repinned_workflows(&root, &pin).is_empty());
+    }
 
     #[test]
     fn differing_files_are_refused_by_name_with_the_fix() {
