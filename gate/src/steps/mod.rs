@@ -4,6 +4,7 @@
 //! two doors in.
 
 mod api_compatibility;
+mod architecture;
 mod attest_binaries;
 mod binary_hardening;
 mod configure_cargo_registry;

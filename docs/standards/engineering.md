@@ -56,7 +56,7 @@ a test function in four, never behind a `test_` prefix or a `_works`, `_ok` or
 | P-007 | Boy Scout rule | Judgement. |
 | P-008 | Least astonishment | Partly deterministic: `RUSTDOCFLAGS='-D warnings -D missing_docs' cargo doc` forces every public item to be described. |
 | P-009 | Single responsibility | Judgement, with one deterministic case: `provenance_attestation_is_isolated_and_reverifies_the_payload`. |
-| P-010 | Composition over inheritance | Partly deterministic: the gate composes three layers, runner, checks and steps, and `imports_flow_one_way_through_the_layer_gates` keeps their imports flowing one way. No crate holds an import cycle: `every_crate_has_an_acyclic_import_graph` walks every crate, the tests included, and names the cycle it finds. |
+| P-010 | Composition over inheritance | Partly deterministic: the gate composes three layers, runner, checks and steps, declared in `maestro-quality.toml` and held by `rust-gate architecture` in `just check`: ARC-004 keeps their imports flowing one way (`declared_layers_refuse_an_import_within_or_against_the_order`) and ARC-001 refuses an import cycle in any crate, the tests included (`an_import_cycle_between_two_files_is_refused_by_name`). |
 | P-011 | Fail fast | **Deterministic.** Every workflow validates its inputs before any side effect. `ci_rejects_unsafe_paths_and_symlinks`, `every_live_publisher_requires_reviewers_and_only_release_tag_deployments`. |
 | P-012 | Illegal states unrepresentable | Judgement in Rust; in workflows, approximated by rejecting the state at the boundary rather than representing it. |
 | P-013 | Parse don't validate | **Deterministic.** A `validate` step writes to `GITHUB_ENV` only values it has already checked; later steps read the checked value, never the raw input. |
@@ -238,6 +238,9 @@ or security exemptions.
 
 ## Rust rules
 
+- Hold the module structure rules ARC-001 to ARC-007 of the organization
+  quality gate, `docs/superpowers/specs/2026-09-24-org-quality-gate-design.md`;
+  `just check` runs `rust-gate architecture` on every project here.
 - Forbid `unsafe` in every library and consumer fixture; `#![forbid(unsafe_code)]`
   at crate level. Consumers may opt into the same rule through the CI
   `unsafe-policy` input.

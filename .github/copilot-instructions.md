@@ -125,10 +125,15 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── checks/                             # What the steps share, built on the runner and never on a step
 │   │   │   ├── cargo_metadata.rs               # The jaq programs several steps read over Cargo's records
 │   │   │   ├── checkout_paths.rs               # Canonical forms, containment in the checkout, symlinks, Rust sources
+│   │   │   ├── findings.rs                     # A rule's finding as one report line, and the exceptions that excuse some
 │   │   │   ├── inputs.rs                       # The ci.yml inputs with a shape of their own: policies, threshold and key, typed
 │   │   │   ├── mod.rs                          # The registry of every step, run and describe, the two doors main.rs calls
+│   │   │   ├── module_tree.rs                  # Every Cargo target's module tree: files, items, named paths and re-exports
 │   │   │   ├── private_directories.rs          # Private temporary directories under the runner's own
+│   │   │   ├── quality_config.rs               # maestro-quality.toml read through jaq: declared layers and reasoned exceptions
 │   │   │   ├── release_boundary.rs             # What both publishers ask of a release before anything is published
+│   │   │   ├── rust_code.rs                    # Rust source with comments and literals blanked, and its top-level items
+│   │   │   ├── rust_paths.rs                   # Every path a Rust file names: use trees expanded, a::b chains, visibilities left out
 │   │   │   ├── rust_versions.rs                # Rust version strings compared the way sort -V compared them
 │   │   │   └── simple_names.rs                 # One validator for every simple-name rule, and hex strings
 │   │   ├── runner/                             # The runner as the gate sees it: inputs, GITHUB_* files, tools
@@ -138,6 +143,14 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── outcome.rs                      # How a step ends: complete, or failed with the tool's own status or with one message
 │   │   │   └── step_declaration.rs             # A step as data: what it declares, and the refusal of anything undeclared
 │   │   ├── steps/                              # One module per step, private to the directory; mod.rs is the one door
+│   │   │   ├── architecture/                   # rust-gate architecture: the step and one module per group of rules
+│   │   │   │   ├── cycles.rs                   # ARC-001: no import cycle between the files of a crate
+│   │   │   │   ├── doors.rs                    # ARC-002 and ARC-003: doors only declare, and paths go through them
+│   │   │   │   ├── layers.rs                   # ARC-004: imports run only to the layers on the right
+│   │   │   │   ├── mod.rs                      # The step's door: its modules and its declaration
+│   │   │   │   ├── roots.rs                    # ARC-006 and ARC-007: thin binary roots, and the module tree is the file tree
+│   │   │   │   ├── seams.rs                    # ARC-005: a seam a door offers serves two callers
+│   │   │   │   └── step.rs                     # The step: module trees, the rules, the exceptions and the report
 │   │   │   ├── quality_scorecard/              # rust-gate scorecard: the step and the value it renders
 │   │   │   │   ├── mod.rs                      # The step's door: its two modules and its declaration
 │   │   │   │   ├── scorecard.rs                # A run's scorecard as a value: its controls, and the JSON, Markdown and badge of them
@@ -181,6 +194,7 @@ generated SBOM output and local download markers are intentionally excluded.
 ├── tests/                                      # Workflow contract validation
 │   ├── ci/                                     # ci.yml, one module per gate it runs: what each step accepts, refuses, builds and reports
 │   │   ├── api_compatibility.rs                # ci.yml: an undeclared API break fails a pull request; what has no API is not applicable
+│   │   ├── architecture_rules.rs               # ci.yml: ARC-001 to ARC-007, each refused by name, and the exceptions maestro-quality.toml takes
 │   │   ├── complexity_report.rs                # ci.yml: function and file sizes, reported and never held against the run
 │   │   ├── duplication_report.rs               # ci.yml: duplicated functions, reported and never held against the run
 │   │   ├── feature_combinations.rs             # ci.yml: real per-feature and combined compilation, plus replay coverage
@@ -197,8 +211,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── supply_chain.rs                     # ci.yml: dependency policy, direct crates.io reads and the scanners
 │   │   └── workspace_boundary.rs               # ci.yml: a workspace whose manifests or sources reach outside the checkout is refused before any lint
 │   ├── gate/                                   # The gate and the tests as structures: layers, no import cycle, the step registry, what holds every step and refusal
-│   │   ├── acyclic_imports.rs                  # No crate holds an import cycle: no file names another that names it back, directly or through others
-│   │   ├── layer_boundaries.rs                 # The gate's three layers and the harness door, enforced on every import
+│   │   ├── layer_boundaries.rs                 # This crate's own step shape, the checks door, seam unit tests and no whole-harness import
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
 │   │   ├── step_and_refusal_coverage.rs        # Every declared step is run by a contract test; every refusal the binary composes is asserted by a test
 │   │   └── step_registry.rs                    # The step registry: declarations, the generated document, every body registered
@@ -206,7 +219,6 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── fixture.rs                          # One temporary checkout, one environment table, a step run against stand-ins, every command traced
 │   │   ├── gate_declarations.rs                # The gate built once per test process, and what rust-gate describe declares about its steps
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
-│   │   ├── native_runtime.rs                   # Real native Windows processes, registry boundary and temporary trees
 │   │   ├── repository.rs                       # The repository root, the toolbelt, commands run to completion, temporary directories, stand-in executables, every test file
 │   │   └── workflow_yaml.rs                    # Readers of workflow and action YAML: whole documents, one step's body, tool rows, jaq queries
 │   ├── nightly/                                # The nightly workflows, unsafe-audit.yml and fuzz.yml, outside the stable policy
@@ -244,6 +256,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   ├── Cargo.lock                              # Locked resolution for the test crate
 │   ├── Cargo.toml                              # Isolated workflow-contract test target
 │   ├── LICENSE                                 # MIT notice included in the Cargo package
+│   ├── native_runtime.rs                       # Real native Windows processes, registry boundary and temporary trees, the native suite's one door
 │   ├── native_windows.rs                       # Native gate units, ACLs and real Cargo examples, not Linux ELF replay
 │   └── workflows.rs                            # Test crate root: one directory per what the tests prove, and the harness they share
 ├── .editorconfig                               # UTF-8, LF, final newlines, space indentation
@@ -263,6 +276,7 @@ generated SBOM output and local download markers are intentionally excluded.
 ├── clippy.toml                                 # The size limits Clippy holds every crate to; the binary's unit tests may unwrap
 ├── deny.toml                                   # Licence allowlist, dependency bans and source policy
 ├── justfile                                    # Development commands: setup and check
+├── maestro-quality.toml                        # The layers this repository's crates declare, and its reasoned exceptions
 ├── mise.lock                                   # Resolved URL and checksum of every toolbelt download
 ├── mise.toml                                   # The toolbelt: each tool at the version CI pins
 ├── rust-toolchain.toml                         # The one compiler pin: the gate, the tests and the action build with it

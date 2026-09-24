@@ -59,6 +59,15 @@ check:
       cargo clippy --manifest-path "$manifest/Cargo.toml" --all-targets --locked -- -D warnings
     done
     cargo test --manifest-path gate/Cargo.toml --locked --offline
+    # The organization's module structure rules hold this repository too:
+    # every project here goes through the step consumers run.
+    for project in gate tests examples/binary examples/library examples/workspace; do
+      scratch=$(mktemp -d)
+      PROJECT="$PWD/$project" REPORTS="$scratch" RUNNER_TEMP="$scratch" \
+        GITHUB_WORKSPACE="$PWD" GITHUB_STEP_SUMMARY="$scratch/summary.md" \
+        cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- architecture
+      rm -rf "$scratch"
+    done
     RUSTDOCFLAGS='-D warnings -D missing_docs' cargo doc --manifest-path gate/Cargo.toml \
       --no-deps --locked --offline --document-private-items
     cargo test --manifest-path tests/Cargo.toml --locked

@@ -543,10 +543,8 @@ pub(crate) fn line_at(text: &str, offset: usize) -> usize {
     text.as_bytes()
         .get(..offset)
         .unwrap_or_default()
-        .iter()
-        .filter(|&&byte| byte == b'\n')
+        .split(|&byte| byte == b'\n')
         .count()
-        + 1
 }
 
 /// The top-level items of blanked code, in order.
@@ -3565,3 +3563,33 @@ Expected: `0`; the spec, this plan and the seven task commits.
 - [ ] **Step 3: Ask before anything leaves the machine**
 
 Pushing the branch and opening the pull request are outward actions: ask the owner, then `git push -u origin feat/org-quality-gate` and `gh pr create` titled `feat: refuse module structure faults with rust-gate architecture`, the body listing ARC-001 to ARC-007, the preview input, the exceptions taken and the tests retired.
+
+## Execution record
+
+What the execution changed against the text above, each a ruling taken while
+the repository's own tests ran:
+
+1. Directory steps declare `pub(crate) const STEPS`, and `registry.rs` names
+   each step by path instead of a `use super::{...}` group: the repository's
+   current scanners read a `pub(in path)` visibility, and an unexpanded brace
+   group, as imports.
+2. The path reader blanks every `pub(in path)` group before reading chains: a
+   visibility names a module without depending on it.
+3. Tasks 6 to 11 land in one commit: the fields Tasks 8 to 10 read have no
+   reader before them, `-D warnings` refuses dead code, and the tests Task 11
+   retires already disagreed with Task 6's fixtures, whose string literals
+   they read as imports.
+4. `quality_config::read` is `read_config`, `module_tree::trees` is
+   `module_trees` and `module_tree::tree` is `target_tree`: the step
+   registry's scanner charges a step with every checks function whose name it
+   calls, and `std::fs::read(` in the release build matched `read`.
+5. `rust_paths` stays private: its `NamedPath` in `Module`'s fields does not
+   trip `private_interfaces`, and an offered module no step names would be a
+   door open on nothing.
+6. `modules_of_the_tests_reach_the_gate_only_through_the_harness` is retired
+   with the other generic tests: ARC-004 on `tests/workflows.rs` holds it, and
+   `no_test_module_imports_the_whole_harness` keeps its one remaining check.
+7. `line_at` counts lines by splitting, since Clippy's `naive_bytecount`
+   refuses the byte filter; the unit test `items_under_test_leave_the_code_the_import_graph_reads`
+   drops the `test_` prefix the naming rule refuses; long string literals are
+   split with `concat!` or a line continuation to hold the 100-column limit.

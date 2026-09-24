@@ -82,9 +82,10 @@ imports flowing one way only:
   doors `main.rs` uses.
 
 The compiler keeps the layers apart: a step is private to `gate/src/steps/`, so
-neither the checks nor the runner can reach it. The test
-`imports_flow_one_way_through_the_layer_gates` keeps the rest: no step imports
-another step, no check imports a step, and a step exposes nothing but `STEPS`.
+neither the checks nor the runner can reach it. ARC-004, declared in
+`maestro-quality.toml`, keeps the imports one way, and
+`a_step_offers_only_its_declaration_and_reaches_no_sibling` the rest: no step
+imports another step, and a step exposes nothing but `STEPS`.
 
 The contract tests never read the gate's source. A test runs a step in a
 fixture and reads three things: what the step wrote, what it declares

@@ -111,8 +111,8 @@ that crate like the test crate. A change to a step is a change to its module
 under `gate/src/steps/`, covered by the contract test that runs the command
 against a fixture; what several steps share lives under `gate/src/checks/`.
 Imports flow one way, steps to checks to runner, and no crate holds an import
-cycle, the tests included: `every_crate_has_an_acyclic_import_graph` names the
-cycle it finds.
+cycle, the tests included: `rust-gate architecture`, run by `just check`,
+names the cycle it finds (`an_import_cycle_between_two_files_is_refused_by_name`).
 
 Five more tests hold the crate and its proof to the same bar. The binary never
 panics: Clippy's `unwrap_used`, `expect_used`, `panic`, `unreachable`, `todo`,
@@ -126,7 +126,7 @@ operating system error is the system's wording and is left out. Every module
 under `gate/src/checks/`, and every internal seam beside a step, that defines
 a function carries unit tests
 (`every_check_and_step_seam_with_a_function_has_unit_tests`), and no crate holds
-an import cycle (`every_crate_has_an_acyclic_import_graph`).
+an import cycle (`an_import_cycle_between_two_files_is_refused_by_name`).
 
 The tests are laid out by what they prove: `tests/ci/`, `tests/publishers/`,
 `tests/nightly/`, `tests/gate/` and `tests/repository/`, with the harness they
