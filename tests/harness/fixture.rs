@@ -59,7 +59,7 @@ impl Fixture {
             ("GITHUB_BASE_REF", ""),
             ("LICENSE_ALLOWLIST", ""),
             ("ARTIFACT_KEY", "test"),
-            ("COVERAGE", "80"),
+            ("COVERAGE", "90"),
             ("LICENSE_POLICY", "auto"),
             ("MUTATION_TEST", "false"),
             ("API_COMPATIBILITY", "false"),

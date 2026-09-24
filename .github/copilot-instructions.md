@@ -140,6 +140,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── module_tree.rs                  # Every Cargo target's module tree: files, items, named paths and re-exports
 │   │   │   ├── nextest_profile.rs              # TST-004: the one nextest profile, retries = 0, the gate's and every repository's
 │   │   │   ├── private_directories.rs          # Private temporary directories under the runner's own
+│   │   │   ├── pull_request.rs                 # A pull request against its base: added and touched lines, the title's type
 │   │   │   ├── quality_config.rs               # maestro-quality.toml read through jaq: declared layers and reasoned exceptions
 │   │   │   ├── release_boundary.rs             # What both publishers ask of a release before anything is published
 │   │   │   ├── rust_code.rs                    # Rust source with comments and literals blanked, and its top-level items
@@ -186,6 +187,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── api_compatibility.rs            # rust-gate api: cargo-semver-checks against the base branch unless the title declares a break
 │   │   │   ├── attest_binaries.rs              # rust-gate attest-binaries: validate, extract the SBOM, verify, record the outcome
 │   │   │   ├── binary_hardening.rs             # rust-gate hardening: reproducible, PIE, RELRO, no executable stack, auditable
+│   │   │   ├── changed_coverage.rs             # rust-gate changed-coverage: COV-002, the new lines of a pull request held to 95 or 90 %
 │   │   │   ├── commit_hooks.rs                 # rust-gate hooks: the repository's commit hooks over every file, through the pinned prek
 │   │   │   ├── configure_cargo_registry.rs       # rust-gate registry: private job-local Cargo home for direct crates.io
 │   │   │   ├── declared_msrv.rs                # rust-gate msrv: every member declares a rust-version the compiler under test reaches
@@ -203,6 +205,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── publish_binaries.rs             # rust-gate publish-binaries: the publication boundary of the binary publisher
 │   │   │   ├── publish_crate.rs                # rust-gate publish-crate: boundary, toolchain, package, semver, publish
 │   │   │   ├── publish_evidence.rs             # rust-gate publish-evidence: validate reports and upload release assets
+│   │   │   ├── pull_request_rules.rs           # rust-gate pull-request: PRL-001, a feature with its test, and PRL-002, its size
 │   │   │   ├── recorded_audits.rs              # rust-gate vet: cargo-vet against the committed ledger
 │   │   │   ├── registry.rs                     # Every step's declaration in workflow order, and the two doors main.rs calls
 │   │   │   ├── release_build.rs                # rust-gate build: release tests, auditable build, packages, per-member SBOMs
@@ -237,6 +240,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
 │   │   ├── organization_lints.rs               # LNT-001: written, refused when missing or looser, and read by real Clippy
 │   │   ├── platform_portability.rs             # ci.yml: named platforms become pinned runners that the required status holds
+│   │   ├── pull_request_rules.rs               # COV-002, PRL-001 and PRL-002 over a real change against a base commit
 │   │   ├── quality_gates.rs                    # ci.yml: lint, documentation, coverage and analysis gates, each proven to fail
 │   │   ├── quality_reports.rs                  # ci.yml: diagnostics survive failing tools without changing their verdict
 │   │   ├── release_payload.rs                  # ci.yml: release build, payload, bills of materials, and the example gate

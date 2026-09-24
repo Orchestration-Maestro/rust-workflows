@@ -323,7 +323,14 @@ fn ci_validates_toolchain_threshold_and_artifact_identity() {
     fixture.env = original;
     let numeric = "coverage-threshold must be numeric";
     for (value, message) in [
-        ("101", "coverage-threshold must be between 0 and 100"),
+        (
+            "101",
+            "coverage-threshold must be between 90, the organization's floor, and 100",
+        ),
+        (
+            "89.9",
+            "coverage-threshold must be between 90, the organization's floor, and 100",
+        ),
         ("nan", numeric),
         ("-1", numeric),
         ("80;touch hacked", numeric),
@@ -332,7 +339,7 @@ fn ci_validates_toolchain_threshold_and_artifact_identity() {
         fixture.set("COVERAGE", value);
         refused(&fixture.run("ci", "validate"), message);
     }
-    fixture.set("COVERAGE", "80");
+    fixture.set("COVERAGE", "90");
     for value in ["--bad", "x\ny", "x;touch hacked"] {
         fixture.set("ARTIFACT_KEY", value);
         refused(

@@ -77,7 +77,7 @@ hygiene: every toolbelt link points at the locked build, every line of Bash
 left (the Just recipes, `bootstrap.sh`, the gate action's build step) passes
 ShellCheck, and Gitleaks scans the tree. It then runs real redacted source
 scanning and each fixture's formatting, Clippy, unit/integration/doc/release tests,
-80% line-coverage gate, release build, packaging, SBOM validation and the actual
+90% line-coverage gate, release build, packaging, SBOM validation and the actual
 workflow artifact-staging and selected-package verification commands.
 
 `CHECK_NETWORK=1` also fetches one isolated RustSec database snapshot and

@@ -12,6 +12,7 @@ mod install_tools;
 mod managed_files;
 mod organization_lints;
 mod platform_portability;
+mod pull_request_rules;
 mod quality_gates;
 mod quality_reports;
 mod release_payload;

@@ -1,5 +1,5 @@
 name: Rust CI
-# Contract: Locked Rust checks, 80% line coverage, security scans, SBOMs and release artifacts
+# Contract: Locked Rust checks, 90% line coverage, security scans, SBOMs and release artifacts
 'on':
   workflow_call:
     inputs:
@@ -17,9 +17,9 @@ name: Rust CI
         default: ''
       coverage-threshold:
         description: >-
-          Finite minimum line percentage, inclusive range 0 to 100
+          Finite minimum line percentage, from the organization's floor of 90 to 100
         type: number
-        default: 80
+        default: 90
       artifact-key:
         description: >-
           Invocation identity, 1 to 40 alphanumeric/underscore/hyphen
@@ -264,6 +264,12 @@ jobs:
         id: hooks
         if: ${{ inputs.quality-preview }}
         run: rust-gate hooks
+      - name: Pull request rules PRL
+        id: pull-request
+        if: ${{ inputs.quality-preview }}
+        env:
+          PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
+        run: rust-gate pull-request
       - name: Formatting, Clippy and tests
         id: quality
         run: rust-gate quality
@@ -278,6 +284,12 @@ jobs:
         env:
           COVERAGE: ${{ inputs.coverage-threshold }}
         run: rust-gate coverage
+      - name: Coverage of the lines a pull request adds
+        id: changed-coverage
+        if: ${{ inputs.quality-preview }}
+        env:
+          PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
+        run: rust-gate changed-coverage
       - name: Dependency vulnerability audit
         id: audit
         run: rust-gate audit

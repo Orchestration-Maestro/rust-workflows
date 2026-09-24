@@ -72,7 +72,7 @@ Codecov needs its GitHub App installed on the organization; the upload logs in
 through OIDC, so there is no Codecov token to store.
 
 That is the whole adoption. Every run enforces formatting, Clippy, tests,
-rustdoc, 80% line coverage, advisories, a secret scan, the declared MSRV,
+rustdoc, 90% line coverage, advisories, a secret scan, the declared MSRV,
 dependency sources and versions, a reproducible hardened release build and both
 SBOM formats. Five more gates are on by default and each is one input to switch
 off: mutation testing, the unused-dependency check, the `unsafe` ban, SARIF
@@ -141,7 +141,7 @@ workflows.
 
 | Workflow | Contract |
 | --- | --- |
-| [`ci.yml`](.github/workflows/ci.yml) | Locked Rust checks, 80% line coverage, security scans, SBOMs and release artifacts |
+| [`ci.yml`](.github/workflows/ci.yml) | Locked Rust checks, 90% line coverage, security scans, SBOMs and release artifacts |
 | [`attest-binaries.yml`](.github/workflows/attest-binaries.yml) | Opt-in signed build provenance for a re-verified payload; isolated so its scopes bind only its callers |
 | [`fuzz.yml`](.github/workflows/fuzz.yml) | Opt-in bounded fuzz regression: replays the committed corpus, then explores for a fixed budget |
 | [`hygiene.yml`](.github/workflows/hygiene.yml) | The checks every repository holds to, for one without Rust: secrets, hygiene, managed files and the commit hooks over every file |
@@ -163,8 +163,8 @@ skip is visible as `attested=false`; require `attested == 'true'`, not just a gr
 job. Set `on-unavailable: fail` when provenance is required. This runtime policy
 cannot bypass GitHub's permission validation before a job starts.
 
-The coverage floor is the `coverage-threshold` input, `80` by default and valid
-from 0 through 100. Every other knob is listed under [gates](#-gates).
+The coverage floor is the `coverage-threshold` input, `90` by default and valid
+from 90, the organization's floor (COV-001), through 100. Every other knob is listed under [gates](#-gates).
 
 ## 🦀 Rust versions
 
@@ -239,7 +239,7 @@ A golden workflow enforces the standard: no input switches these off.
 | --- | --- | --- | --- |
 | Formatting, Clippy, tests | `cargo fmt --check`; Clippy with every warning denied, plus `todo!()` and `dbg!()`; unit, integration and doc tests | SST-001 | `example_gate_replays_ci_step_bodies_against_every_fixture`, `a_failing_consumer_command_fails_the_step_with_its_own_status` |
 | Strict rustdoc | A public item without documentation, or a broken intra-doc link | North Star, Maintainability | `strict_rustdoc_fails_the_run_when_cargo_doc_does`, `example_gate_replays_ci_step_bodies_against_every_fixture` |
-| Line coverage | Below `coverage-threshold`, `80` by default | North Star, Quality | `line_coverage_below_the_threshold_fails_the_run`, `example_gate_replays_ci_step_bodies_against_every_fixture` |
+| Line coverage | Below `coverage-threshold`, `90` by default and never lower (COV-001) | North Star, Quality, COV-001 | `line_coverage_below_the_threshold_fails_the_run`, `ci_validates_toolchain_threshold_and_artifact_identity`, `example_gate_replays_ci_step_bodies_against_every_fixture` |
 | Advisories | A RustSec vulnerability, or a yanked, unsound or unmaintained crate | SST-002 | `scanners_propagate_findings_execution_errors_and_missing_tools` |
 | Secret scan | A secret anywhere in the source revision; the report is redacted | SEC-001, SST-003 | `scanners_propagate_findings_execution_errors_and_missing_tools` |
 | Declared MSRV | A workspace member without `rust-version`, one the selected compiler cannot satisfy, or a workspace that does not compile with the oldest compiler its declarations allow | North Star, Quality | `the_declared_msrv_must_be_real_and_reachable`, `the_declared_msrv_is_the_compiler_the_workspace_is_checked_with` |
@@ -280,6 +280,7 @@ Each is one input to switch off, documented in [docs/ci.md](docs/ci.md).
 | Repository hygiene | `quality-preview: true`, until v2.0.0 runs it always | HYG-001 to HYG-005, SIZE-003 | `unlinked_markers_in_comments_are_refused_and_linked_ones_pass`, `snapshots_large_files_modes_and_links_are_refused`, `a_readme_a_licence_and_a_changelog_are_required`, `wide_shell_lines_and_justfiles_are_refused` |
 | Managed files | `quality-preview: true`, until v2.0.0 runs it always | The generated files of every repository, TST-004 | `init_writes_every_managed_file_and_the_check_finds_them_equal`, `a_managed_file_changed_by_hand_is_refused_and_sync_writes_it_back`, `the_managed_files_step_refuses_a_difference_in_ci` |
 | Commit hooks | `quality-preview: true`, until v2.0.0 runs it always | The universal set, UNI | `the_hooks_step_runs_prek_over_every_file_and_skips_what_ci_runs_itself`, `a_step_runs_locally_the_way_a_commit_hook_runs_it`, `every_rendered_hook_runs_a_pinned_version_and_this_repository_runs_them_all`, `the_rendered_hooks_run_in_a_fresh_clone_with_only_prek_and_rustup` |
+| Pull request rules | `quality-preview: true`, until v2.0.0 runs it always | COV-002, PRL-001, PRL-002 | `new_lines_that_never_run_are_refused_past_the_allowance`, `a_feature_without_a_test_is_refused_and_a_large_change_reported` |
 | Semantic-version compatibility | `semver-check: true` on `publish-crate.yml`; off for a first publication, which has no baseline | North Star, Quality | `semver_check_fails_the_publication_when_cargo_semver_checks_does` |
 | Signed build provenance | `attest-binaries.yml`, see below | SCH-001, SCH-002 | `attestation_signs_only_bytes_it_verified_itself`, `provenance_attestation_is_isolated_and_reverifies_the_payload` |
 | Undefined-behaviour audit | `unsafe-audit.yml`, Miri on nightly, see below | SST-006 | `the_undefined_behaviour_audit_refuses_to_pass_without_running_anything` |

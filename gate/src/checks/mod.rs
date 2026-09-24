@@ -14,6 +14,7 @@ pub(crate) mod manifests;
 pub(crate) mod module_tree;
 pub(crate) mod nextest_profile;
 pub(crate) mod private_directories;
+pub(crate) mod pull_request;
 pub(crate) mod quality_config;
 pub(crate) mod release_boundary;
 pub(crate) mod rust_code;

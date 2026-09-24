@@ -245,3 +245,9 @@ Rulings taken while executing, newest last.
     printed when the step refuses. `rust-gate check`, every CI step locally,
     waits for after v2.0.0: CI runs the whole gate on every pull request, and
     no rule depends on it.
+17. COV-001 needs no preview: `validate` refuses a threshold under 90 and every
+    workflow's default is 90, and a caller meets both only by moving its pin.
+    COV-002 and PRL read the change as the mutation step does, the merge
+    commit against its first parent, and need no network; PRL-001 counts a
+    test as touched when a file under a `tests` directory changes or a new line
+    falls inside a top-level `cfg(test)` item of the changed file.

@@ -21,6 +21,8 @@ const REGISTRY: &[&[Step]] = &[
     super::report_sizes::STEPS,
     super::report_duplicates::STEPS,
     super::line_coverage::STEPS,
+    super::changed_coverage::STEPS,
+    super::pull_request_rules::STEPS,
     super::vulnerability_audit::STEPS,
     super::dependency_policy::STEPS,
     super::mutation_testing::STEPS,

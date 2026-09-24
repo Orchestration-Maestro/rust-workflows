@@ -28,7 +28,7 @@ committed `deny.toml` applies the same way to every pull request. See [runner se
 | --- | --- | --- | --- |
 | `working-directory` | string | `.` | Relative package/workspace directory inside checkout; must contain `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` |
 | `rust-version` | string | Empty | Exact stable version, `1.85.0` or newer; empty uses `rust-toolchain.toml` |
-| `coverage-threshold` | number | `80` | Finite minimum line percentage, inclusive range 0 to 100 |
+| `coverage-threshold` | number | `90` | Finite minimum line percentage, from the organization's floor of 90 to 100 |
 | `artifact-key` | string | `ci` | Invocation identity, 1 to 40 alphanumeric/underscore/hyphen characters, starting alphanumeric |
 | `license-policy` | string | `auto` | `auto` applies a consumer `deny.toml` when present, else the default source and version policy plus the `LICENSE_ALLOWLIST` organization allowlist when set; `enforce` requires a consumer file; `off` skips the gate |
 | `mutation-test` | boolean | `true` | Run cargo-mutants and fail on surviving mutants; a pull request mutates its diff, a push or tag its own commit; set `false` when run time exceeds the job |
@@ -203,6 +203,21 @@ Clippy and the gate's rules, which CI runs as steps of their own; the output is
 `hooks.txt`. A repository without Rust calls `hygiene.yml` instead of `ci.yml`:
 the secret scan, `hygiene`, `managed-files` and `hooks`, under the check
 `hygiene / Required hygiene`.
+
+### Pull request rules
+
+Preview until v2.0.0, with `quality-preview: true`, and measured on a pull
+request only, against its base branch, the merge commit's first parent:
+
+| Rule | Refuses |
+| --- | --- |
+| COV-002 | New lines that never run, past what the pull request may leave: a `feat` or `fix` title covers 95 % of its coverable new lines, any other 90 %, and `max(1, floor((100 - target) % of n))` of the `n` may stay uncovered, so a three-line change is not failed by one line |
+| PRL-001 | A `feat` or `fix` pull request that changes product Rust code, outside a `tests`, `benches` or `examples` directory, and touches no test: no file under a `tests` directory and no new line inside a `#[cfg(test)]` item |
+| PRL-002 | Nothing: past 400 changed lines, lockfiles, snapshots and generated files left out, the pull request is reported in the summary |
+
+`changed-coverage.txt` names every new line that never ran, from the coverage
+step's LCOV; `pull-request.txt` holds the size and the PRL findings. A push has
+no base, and both steps report that they do not apply.
 
 ### Source rules
 
@@ -523,6 +538,8 @@ earlier failure. The scorecard identifies controls that never ran.
 | `hygiene.txt` | Every hygiene finding with its rule, file and line, then each finding an exception excuses, with its reason | `quality-preview: true` until v2.0.0 |
 | `managed-files.txt` | Every managed file whose bytes differ from the gate's rendering, one per line | `quality-preview: true` until v2.0.0 |
 | `hooks.txt` | What the commit hooks printed over every file | `quality-preview: true` until v2.0.0 |
+| `changed-coverage.txt` | The coverable new lines, the uncovered ones by file and line, and the allowance | `quality-preview: true` until v2.0.0, pull requests |
+| `pull-request.txt` | The changed lines counted, and the PRL-001 and PRL-002 findings | `quality-preview: true` until v2.0.0, pull requests |
 | `architecture.txt` | Every source-rule finding with its rule, file and line, each finding an exception excuses with its reason, then the files over 300 lines | `quality-preview: true` until v2.0.0 |
 | `coverage.lcov` | Line coverage in LCOV format | always |
 | `audit.json` | RustSec advisory results | always |

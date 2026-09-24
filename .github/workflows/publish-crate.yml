@@ -24,7 +24,7 @@ name: Publish Rust crate
           as the project's own CI. `rust-version` is not: a release builds with
           the committed pin
         type: number
-        default: 80
+        default: 90
       license-policy:
         description: >-
           Forwarded unchanged to the CI run, so a release passes the same gates

@@ -26,10 +26,11 @@ proofs = [
 [[gate]]
 name = "Line coverage"
 kind = "always"
-fails = "Below `coverage-threshold`, `80` by default"
-standard = "North Star, Quality"
+fails = "Below `coverage-threshold`, `90` by default and never lower (COV-001)"
+standard = "North Star, Quality, COV-001"
 proofs = [
   "line_coverage_below_the_threshold_fails_the_run",
+  "ci_validates_toolchain_threshold_and_artifact_identity",
   "example_gate_replays_ci_step_bodies_against_every_fixture",
 ]
 
@@ -247,6 +248,16 @@ proofs = [
   "a_step_runs_locally_the_way_a_commit_hook_runs_it",
   "every_rendered_hook_runs_a_pinned_version_and_this_repository_runs_them_all",
   "the_rendered_hooks_run_in_a_fresh_clone_with_only_prek_and_rustup",
+]
+
+[[gate]]
+name = "Pull request rules"
+kind = "opt-in"
+switch = "`quality-preview: true`, until v2.0.0 runs it always"
+standard = "COV-002, PRL-001, PRL-002"
+proofs = [
+  "new_lines_that_never_run_are_refused_past_the_allowance",
+  "a_feature_without_a_test_is_refused_and_a_large_change_reported",
 ]
 
 [[gate]]
