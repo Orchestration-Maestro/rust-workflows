@@ -171,7 +171,7 @@ the fix, `rust-gate sync`. Each managed file opens with
 | Repository | Managed files |
 | --- | --- |
 | Every one | `.editorconfig`, `.gitattributes`, `.taplo.toml`, `.yamlfmt.yml`, `typos.toml`, and `.github/dependabot.yml` outside rust-workflows |
-| Rust, a root `Cargo.toml` or `rust-toolchain.toml` | `.config/nextest.toml` (TST-004, `retries = 0`), `clippy.toml`, `rust-toolchain.toml`, `rustfmt.toml`, the lint block of the root `Cargo.toml`, and the caller `.github/workflows/ci.yml` outside rust-workflows |
+| Rust, a root `Cargo.toml` or `rust-toolchain.toml` | `.config/nextest.toml` (TST-004, `retries = 0`), `clippy.toml`, `deny.toml` (DEP-001), `rust-toolchain.toml`, `rustfmt.toml`, the lint block of the root `Cargo.toml`, and the caller `.github/workflows/ci.yml` outside rust-workflows |
 
 Run in a repository's root, `rust-gate sync` writes them and `rust-gate
 sync --check` compares them. The caller pins the release its `uses:` lines
@@ -179,7 +179,12 @@ already name; `RUST_WORKFLOWS_PIN='<commit> v<version>'` moves it. `rust-gate
 init` writes them for a repository with no caller yet, at the release
 `RUST_WORKFLOWS_PIN` names. What a repository may say goes in
 `maestro-quality.toml`: the words it means, `[typos] words = ["jaq"]`, and the
-inputs its caller passes, `[ci] platforms = "macos windows"`. The files every
+inputs its caller passes, `[ci] platforms = "macos windows"`. The generated
+`deny.toml` holds DEP-001: one version of each crate, no wildcard requirement,
+crates.io alone, no yanked or unmaintained crate, and the reviewed licences; a
+duplicate the ecosystem forces is a DEP-001 exception whose `path` names the
+crate and version, `windows-sys@0.52`, rendered as one of cargo-deny's skips
+with its reason. The files every
 repository holds as they are here are rust-workflows' own, read in when the
 gate is built.
 

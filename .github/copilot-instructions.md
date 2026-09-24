@@ -315,7 +315,7 @@ generated SBOM output and local download markers are intentionally excluded.
 ├── SECURITY.md                                 # Runner trust, token handling, publication boundaries
 ├── SUPPORT.md                                  # Troubleshooting and safe diagnostic steps
 ├── clippy.toml                                 # The organization's thresholds and test allowances; rendered by rust-gate sync
-├── deny.toml                                   # Licence allowlist, dependency bans and source policy
+├── deny.toml                                   # DEP-001 and the reviewed licences; rendered by rust-gate sync
 ├── justfile                                    # Development commands: setup and check
 ├── maestro-quality.toml                        # The layers this repository's crates declare, its reasoned exceptions and its words
 ├── mise.lock                                   # Resolved URL and checksum of every toolbelt download

@@ -35,6 +35,41 @@ const TOOLCHAIN: &str = include_str!("../../../../rust-toolchain.toml");
 /// The organization's formatting: rustfmt's own, in the 2024 style.
 const RUSTFMT: &str = "style_edition = \"2024\"\n";
 
+/// DEP-001's cargo-deny policy, up to its exceptions.
+const DENY: &str = concat!(
+    "# DEP-001: one version of each crate, no wildcard requirement, crates.io\n",
+    "# alone, and no yanked or unmaintained crate; the licences the organization\n",
+    "# reviewed. An exception lives in maestro-quality.toml, with its reason.\n",
+    "\n",
+    "[graph]\n",
+    "all-features = true\n",
+    "\n",
+    "[licenses]\n",
+    "allow = [\n",
+    "  \"Apache-2.0\",\n",
+    "  \"MIT\",\n",
+    "  \"MIT-0\",\n",
+    "  \"Unicode-3.0\",\n",
+    "  \"Unlicense\",\n",
+    "]\n",
+    "confidence-threshold = 0.93\n",
+    "unused-allowed-license = \"allow\"\n",
+    "private = { ignore = true }\n",
+    "\n",
+    "[advisories]\n",
+    "yanked = \"deny\"\n",
+    "unmaintained = \"all\"\n",
+    "\n",
+    "[sources]\n",
+    "unknown-registry = \"deny\"\n",
+    "unknown-git = \"deny\"\n",
+    "allow-registry = [\"https://github.com/rust-lang/crates.io-index\"]\n",
+    "\n",
+    "[bans]\n",
+    "multiple-versions = \"deny\"\n",
+    "wildcards = \"deny\"\n",
+);
+
 /// Dependabot's settings for one ecosystem, after its `package-ecosystem`.
 const WEEKLY: &str = concat!(
     "    directory: /\n",
@@ -90,6 +125,7 @@ pub(super) fn managed_files(repository: &Repository) -> Result<Vec<(String, Stri
         files.push(("clippy.toml", format!("{HEADER}{}", clippy_config())));
         files.push(("rust-toolchain.toml", TOOLCHAIN.to_owned()));
         files.push(("rustfmt.toml", format!("{HEADER}{RUSTFMT}")));
+        files.push(("deny.toml", deny(&repository.config)));
     }
     if let Some((text, workspace)) = &repository.manifest {
         files.push(("Cargo.toml", with_lint_block(text, *workspace)?));
@@ -100,6 +136,31 @@ pub(super) fn managed_files(repository: &Repository) -> Result<Vec<(String, Stri
         .collect();
     files.sort();
     Ok(files)
+}
+
+/// `deny.toml`: DEP-001's policy and, as cargo-deny's skips, the duplicate
+/// versions `maestro-quality.toml` excuses, `path` naming the crate and its
+/// version, `windows-sys@0.52`.
+fn deny(config: &QualityConfig) -> String {
+    let mut text = format!("{HEADER}{DENY}");
+    let skips: Vec<_> = config
+        .exceptions
+        .iter()
+        .filter(|exception| exception.rule == "DEP-001")
+        .collect();
+    if !skips.is_empty() {
+        text.push_str("skip = [\n");
+        for exception in skips {
+            let reason = exception.reason.replace('\\', "\\\\").replace('"', "\\\"");
+            let _ = writeln!(
+                text,
+                "  {{ crate = \"{}\", reason = \"{reason}\" }},",
+                exception.path
+            );
+        }
+        text.push_str("]\n");
+    }
+    text
 }
 
 /// `typos.toml`: the words the repository means, each allowed as written.
@@ -262,6 +323,7 @@ mod tests {
                 ".yamlfmt.yml",
                 "Cargo.toml",
                 "clippy.toml",
+                "deny.toml",
                 "rust-toolchain.toml",
                 "rustfmt.toml",
                 "typos.toml",

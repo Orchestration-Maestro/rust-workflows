@@ -49,6 +49,7 @@ fn init_writes_every_managed_file_and_the_check_finds_them_equal() {
         ".taplo.toml",
         ".yamlfmt.yml",
         "clippy.toml",
+        "deny.toml",
         "rust-toolchain.toml",
         "rustfmt.toml",
         "typos.toml",
@@ -160,6 +161,27 @@ fn a_managed_file_changed_by_hand_is_refused_and_sync_writes_it_back() {
         &in_project(&fixture, "rust-gate sync"),
         "maestro-quality.toml: [typos] word `two words` is not one word",
     );
+    fs::remove_file(project.join("maestro-quality.toml")).unwrap();
+    succeeds(&in_project(&fixture, "rust-gate sync"));
+    // DEP-001: a duplicate version the ecosystem forces is excused in
+    // maestro-quality.toml and becomes one of cargo-deny's skips.
+    fs::write(
+        project.join("maestro-quality.toml"),
+        "[[exception]]\nrule = \"DEP-001\"\npath = \"windows-sys@0.52\"\nreason = \"two \
+         platform crates pin it\"\n",
+    )
+    .unwrap();
+    succeeds(&in_project(&fixture, "rust-gate sync"));
+    assert!(managed(&fixture, "deny.toml").ends_with(
+        "multiple-versions = \"deny\"\nwildcards = \"deny\"\nskip = [\n  { crate = \
+         \"windows-sys@0.52\", reason = \"two platform crates pin it\" },\n]\n"
+    ));
+    let toml = tool("taplo")
+        .args(["fmt", "--check", "deny.toml"])
+        .current_dir(&project)
+        .output()
+        .unwrap();
+    succeeds(&toml);
     fs::remove_file(project.join("maestro-quality.toml")).unwrap();
     succeeds(&in_project(&fixture, "rust-gate sync"));
     // The lint block of the root manifest is managed as well.

@@ -231,7 +231,7 @@ proofs = [
 name = "Managed files"
 kind = "opt-in"
 switch = "`quality-preview: true`, until v2.0.0 runs it always"
-standard = "The generated files of every repository, TST-004"
+standard = "The generated files of every repository, TST-004, DEP-001"
 proofs = [
   "init_writes_every_managed_file_and_the_check_finds_them_equal",
   "a_managed_file_changed_by_hand_is_refused_and_sync_writes_it_back",
