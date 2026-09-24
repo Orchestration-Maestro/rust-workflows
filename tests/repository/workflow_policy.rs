@@ -337,7 +337,9 @@ fn canonical_document_generation_and_native_status_remain_safe() {
 /// Dependabot's own pull requests queue a squash merge on the organization's
 /// bot token, which reaches a Dependabot run only as a Dependabot secret. A merge
 /// by `GITHUB_TOKEN` would trigger no workflow on `main`. An update is left to
-/// a person when any member of it is major or its type is not recorded.
+/// a person when any member of it is major or its type is not recorded. A run a
+/// person starts by pushing to Dependabot's branch holds no Dependabot secret,
+/// so the job skips it rather than fail to mint the token.
 #[test]
 fn dependabot_updates_merge_through_the_bot_unless_one_is_major() {
     let data = workflow("dependabot-auto-merge");
@@ -348,7 +350,10 @@ fn dependabot_updates_merge_through_the_bot_unless_one_is_major() {
     let job = &data["jobs"]["auto-merge"];
     assert_eq!(
         job["if"],
-        "${{ github.event.pull_request.user.login == 'dependabot[bot]' }}"
+        concat!(
+            "${{ github.event.pull_request.user.login == 'dependabot[bot]' ",
+            "&& github.actor == 'dependabot[bot]' }}"
+        )
     );
     let token = &job["steps"][0];
     assert!(
