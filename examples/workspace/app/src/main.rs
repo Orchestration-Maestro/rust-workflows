@@ -5,11 +5,9 @@
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    match maestro_workspace_arithmetic::checked_sum(20, 22) {
-        Some(total) => {
-            println!("{total}");
-            ExitCode::SUCCESS
-        }
-        None => ExitCode::FAILURE,
+    let total = maestro_workspace_arithmetic::checked_sum(20, 22);
+    if let Some(total) = total {
+        println!("{total}");
     }
+    ExitCode::from(u8::from(total.is_none()))
 }
