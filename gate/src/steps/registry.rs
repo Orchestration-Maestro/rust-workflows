@@ -26,6 +26,7 @@ const REGISTRY: &[&[Step]] = &[
     super::vulnerability_audit::STEPS,
     super::dependency_policy::STEPS,
     super::mutation_testing::STEPS,
+    super::performance::STEPS,
     super::api_compatibility::STEPS,
     super::secret_scan::STEPS,
     super::declared_msrv::STEPS,

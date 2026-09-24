@@ -11,6 +11,7 @@ mod input_validation;
 mod install_tools;
 mod managed_files;
 mod organization_lints;
+mod performance_budget;
 mod platform_portability;
 mod pull_request_rules;
 mod quality_gates;

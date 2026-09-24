@@ -359,6 +359,24 @@ checksum = "sha256:551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f247
 url = "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz"
 url_api = "https://api.github.com/repos/gitleaks/gitleaks/releases/assets/378332058"
 
+[[tools.gungraun-runner]]
+version = "0.19.4"
+backend = "github:gungraun/gungraun"
+specifiers = ["0.19.4"]
+
+[tools.gungraun-runner.options]
+matching = "gungraun-runner-v0.19.4-x86_64-unknown-linux-gnu"
+
+[tools.gungraun-runner."platforms.linux-x64"]
+checksum = "sha256:f88194dac725ef0599b2812396518e9bd74aadaf75f5baf78df91ddb9eec67d3"
+url = "https://github.com/gungraun/gungraun/releases/download/v0.19.4/gungraun-runner-v0.19.4-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/gungraun/gungraun/releases/assets/472238871"
+
+[tools.gungraun-runner."platforms.linux-x64-musl"]
+checksum = "sha256:f88194dac725ef0599b2812396518e9bd74aadaf75f5baf78df91ddb9eec67d3"
+url = "https://github.com/gungraun/gungraun/releases/download/v0.19.4/gungraun-runner-v0.19.4-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/gungraun/gungraun/releases/assets/472238871"
+
 [[tools.jaq]]
 version = "3.1.1"
 backend = "aqua:01mf02/jaq"

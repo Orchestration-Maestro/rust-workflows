@@ -257,3 +257,10 @@ Rulings taken while executing, newest last.
     ledger locks that import as empty, which is what the file holds, and
     `cargo vet regenerate imports` refreshes it afterwards. taplo leaves
     `supply-chain` to `cargo vet fmt`.
+19. PRF-001 pins gungraun 0.19.4: the runner must match the library the
+    benchmarks link, so the step refuses a lockfile on another version rather
+    than installing a runner per repository. Valgrind comes from the runner
+    image's archive at `1:3.22.0-0ubuntu3`, installed by the step only when a
+    bench is declared; the runner is one pinned row of `install-tools`. The
+    base runs in a `git worktree` of the merge commit's first parent, both runs
+    sharing one gungraun home, so the second compares with the first.

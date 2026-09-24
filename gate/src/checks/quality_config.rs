@@ -40,6 +40,9 @@ const CI_INPUTS: &[&str] = &[
 /// Each `[typos] words` entry, one per line.
 const TYPOS: &str = ".typos.words // [] | .[] | tostring";
 
+/// Each `[performance] benches` entry, one per line.
+const BENCHES: &str = ".performance.benches // [] | .[] | tostring";
+
 /// Each `[ci]` key, its value's JSON type and the value, tab-separated.
 const CI: &str = ".ci // {} | to_entries[] | [.key, (.value | type), (.value | tostring)] | @tsv";
 
@@ -110,6 +113,8 @@ pub(crate) struct QualityConfig {
     pub(crate) typos: Vec<String>,
     /// The inputs its `ci.yml` caller passes, each as its YAML value.
     pub(crate) ci: Vec<(String, String)>,
+    /// The benchmarks PRF-001 holds to their instruction counts.
+    pub(crate) benches: Vec<String>,
 }
 
 /// Read the file at the root of `workspace`, refusing a table it does not
@@ -146,9 +151,23 @@ pub(crate) fn read_config(workspace: &Path) -> Result<QualityConfig, Failure> {
         }
         typos.push(word.to_owned());
     }
+    let mut benches = Vec::new();
+    for bench in query(BENCHES)?.lines() {
+        let named = !bench.is_empty()
+            && bench
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric() || "_-".contains(character));
+        if !named {
+            return Err(
+                format!("{FILE}: [performance] bench `{bench}` is not a bench name").into(),
+            );
+        }
+        benches.push(bench.to_owned());
+    }
     Ok(QualityConfig {
         limits,
         typos,
+        benches,
         ci: query(CI)?
             .lines()
             .map(parse_ci_input)

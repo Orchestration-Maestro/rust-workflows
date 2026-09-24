@@ -188,6 +188,9 @@ jobs:
             # prek runs the repository's commit hooks over every file; each hook
             # brings its own tool at the version the gate renders.
             prek j178/prek/releases/download/v0.5.3/prek-x86_64-unknown-linux-musl.tar.gz d4eae1f31c0817d0a9bfa532d4bb66df60a8b01f121def002021915e826c3d1f prek-x86_64-unknown-linux-musl/prek
+            # gungraun's runner counts the declared benchmarks' instructions
+            # (PRF-001); it must match the gungraun the benchmarks link.
+            gungraun-runner gungraun/gungraun/releases/download/v0.19.4/gungraun-runner-v0.19.4-x86_64-unknown-linux-gnu.tar.gz f88194dac725ef0599b2812396518e9bd74aadaf75f5baf78df91ddb9eec67d3 gungraun-runner-v0.19.4-x86_64-unknown-linux-gnu/gungraun-runner
             gitleaks gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb gitleaks
             cargo-llvm-cov taiki-e/cargo-llvm-cov/releases/download/v0.9.1/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz b3f68e625481fed9b16444174f3fa5ebcdbde4a1878803a35eabe2dcefcdc41a cargo-llvm-cov
             cargo-audit rustsec/rustsec/releases/download/cargo-audit%2Fv0.22.2/cargo-audit-x86_64-unknown-linux-gnu-v0.22.2.tgz ab28a1bdb54db4d5d8ad5981cf1f959410370b3d28250dbd35f6a44248620e39 cargo-audit-x86_64-unknown-linux-gnu-v0.22.2/cargo-audit
@@ -300,6 +303,10 @@ jobs:
       - name: Mutation testing
         id: mutants
         run: rust-gate mutants
+      - name: Instruction counts of the declared benchmarks against the base
+        id: performance
+        if: ${{ inputs.quality-preview }}
+        run: rust-gate performance
       - name: Public API compatibility
         id: api
         env:

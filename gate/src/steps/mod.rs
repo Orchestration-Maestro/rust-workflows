@@ -23,6 +23,7 @@ mod line_coverage;
 mod local_runs;
 mod managed_files;
 mod mutation_testing;
+mod performance;
 mod publish_binaries;
 mod publish_crate;
 mod publish_evidence;

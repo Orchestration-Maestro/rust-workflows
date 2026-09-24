@@ -25,6 +25,7 @@ cargo-mutants = "github:sourcefrog/cargo-mutants"
 cargo-sbom = "github:psastras/sbom-rs"
 cargo-vet = "github:mozilla/cargo-vet"
 clippy-sarif = "github:psastras/sarif-rs"
+gungraun-runner = "github:gungraun/gungraun"
 prek = "github:j178/prek"
 similarity-rs = "github:mizchi/similarity"
 typos = "github:crate-ci/typos"
@@ -81,6 +82,8 @@ cargo-vet = { version = "0.10.0", matching = "x86_64-unknown-linux-gnu" }
 similarity-rs = { version = "0.5.0", matching = "x86_64-unknown-linux-gnu", bin = "similarity-rs" }
 # tool: typos | workflows | Rust | Spelling in code and prose; `typos.toml` names the words this repository means
 typos = { version = "1.50.2", matching = "x86_64-unknown-linux-musl" }
+# tool: gungraun-runner | rust | Rust | Instruction counts of the declared benchmarks under Valgrind, base against head
+gungraun-runner = { version = "0.19.4", matching = "gungraun-runner-v0.19.4-x86_64-unknown-linux-gnu", bin = "gungraun-runner" }
 # tool: shfmt | workflows | Go | Shell formatting, the width and indentation .editorconfig sets
 shfmt = "3.14.1"
 # tool: rumdl | workflows | Rust | Markdown structure: headings, lists, fences and blank lines

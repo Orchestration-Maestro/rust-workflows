@@ -220,6 +220,20 @@ request only, against its base branch, the merge commit's first parent:
 | PRL-001 | A `feat` or `fix` pull request that changes product Rust code, outside a `tests`, `benches` or `examples` directory, and touches no test: no file under a `tests` directory and no new line inside a `#[cfg(test)]` item |
 | PRL-002 | Nothing: past 400 changed lines, lockfiles, snapshots and generated files left out, the pull request is reported in the summary |
 
+### Performance budget
+
+Preview until v2.0.0, with `quality-preview: true`, and opt-in by declaration:
+a repository names its benchmarks in `maestro-quality.toml`,
+`[performance] benches = ["tokenizer"]`, written with gungraun 0.19.4, the
+version the organization's pinned runner matches. On a pull request the
+`performance` step installs the runner image's Valgrind at its pinned version,
+runs each benchmark on the base, the merge commit's first parent, in a worktree
+of its own, then on the pull request, and refuses one whose instruction count
+rises more than 5 % (PRF-001). Instruction counts do not move with the runner's
+load. A regression the repository accepts is a PRF-001 exception whose `path`
+names the bench; its counts are still in `performance.txt`. Without a bench or a
+base, the step reports that it does not apply.
+
 `changed-coverage.txt` names every new line that never ran, from the coverage
 step's LCOV; `pull-request.txt` holds the size and the PRL findings. A push has
 no base, and both steps report that they do not apply.
@@ -547,6 +561,7 @@ earlier failure. The scorecard identifies controls that never ran.
 | `hooks.txt` | What the commit hooks printed over every file | `quality-preview: true` until v2.0.0 |
 | `changed-coverage.txt` | The coverable new lines, the uncovered ones by file and line, and the allowance | `quality-preview: true` until v2.0.0, pull requests |
 | `pull-request.txt` | The changed lines counted, and the PRL-001 and PRL-002 findings | `quality-preview: true` until v2.0.0, pull requests |
+| `performance.txt` | Each declared benchmark's counts, the base's then the pull request's, and the excused ones | `quality-preview: true` until v2.0.0, `[performance] benches`, pull requests |
 | `architecture.txt` | Every source-rule finding with its rule, file and line, each finding an exception excuses with its reason, then the files over 300 lines | `quality-preview: true` until v2.0.0 |
 | `coverage.lcov` | Line coverage in LCOV format | always |
 | `audit.json` | RustSec advisory results | always |

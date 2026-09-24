@@ -214,6 +214,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── local_runs.rs                   # rust-gate architecture --local and hygiene --local: a step as a commit hook runs it
 │   │   │   ├── mod.rs                          # One module per step, the registry among them; run and describe are its doors
 │   │   │   ├── mutation_testing.rs             # rust-gate mutants: cargo-mutants scoped to the change, a diff or the last commit
+│   │   │   ├── performance.rs                  # rust-gate performance: PRF-001, declared benchmarks base against head under gungraun
 │   │   │   ├── publish_binaries.rs             # rust-gate publish-binaries: the publication boundary of the binary publisher
 │   │   │   ├── publish_crate.rs                # rust-gate publish-crate: boundary, toolchain, package, semver, publish
 │   │   │   ├── publish_evidence.rs             # rust-gate publish-evidence: validate reports and upload release assets
@@ -253,6 +254,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── managed_files.rs                    # init, sync, sync --check and managed-files: written, refused by name, written back
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
 │   │   ├── organization_lints.rs               # LNT-001: written, refused when missing or looser, and read by real Clippy
+│   │   ├── performance_budget.rs               # PRF-001: a rise past 5 % refused unless excused, and when nothing is measured
 │   │   ├── platform_portability.rs             # ci.yml: named platforms become pinned runners that the required status holds
 │   │   ├── pull_request_rules.rs               # COV-002, PRL-001 and PRL-002 over a real change against a base commit
 │   │   ├── quality_gates.rs                    # ci.yml: lint, documentation, coverage and analysis gates, each proven to fail

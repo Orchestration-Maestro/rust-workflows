@@ -262,6 +262,16 @@ proofs = [
 ]
 
 [[gate]]
+name = "Performance budget"
+kind = "opt-in"
+switch = "`[performance] benches` in maestro-quality.toml, with `quality-preview: true` until v2.0.0"
+standard = "PRF-001"
+proofs = [
+  "a_benchmark_past_its_budget_is_refused_unless_excused",
+  "nothing_is_measured_without_a_bench_a_base_or_the_pinned_gungraun",
+]
+
+[[gate]]
 name = "Semantic-version compatibility"
 kind = "opt-in"
 switch = "`semver-check: true` on `publish-crate.yml`; off for a first publication, which has no baseline"
