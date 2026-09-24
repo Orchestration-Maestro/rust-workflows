@@ -81,6 +81,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── 2026-09-24-org-quality-gate-1-architecture.md  # Plan 1 of 2: the module structure rules, and this repository held to them
 │   │   │   └── 2026-09-24-org-quality-gate-2-complete.md  # Plan 2 of 2: every remaining rule, the generated files, the release and the repositories
 │   │   └── specs/                              # One approved design per change, named by date and topic
+│   │       ├── 2026-09-24-guide-and-rule-map-design.md  # The Copilot guide and rule map, moved into rust-gate and written by a commit hook
 │   │       └── 2026-09-24-org-quality-gate-design.md  # The quality gate every organization repository inherits, and how
 │   ├── README.md                               # Complete workflow contracts and usage examples
 │   ├── ci.md                                   # Every CI input, output, gate and report
