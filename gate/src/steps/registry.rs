@@ -7,13 +7,15 @@ use std::fmt::Write as _;
 
 /// Every step of every workflow, in the order the workflows run them:
 /// `ci.yml` first, then the commands several workflows share, then the other
-/// workflows, and last the commands a developer or a hook runs locally.
+/// workflows; the commands a developer or a hook runs locally sit beside the
+/// steps they share code with, and `describe` gathers each workflow's.
 const REGISTRY: &[&[Step]] = &[
     super::validate_inputs::STEPS,
     super::configure_cargo_registry::STEPS,
     super::install_toolchain::STEPS,
     super::architecture::STEPS,
     super::hygiene::STEPS,
+    super::managed_files::STEPS,
     super::format_lint_test::STEPS,
     super::report_sizes::STEPS,
     super::report_duplicates::STEPS,
@@ -85,25 +87,29 @@ pub(crate) fn describe() -> String {
          the step did not declare is refused. The runner's own files and the job's \
          directories are read by every step and not listed.\n",
     );
-    let mut workflow = "";
+    let mut workflows: Vec<&str> = Vec::new();
     for step in steps() {
-        if step.workflow != workflow {
-            workflow = step.workflow;
-            let _ = write!(
+        if !workflows.contains(&step.workflow) {
+            workflows.push(step.workflow);
+        }
+    }
+    for workflow in workflows {
+        let _ = write!(
+            text,
+            "\n## {workflow}\n\n| Step | What it does | Inputs | Tools | Reports |\n\
+             | --- | --- | --- | --- | --- |\n"
+        );
+        for step in steps().filter(|step| step.workflow == workflow) {
+            let _ = writeln!(
                 text,
-                "\n## {workflow}\n\n| Step | What it does | Inputs | Tools | Reports |\n\
-                 | --- | --- | --- | --- | --- |\n"
+                "| `{}` | {} | {} | {} | {} |",
+                step.id,
+                step.summary,
+                cell(step.inputs),
+                cell(step.tools),
+                cell(step.reports)
             );
         }
-        let _ = writeln!(
-            text,
-            "| `{}` | {} | {} | {} | {} |",
-            step.id,
-            step.summary,
-            cell(step.inputs),
-            cell(step.tools),
-            cell(step.reports)
-        );
     }
     text
 }

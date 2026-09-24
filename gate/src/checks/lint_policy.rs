@@ -129,6 +129,19 @@ pub(crate) fn lint_block(workspace: bool) -> String {
     block
 }
 
+/// The organization's `clippy.toml` settings, every threshold then every
+/// allowance.
+pub(crate) fn clippy_config() -> String {
+    let mut text = String::new();
+    for (key, value) in THRESHOLDS {
+        let _ = writeln!(text, "{key} = {value}");
+    }
+    for (key, value) in ALLOWANCES {
+        let _ = writeln!(text, "{key} = {value}");
+    }
+    text
+}
+
 /// `manifest` with the block written in: in place of the one between the
 /// markers, or appended when there is none. A manifest that sets lints
 /// outside the markers is refused, since TOML cannot hold one table twice.

@@ -56,7 +56,7 @@ fn the_quality_file_refuses_unknown_tables_and_unreasoned_exceptions() {
     fs::write(&file, "[typo]\nx = 1\n").unwrap();
     refused(
         &fixture.run("ci", "architecture"),
-        "maestro-quality.toml: unknown table `typo`; it takes crate, exception, limits, \
+        "maestro-quality.toml: unknown table `typo`; it takes ci, crate, exception, limits, \
          performance, typos",
     );
     fs::write(

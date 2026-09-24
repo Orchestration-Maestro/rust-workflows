@@ -17,6 +17,7 @@ mod hygiene;
 mod install_toolchain;
 mod install_tools;
 mod line_coverage;
+mod managed_files;
 mod mutation_testing;
 mod publish_binaries;
 mod publish_crate;

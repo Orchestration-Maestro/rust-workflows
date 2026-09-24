@@ -23,8 +23,8 @@ fn the_steps_document_is_the_one_the_gate_describes() {
 fn every_workflow_body_runs_a_registered_step_and_every_step_is_run() {
     // A body naming a step the gate does not register fails on the runner;
     // a registered step no workflow runs is dead code with a document row.
-    // A local command runs where a developer or a hook runs it: the justfile
-    // names each one.
+    // A local command runs where a developer, a hook or the organization's
+    // sync runs it, never in a workflow here; a contract test runs each one.
     let steps = described();
     let mut run: BTreeSet<(String, String)> = BTreeSet::new();
     for (name, _, step) in workflow_steps() {
@@ -39,13 +39,7 @@ fn every_workflow_body_runs_a_registered_step_and_every_step_is_run() {
         });
         run.insert((found.workflow.clone(), found.id.clone()));
     }
-    let justfile = fs::read_to_string(root().join("justfile")).unwrap();
-    for step in steps.iter().filter(|step| step.workflow == "local") {
-        if justfile.contains(&format!(" -- {}", step.id)) {
-            run.insert((step.workflow.clone(), step.id.clone()));
-        }
-    }
-    for step in &steps {
+    for step in steps.iter().filter(|step| step.workflow != "local") {
         assert!(
             run.contains(&(step.workflow.clone(), step.id.clone())),
             "no workflow runs rust-gate {} {}",

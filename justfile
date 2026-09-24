@@ -74,6 +74,8 @@ check:
       GITHUB_WORKSPACE="$PWD" GITHUB_STEP_SUMMARY="$scratch/summary.md" \
       cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- hygiene
     rm -rf "$scratch"
+    # The files the gate renders for every repository are this one's too.
+    cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- sync --check
     RUSTDOCFLAGS='-D warnings -D missing_docs' cargo doc --manifest-path gate/Cargo.toml \
       --no-deps --locked --offline --document-private-items
     cargo test --manifest-path tests/Cargo.toml --locked
@@ -192,13 +194,14 @@ update-tools:
       echo "codecov-cli ${used} -> ${cli}"
     fi
 
-# Regenerate every generated document: the steps, every generated table, and
-# the organization's lints in every crate's manifest.
+# Regenerate every generated document: the steps, every generated table, the
+# managed files, and the organization's lints in every crate's manifest.
 [linux]
 docs:
     cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- describe \
       > docs/steps.md
     just _tables
+    cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- sync
     for crate in gate tests examples/binary examples/library examples/workspace; do \
       (cd "$crate" && cargo run --manifest-path "{{ justfile_directory() }}/gate/Cargo.toml" \
         --locked --offline --quiet -- lints --write); \

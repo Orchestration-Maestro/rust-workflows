@@ -211,3 +211,18 @@ Rulings taken while executing, newest last.
 11. `hygiene` reads the new files git does not ignore as well as the tracked
     ones, so a local run sees what the next commit adds; HYG-001 leaves a
     marker in backticks alone, since it names the word and leaves no work.
+12. The files every repository holds as they are, `.editorconfig`,
+    `.gitattributes`, `.taplo.toml`, `.yamlfmt.yml` and `rust-toolchain.toml`,
+    are this repository's own, read into the gate when it is built: one copy,
+    changed here and nowhere else. The rest are rendered from the gate's data
+    and `maestro-quality.toml`, which gains `[ci]`, the inputs a caller
+    passes.
+13. The home of the reusable workflows, the repository whose
+    `.github/workflows/ci.yml` declares `workflow_call`, keeps its own
+    `ci.yml`, Dependabot settings and hooks. A caller's pin is read from its
+    own `uses:` lines by `sync`, `sync --check` and `managed-files`;
+    `RUST_WORKFLOWS_PIN` moves it, and `init` requires it. `deny.toml` joins the
+    managed files with DEP-001 in phase D, and `.pre-commit-config.yaml` and
+    `.rumdl.toml` with the hook set; a non-Rust caller comes with `hygiene.yml`.
+14. `describe` gathers each workflow's steps, so one module declares a
+    `ci.yml` step and the local commands that share its code in one `STEPS`.

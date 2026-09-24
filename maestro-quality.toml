@@ -1,6 +1,7 @@
 # The organization's quality rules as this repository shapes them: the
-# layers its two layered crates declare, and the seams that keep one caller,
-# each with its reason. Read by rust-gate architecture.
+# layers its two layered crates declare, the seams that keep one caller, each
+# with its reason, and the words it means. Read by rust-gate architecture and
+# rust-gate sync.
 
 [[crate]]
 root = "gate/src/main.rs"
@@ -33,3 +34,8 @@ rule = "ARC-005"
 path = "tests/harness/mod.rs"
 item = "helper_action"
 reason = "workflow and action YAML are read through the harness alone"
+
+# The words this repository means that the spell checker reads as mistakes:
+# FND, the identifier prefix of the Foundation standards in docs/standards.
+[typos]
+words = ["FND"]

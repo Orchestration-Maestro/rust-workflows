@@ -1,6 +1,7 @@
 //! `maestro-quality.toml`, the one file a repository writes to shape the
-//! organization's rules: the layers a target declares and the exceptions the
-//! repository takes, each with its reason. Read through the pinned jaq, which
+//! organization's rules: the layers a target declares, the exceptions the
+//! repository takes, each with its reason, the words it means and the inputs
+//! its `ci.yml` passes. Read through the pinned jaq, which
 //! reads TOML, so the gate stays standard-library only.
 
 use crate::runner::{Cmd, Failure};
@@ -16,7 +17,31 @@ const EXCEPTED: &[&str] = &[
 ];
 
 /// The tables the file may hold.
-const TABLES: &[&str] = &["crate", "exception", "limits", "performance", "typos"];
+const TABLES: &[&str] = &["ci", "crate", "exception", "limits", "performance", "typos"];
+
+/// The inputs of the reusable `ci.yml` a repository's caller may pass.
+const CI_INPUTS: &[&str] = &[
+    "working-directory",
+    "rust-version",
+    "coverage-threshold",
+    "artifact-key",
+    "license-policy",
+    "mutation-test",
+    "sarif-reports",
+    "clippy-level",
+    "dependency-audit",
+    "unsafe-policy",
+    "unused-dependencies",
+    "platforms",
+    "api-compatibility",
+    "quality-preview",
+];
+
+/// Each `[typos] words` entry, one per line.
+const TYPOS: &str = ".typos.words // [] | .[] | tostring";
+
+/// Each `[ci]` key, its value's JSON type and the value, tab-separated.
+const CI: &str = ".ci // {} | to_entries[] | [.key, (.value | type), (.value | tostring)] | @tsv";
 
 /// The top-level tables of the file, one per line.
 const KEYS: &str = "keys[]";
@@ -81,6 +106,10 @@ pub(crate) struct QualityConfig {
     pub(crate) exceptions: Vec<Exception>,
     /// The limits, the organization's floors unless the file tightens them.
     pub(crate) limits: Limits,
+    /// The words the repository means, merged into its `typos.toml`.
+    pub(crate) typos: Vec<String>,
+    /// The inputs its `ci.yml` caller passes, each as its YAML value.
+    pub(crate) ci: Vec<(String, String)>,
 }
 
 /// Read the file at the root of `workspace`, refusing a table it does not
@@ -110,8 +139,20 @@ pub(crate) fn read_config(workspace: &Path) -> Result<QualityConfig, Failure> {
     for line in query(LIMITS)?.lines() {
         parse_limit(&mut limits, line)?;
     }
+    let mut typos = Vec::new();
+    for word in query(TYPOS)?.lines() {
+        if word.is_empty() || !word.chars().all(char::is_alphanumeric) {
+            return Err(format!("{FILE}: [typos] word `{word}` is not one word").into());
+        }
+        typos.push(word.to_owned());
+    }
     Ok(QualityConfig {
         limits,
+        typos,
+        ci: query(CI)?
+            .lines()
+            .map(parse_ci_input)
+            .collect::<Result<_, _>>()?,
         layers: query(CRATES)?
             .lines()
             .map(parse_layers)
@@ -150,6 +191,40 @@ fn parse_limit(limits: &mut Limits, line: &str) -> Result<(), Failure> {
     }
     *slot = number;
     Ok(())
+}
+
+/// One line of the `[ci]` listing: a known input and its value as YAML, a
+/// string quoted unless it is plain words.
+fn parse_ci_input(line: &str) -> Result<(String, String), Failure> {
+    let mut fields = line.splitn(3, '\t');
+    let mut next = || fields.next().unwrap_or_default();
+    let (key, kind, value) = (next(), next(), next());
+    if !CI_INPUTS.contains(&key) {
+        return Err(format!(
+            "{FILE}: [ci] sets `{key}`, which ci.yml does not take; it takes {}",
+            CI_INPUTS.join(", ")
+        )
+        .into());
+    }
+    let plain = value
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || " ._-".contains(character))
+        && !value.is_empty();
+    let yaml = match kind {
+        "number" | "boolean" => value.to_owned(),
+        "string"
+            if plain && value.parse::<f64>().is_err() && !matches!(value, "true" | "false") =>
+        {
+            value.to_owned()
+        }
+        "string" => format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\"")),
+        _ => {
+            return Err(
+                format!("{FILE}: [ci] {key} must be a string, a number or a boolean").into(),
+            );
+        }
+    };
+    Ok((key.to_owned(), yaml))
 }
 
 /// One line of the layers listing.
@@ -207,7 +282,41 @@ fn parse_exception(line: &str) -> Result<Exception, Failure> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Limits, parse_exception, parse_layers, parse_limit};
+    use super::{Limits, parse_ci_input, parse_exception, parse_layers, parse_limit};
+
+    #[test]
+    fn a_ci_input_is_known_and_rendered_as_yaml() {
+        assert_eq!(
+            parse_ci_input("platforms\tstring\tmacos windows").unwrap(),
+            ("platforms".to_owned(), "macos windows".to_owned())
+        );
+        assert_eq!(
+            parse_ci_input("coverage-threshold\tnumber\t95").unwrap().1,
+            "95"
+        );
+        assert_eq!(
+            parse_ci_input("mutation-test\tboolean\tfalse").unwrap().1,
+            "false"
+        );
+        assert_eq!(
+            parse_ci_input("rust-version\tstring\t1.85").unwrap().1,
+            "\"1.85\""
+        );
+        assert_eq!(
+            parse_ci_input("artifact-key\tstring\ta: \"b\"").unwrap().1,
+            "\"a: \\\"b\\\"\""
+        );
+        let unknown = parse_ci_input("colour\tstring\tred").unwrap_err();
+        assert!(unknown.message.unwrap_or_default().starts_with(
+            "maestro-quality.toml: [ci] sets `colour`, which ci.yml does not take; it takes \
+             working-directory,"
+        ));
+        let table = parse_ci_input("platforms\tobject\t{}").unwrap_err();
+        assert_eq!(
+            table.message.unwrap_or_default(),
+            "maestro-quality.toml: [ci] platforms must be a string, a number or a boolean"
+        );
+    }
 
     #[test]
     fn layers_split_into_modules_and_refuse_a_single_layer_or_a_repeated_module() {

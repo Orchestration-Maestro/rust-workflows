@@ -8,6 +8,7 @@ mod duplication_report;
 mod feature_combinations;
 mod input_validation;
 mod install_tools;
+mod managed_files;
 mod organization_lints;
 mod platform_portability;
 mod quality_gates;

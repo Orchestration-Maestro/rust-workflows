@@ -12,6 +12,7 @@
 
 use crate::checks::checkout_paths::canonical;
 use crate::checks::inputs::{UnsafePolicy, clippy_level, unsafe_policy};
+use crate::checks::nextest_profile::nextest_profile;
 use crate::runner::{Cmd, Job, Outcome, Step, flag, non_empty, path};
 use std::fs;
 use std::path::Path;
@@ -58,9 +59,9 @@ const MEMBER_PATHS: &str =
 fn run_the_tests(job: &Job) -> Outcome {
     let report = job.report("tests.xml")?;
     let profile = job.temp.join("nextest.toml");
-    let body = format!(
-        "[profile.gate]\njunit = {{ path = '{}' }}\n",
-        report.display()
+    let body = nextest_profile(
+        "gate",
+        &format!("junit = {{ path = '{}' }}\n", report.display()),
     );
     fs::write(&profile, body)
         .map_err(|error| format!("cannot write {}: {error}", profile.display()))?;

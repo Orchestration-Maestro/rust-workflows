@@ -253,6 +253,10 @@ jobs:
         id: hygiene
         if: ${{ inputs.quality-preview }}
         run: rust-gate hygiene
+      - name: Managed files as the organization renders them
+        id: managed-files
+        if: ${{ inputs.quality-preview }}
+        run: rust-gate managed-files
       - name: Formatting, Clippy and tests
         id: quality
         run: rust-gate quality

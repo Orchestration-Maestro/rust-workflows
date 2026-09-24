@@ -26,6 +26,8 @@ generated SBOM output and local download markers are intentionally excluded.
 
 ```text
 .                                               # Repository root
+├── .config/                                    # Tool settings that live in a directory
+│   └── nextest.toml                            # TST-004: the nextest profile, retries = 0; rendered by rust-gate sync
 ├── .github/                                    # GitHub metadata, templates and workflows
 │   ├── ISSUE_TEMPLATE/                         # Structured issue forms and the chooser
 │   │   ├── bug_report.yml                      # Bug form: runner, arch, regression, release impact
@@ -135,6 +137,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── manifests.rs                    # What Cargo says beyond module trees: packages, the workspace, what members inherit
 │   │   │   ├── mod.rs                          # The registry of every step, run and describe, the two doors main.rs calls
 │   │   │   ├── module_tree.rs                  # Every Cargo target's module tree: files, items, named paths and re-exports
+│   │   │   ├── nextest_profile.rs              # TST-004: the one nextest profile, retries = 0, the gate's and every repository's
 │   │   │   ├── private_directories.rs          # Private temporary directories under the runner's own
 │   │   │   ├── quality_config.rs               # maestro-quality.toml read through jaq: declared layers and reasoned exceptions
 │   │   │   ├── release_boundary.rs             # What both publishers ask of a release before anything is published
@@ -169,6 +172,11 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   │   ├── mod.rs                      # The step's door: its modules and its declaration
 │   │   │   │   ├── step.rs                     # The step: tracked files, the rules, the exceptions and the report
 │   │   │   │   └── widths.rs                   # SIZE-003 for shell scripts and justfiles
+│   │   │   ├── managed_files/                  # rust-gate sync, sync --check, init and managed-files: the files every repository holds
+│   │   │   │   ├── mod.rs                      # The steps' door: their modules and their declaration
+│   │   │   │   ├── pin.rs                      # The release a caller pins: a commit and its version
+│   │   │   │   ├── render.rs                   # Every managed file rendered, this repository's own among them
+│   │   │   │   └── step.rs                     # The steps: write, compare, and refuse by name what differs
 │   │   │   ├── quality_scorecard/              # rust-gate scorecard: the step and the value it renders
 │   │   │   │   ├── mod.rs                      # The step's door: its two modules and its declaration
 │   │   │   │   ├── scorecard.rs                # A run's scorecard as a value: its controls, and the JSON, Markdown and badge of them
@@ -219,6 +227,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── feature_combinations.rs             # ci.yml: real per-feature and combined compilation, plus replay coverage
 │   │   ├── input_validation.rs                 # unsafe-audit.yml and fuzz.yml: every malformed input refused before a toolchain is touched
 │   │   ├── install_tools.rs                    # rust-gate install-tools: what it refuses, honours, and ci.yml installs
+│   │   ├── managed_files.rs                    # init, sync, sync --check and managed-files: written, refused by name, written back
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
 │   │   ├── organization_lints.rs               # LNT-001: written, refused when missing or looser, and read by real Clippy
 │   │   ├── platform_portability.rs             # ci.yml: named platforms become pinned runners that the required status holds
@@ -293,14 +302,15 @@ generated SBOM output and local download markers are intentionally excluded.
 ├── README.md                                   # Complete workflow contracts and usage examples
 ├── SECURITY.md                                 # Runner trust, token handling, publication boundaries
 ├── SUPPORT.md                                  # Troubleshooting and safe diagnostic steps
-├── clippy.toml                                 # The size limits Clippy holds every crate to; the binary's unit tests may unwrap
+├── clippy.toml                                 # The organization's thresholds and test allowances; rendered by rust-gate sync
 ├── deny.toml                                   # Licence allowlist, dependency bans and source policy
 ├── justfile                                    # Development commands: setup and check
-├── maestro-quality.toml                        # The layers this repository's crates declare, and its reasoned exceptions
+├── maestro-quality.toml                        # The layers this repository's crates declare, its reasoned exceptions and its words
 ├── mise.lock                                   # Resolved URL and checksum of every toolbelt download
 ├── mise.toml                                   # The toolbelt: each tool at the version CI pins
 ├── rust-toolchain.toml                         # The one compiler pin: the gate, the tests and the action build with it
-├── typos.toml                                  # The words this repository means, so the spell checker reports only mistakes
+├── rustfmt.toml                                # The 2024 formatting style; rendered by rust-gate sync
+├── typos.toml                                  # The words this repository means, from maestro-quality.toml; rendered by rust-gate sync
 └── version.txt                                 # Simple-release version, not a compiler pin
 ```
 
