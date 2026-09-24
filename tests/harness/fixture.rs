@@ -12,6 +12,30 @@ use std::process;
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+/// Every step outcome the scorecard reads: what a run hands it.
+pub(crate) const SCORECARD_OUTCOMES: [&str; 20] = [
+    "OUT_QUALITY",
+    "OUT_COVERAGE",
+    "OUT_AUDIT",
+    "OUT_SECRETS",
+    "OUT_MSRV",
+    "OUT_FEATURES",
+    "OUT_LICENCES",
+    "OUT_MUTANTS",
+    "OUT_UNUSED",
+    "OUT_STAGE",
+    "OUT_API",
+    "OUT_ARCHITECTURE",
+    "OUT_HYGIENE",
+    "OUT_MANAGED_FILES",
+    "OUT_HOOKS",
+    "OUT_DUPLICATION",
+    "OUT_CHANGED_COVERAGE",
+    "OUT_PULL_REQUEST",
+    "OUT_VET",
+    "OUT_PERFORMANCE",
+];
+
 pub(crate) struct Fixture {
     pub(crate) root: PathBuf,
     pub(crate) env: BTreeMap<String, String>,

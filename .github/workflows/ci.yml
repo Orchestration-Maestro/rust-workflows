@@ -366,6 +366,19 @@ jobs:
           MUTANTS_APPLIED: ${{ steps.mutants.outputs.applied }}
           OUT_API: ${{ steps.api.outcome }}
           API_APPLIED: ${{ steps.api.outputs.applied }}
+          OUT_ARCHITECTURE: ${{ steps.architecture.outcome }}
+          OUT_HYGIENE: ${{ steps.hygiene.outcome }}
+          OUT_MANAGED_FILES: ${{ steps.managed-files.outcome }}
+          OUT_HOOKS: ${{ steps.hooks.outcome }}
+          HOOKS_APPLIED: ${{ steps.hooks.outputs.applied }}
+          OUT_DUPLICATION: ${{ steps.duplication.outcome }}
+          OUT_CHANGED_COVERAGE: ${{ steps.changed-coverage.outcome }}
+          CHANGED_COVERAGE_APPLIED: ${{ steps.changed-coverage.outputs.applied }}
+          OUT_PULL_REQUEST: ${{ steps.pull-request.outcome }}
+          PULL_REQUEST_APPLIED: ${{ steps.pull-request.outputs.applied }}
+          OUT_VET: ${{ steps.vet.outcome }}
+          OUT_PERFORMANCE: ${{ steps.performance.outcome }}
+          PERFORMANCE_APPLIED: ${{ steps.performance.outputs.applied }}
         run: rust-gate scorecard
       - name: Upload diagnostic reports
         if: ${{ always() && steps.validate.outcome == 'success' }}

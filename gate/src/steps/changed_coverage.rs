@@ -7,7 +7,7 @@
 //! n))`. A push has no base to compare with, and nothing is measured.
 
 use crate::checks::pull_request::{added_lines, pull_request_diff, title_type};
-use crate::runner::{Failure, Job, Outcome, Step, input, optional, summary, write};
+use crate::runner::{Failure, Job, Outcome, Step, input, optional, output, summary, write};
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::fs;
@@ -47,8 +47,9 @@ fn run() -> Outcome {
             b"NOT APPLICABLE: a push has no base to compare with\n",
             false,
         )?;
-        return Ok(());
+        return output("applied", "false");
     }
+    output("applied", "true")?;
     let workspace = PathBuf::from(input("GITHUB_WORKSPACE")?);
     let lcov = fs::read_to_string(job.earlier("coverage.lcov"))
         .map_err(|error| format!("changed-coverage: the coverage report: {error}"))?;

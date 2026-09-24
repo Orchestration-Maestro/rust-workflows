@@ -1,6 +1,6 @@
 //! `ci.yml`: the scorecard, the required status and mutation testing.
 
-use crate::harness::{Fixture, refused, root, succeeds, workflow};
+use crate::harness::{Fixture, SCORECARD_OUTCOMES, refused, root, succeeds, workflow};
 use serde_json::Value;
 use std::fs;
 
@@ -9,19 +9,7 @@ fn the_scorecard_reports_what_ran_and_refuses_to_imply_more() {
     // The scorecard is the number a reader will quote. If it counted a gate that
     // was skipped, every claim made from it would be wrong, so both extremes are
     // exercised: nothing selected, and everything selected.
-    let outcomes = [
-        "OUT_QUALITY",
-        "OUT_COVERAGE",
-        "OUT_AUDIT",
-        "OUT_SECRETS",
-        "OUT_MSRV",
-        "OUT_FEATURES",
-        "OUT_LICENCES",
-        "OUT_MUTANTS",
-        "OUT_UNUSED",
-        "OUT_STAGE",
-        "OUT_API",
-    ];
+    let outcomes = SCORECARD_OUTCOMES;
     let read = |fixture: &Fixture, key: &str| -> String {
         let text = fs::read_to_string(fixture.root.join("reports/scorecard.json")).unwrap();
         let value: Value = serde_json::from_str(&text).unwrap();
@@ -54,11 +42,20 @@ fn the_scorecard_reports_what_ran_and_refuses_to_imply_more() {
         "UNUSED_DEPENDENCIES",
         "SARIF_REPORTS",
         "API_COMPATIBILITY",
+        "DEPENDENCY_AUDIT",
     ] {
         full.set(key, "true");
     }
     full.set("UNSAFE_POLICY", "deny");
-    for key in ["FEATURES_APPLIED", "MUTANTS_APPLIED", "API_APPLIED"] {
+    for key in [
+        "FEATURES_APPLIED",
+        "MUTANTS_APPLIED",
+        "API_APPLIED",
+        "HOOKS_APPLIED",
+        "CHANGED_COVERAGE_APPLIED",
+        "PULL_REQUEST_APPLIED",
+        "PERFORMANCE_APPLIED",
+    ] {
         full.set(key, "true");
     }
     succeeds(&full.run("ci", "scorecard"));
@@ -108,19 +105,7 @@ fn the_diagram_counts_the_same_controls_the_scorecard_does() {
     let mut fixture = Fixture::new();
     fixture.set("RUSTUP_TOOLCHAIN", "1.98.1");
     fixture.set("DENY_CONFIG", "");
-    for key in [
-        "OUT_QUALITY",
-        "OUT_COVERAGE",
-        "OUT_AUDIT",
-        "OUT_SECRETS",
-        "OUT_MSRV",
-        "OUT_FEATURES",
-        "OUT_LICENCES",
-        "OUT_MUTANTS",
-        "OUT_UNUSED",
-        "OUT_STAGE",
-        "OUT_API",
-    ] {
+    for key in SCORECARD_OUTCOMES {
         fixture.set(key, "success");
     }
     succeeds(&fixture.run("ci", "scorecard"));
