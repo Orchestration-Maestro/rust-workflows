@@ -205,7 +205,9 @@ needs prek and rustup and nothing else.
 Preview until v2.0.0, with `quality-preview: true`: the `hooks` step runs the
 same hooks over every file through the pinned prek, skipping the formatter,
 Clippy and the gate's rules, which CI runs as steps of their own; the output is
-`hooks.txt`. A repository without Rust calls `hygiene.yml` instead of `ci.yml`:
+`hooks.txt`. mise asks GitHub's API for each hook's release, so the step hands
+it the job's read-only token as `MISE_GITHUB_TOKEN`: an anonymous runner shares
+its rate limit with every other job on its address. A repository without Rust calls `hygiene.yml` instead of `ci.yml`:
 the secret scan, `hygiene`, `managed-files` and `hooks`, under the check
 `hygiene / Required hygiene`.
 

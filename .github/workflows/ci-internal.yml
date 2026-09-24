@@ -42,6 +42,8 @@ jobs:
         shell: bash
         env:
           CHECK_NETWORK: "1"
+          # The live hooks test has mise ask GitHub's API for each release.
+          MISE_GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           just check
