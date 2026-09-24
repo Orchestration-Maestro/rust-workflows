@@ -3,13 +3,14 @@
 
 use crate::checks::findings::Finding;
 use crate::checks::quality_config::Limits;
+use std::fs;
 use std::path::Path;
 
 /// SIZE-003 over the shell scripts and justfiles among `files`.
 pub(super) fn findings(workspace: &Path, files: &[String], limits: Limits) -> Vec<Finding> {
     let mut found = Vec::new();
     for file in files.iter().filter(|file| shell_like(file)) {
-        let Ok(text) = std::fs::read_to_string(workspace.join(file)) else {
+        let Ok(text) = fs::read_to_string(workspace.join(file)) else {
             continue;
         };
         for (number, line) in text.lines().enumerate() {

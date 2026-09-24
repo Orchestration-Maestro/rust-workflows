@@ -1,8 +1,9 @@
 //! The gate action: one pin at every call site, and a commit that ships it.
 
-use crate::harness::{Fixture, action, helper_action, root, succeeds, workflow};
+use crate::harness::{Fixture, action, helper_action, root, succeeds, workflow, workflow_steps};
 use std::collections::BTreeSet;
 use std::fs;
+use std::path::Path;
 use std::process::Command;
 
 #[test]
@@ -50,7 +51,7 @@ fn repository_checkout_fetches_the_history_needed_to_verify_gate_pins() {
         .find(|step| {
             step["uses"]
                 .as_str()
-                .is_some_and(|s| s.starts_with("actions/checkout@"))
+                .is_some_and(|uses| uses.starts_with("actions/checkout@"))
         })
         .unwrap();
     assert_eq!(checkout["with"]["fetch-depth"], 0);
@@ -59,17 +60,11 @@ fn repository_checkout_fetches_the_history_needed_to_verify_gate_pins() {
 
 #[test]
 fn every_gate_reference_uses_the_private_provider_owner() {
-    for entry in fs::read_dir(root().join(".github/workflows")).unwrap() {
-        let path = entry.unwrap().path();
-        let data = workflow(path.file_stem().unwrap().to_str().unwrap());
-        for job in data["jobs"].as_object().unwrap().values() {
-            for step in job["steps"].as_array().into_iter().flatten() {
-                if let Some(reference) = step["uses"].as_str()
-                    && reference.contains("/rust-workflows/.github/actions/")
-                {
-                    assert!(reference.starts_with("Orchestration-Maestro/rust-workflows/"));
-                }
-            }
+    for (_, _, step) in workflow_steps() {
+        if let Some(reference) = step["uses"].as_str()
+            && reference.contains("/rust-workflows/.github/actions/")
+        {
+            assert!(reference.starts_with("Orchestration-Maestro/rust-workflows/"));
         }
     }
 }
@@ -105,7 +100,7 @@ printf 'rebuilt\n' > "$target/release/rust-gate""#,
         succeeds(&fixture.run_body(body));
         let paths = fs::read_to_string(fixture.root.join("path")).unwrap();
         let directory = paths.lines().last().unwrap();
-        let executable = std::path::Path::new(directory).join("rust-gate");
+        let executable = Path::new(directory).join("rust-gate");
         assert_eq!(fs::read_to_string(&executable).unwrap(), "rebuilt\n");
         assert!(
             directories.insert(directory.to_owned()),
@@ -127,19 +122,13 @@ fn call_sites() -> (BTreeSet<String>, BTreeSet<String>, usize) {
     let mut pins = BTreeSet::new();
     let mut called = BTreeSet::new();
     let mut sites = 0;
-    for entry in fs::read_dir(root().join(".github/workflows")).unwrap() {
-        let path = entry.unwrap().path();
-        let data = workflow(path.file_stem().unwrap().to_str().unwrap());
-        for job in data["jobs"].as_object().unwrap().values() {
-            for step in job["steps"].as_array().into_iter().flatten() {
-                let Some((name, pin)) = step["uses"].as_str().and_then(helper_action) else {
-                    continue;
-                };
-                pins.insert(pin);
-                called.insert(name);
-                sites += 1;
-            }
-        }
+    for (_, _, step) in workflow_steps() {
+        let Some((name, pin)) = step["uses"].as_str().and_then(helper_action) else {
+            continue;
+        };
+        pins.insert(pin);
+        called.insert(name);
+        sites += 1;
     }
     (pins, called, sites)
 }
@@ -164,7 +153,9 @@ fn action_follows_the_step_policy(name: &str) {
     assert_eq!(data["runs"]["using"], "composite", "{name}");
     for (input, spec) in data["inputs"].as_object().into_iter().flatten() {
         assert!(
-            spec["description"].as_str().is_some_and(|d| !d.is_empty()),
+            spec["description"]
+                .as_str()
+                .is_some_and(|description| !description.is_empty()),
             "{name}: input {input} has no description"
         );
     }
@@ -172,7 +163,7 @@ fn action_follows_the_step_policy(name: &str) {
         if let Some(reference) = step["uses"].as_str() {
             let pin = reference.rsplit_once('@').unwrap().1;
             assert!(
-                pin.len() == 40 && pin.bytes().all(|b| b.is_ascii_hexdigit()),
+                pin.len() == 40 && pin.bytes().all(|byte| byte.is_ascii_hexdigit()),
                 "{name}: {reference} is not pinned to a commit"
             );
             continue;

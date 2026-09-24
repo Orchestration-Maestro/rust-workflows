@@ -4,6 +4,7 @@
 
 use crate::checks::findings::Finding;
 use crate::checks::rust_code::comments;
+use std::fs;
 use std::path::Path;
 
 /// The words that mark work left for later.
@@ -21,7 +22,7 @@ pub(super) fn findings(workspace: &Path, files: &[String]) -> Vec<Finding> {
         if !rust && !hash_commented(file) {
             continue;
         }
-        let Ok(text) = std::fs::read_to_string(workspace.join(file)) else {
+        let Ok(text) = fs::read_to_string(workspace.join(file)) else {
             continue;
         };
         let listed = if rust {
@@ -63,18 +64,17 @@ fn hash_comments(text: &str) -> Vec<(usize, &str)> {
     for (number, line) in text.lines().enumerate() {
         let mut quote = None;
         let mut previous = ' ';
-        for (offset, c) in line.char_indices() {
-            if let Some(open) = quote {
-                if c == open && previous != '\\' {
-                    quote = None;
+        for (offset, character) in line.char_indices() {
+            match quote {
+                Some(open) if character == open && previous != '\\' => quote = None,
+                None if character == '"' || character == '\'' => quote = Some(character),
+                None if character == '#' && previous.is_whitespace() => {
+                    found.push((number + 1, line.get(offset..).unwrap_or_default()));
+                    break;
                 }
-            } else if c == '"' || c == '\'' {
-                quote = Some(c);
-            } else if c == '#' && previous.is_whitespace() {
-                found.push((number + 1, line.get(offset..).unwrap_or_default()));
-                break;
+                _ => {}
             }
-            previous = c;
+            previous = character;
         }
     }
     found
@@ -86,7 +86,7 @@ fn unlinked_marker(comment: &str) -> Option<&'static str> {
         || comment.match_indices('#').any(|(offset, _)| {
             comment
                 .get(offset + 1..)
-                .is_some_and(|rest| rest.starts_with(|c: char| c.is_ascii_digit()))
+                .is_some_and(|rest| rest.starts_with(|character: char| character.is_ascii_digit()))
         });
     if linked {
         return None;
@@ -99,8 +99,12 @@ fn unlinked_marker(comment: &str) -> Option<&'static str> {
             let after = comment
                 .get(offset + marker.len()..)
                 .and_then(|text| text.chars().next());
-            let word = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
-            !word(before) && !word(after)
+            let word = |next: Option<char>| {
+                next.is_some_and(|character| character.is_alphanumeric() || character == '_')
+            };
+            // A marker in backticks names the word; it leaves no work.
+            let quoted = before == Some('`') && after == Some('`');
+            !word(before) && !word(after) && !quoted
         })
     })
 }
@@ -121,6 +125,7 @@ mod tests {
             unlinked_marker("// TODOS and XXXL are words of their own"),
             None
         );
+        assert_eq!(unlinked_marker("//! a `TODO` names the marker"), None);
     }
 
     #[test]

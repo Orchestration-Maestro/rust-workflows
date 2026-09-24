@@ -1,6 +1,9 @@
 //! How a step ends: complete, or failed with the exit status of the tool
 //! that failed, or with one actionable message and status 1.
 
+use std::io;
+use std::io::ErrorKind;
+
 /// How a step fails: with the exit status of the tool that failed and no
 /// message of its own, since the tool already printed one, or with one
 /// actionable message and status 1.
@@ -23,8 +26,8 @@ impl Failure {
 
     /// A tool that could not be started: 127 when it is missing, the way a
     /// shell reports `command not found`.
-    pub(crate) fn spawn(command: &str, error: &std::io::Error) -> Self {
-        let code = if error.kind() == std::io::ErrorKind::NotFound {
+    pub(crate) fn spawn(command: &str, error: &io::Error) -> Self {
+        let code = if error.kind() == ErrorKind::NotFound {
             127
         } else {
             1

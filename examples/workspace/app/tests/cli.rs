@@ -2,9 +2,11 @@
 
 #![forbid(unsafe_code)]
 
+use std::process::Command;
+
 #[test]
 fn the_binary_prints_the_checked_sum() {
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_workspace-sum"))
+    let output = Command::new(env!("CARGO_BIN_EXE_workspace-sum"))
         .output()
         .expect("example binary must run");
     assert!(output.status.success());

@@ -7,7 +7,7 @@ use std::fmt::Write as _;
 
 /// Every step of every workflow, in the order the workflows run them:
 /// `ci.yml` first, then the commands several workflows share, then the other
-/// workflows.
+/// workflows, and last the commands a developer or a hook runs locally.
 const REGISTRY: &[&[Step]] = &[
     super::validate_inputs::STEPS,
     super::configure_cargo_registry::STEPS,
@@ -40,6 +40,7 @@ const REGISTRY: &[&[Step]] = &[
     super::attest_binaries::STEPS,
     super::fuzz_regression::STEPS,
     super::unsafe_audit::STEPS,
+    super::write_lints::STEPS,
 ];
 
 /// Every registered step, in registry order.
@@ -47,19 +48,22 @@ fn steps() -> impl Iterator<Item = &'static Step> {
     REGISTRY.iter().flat_map(|steps| steps.iter())
 }
 
-/// Run the step `command` names: `ci.yml` steps and the shared commands are
-/// one word, the other workflows name themselves first. The step is entered
-/// before it runs, so the runner refuses what it did not declare.
+/// Run the step `command` names: `ci.yml` steps, the shared commands and
+/// the local commands are one word, a local command's flag the second, and
+/// the other workflows name themselves first. The step is entered before it
+/// runs, so the runner refuses what it did not declare.
 pub(crate) fn run(command: &str, step: &str) -> Outcome {
     let (workflow, id) = if step.is_empty() {
-        ("", command)
+        ("", command.to_owned())
+    } else if step.starts_with("--") {
+        ("local", format!("{command} {step}"))
     } else {
-        (command, step)
+        (command, step.to_owned())
     };
     let found = steps().find(|candidate| {
         candidate.id == id
             && (candidate.workflow == workflow
-                || workflow.is_empty() && matches!(candidate.workflow, "ci" | "shared"))
+                || workflow.is_empty() && matches!(candidate.workflow, "ci" | "shared" | "local"))
     });
     let Some(found) = found else {
         return Err(Failure::from(format!(

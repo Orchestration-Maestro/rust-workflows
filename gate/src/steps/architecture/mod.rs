@@ -5,6 +5,7 @@
 mod cycles;
 mod doors;
 mod layers;
+mod lints;
 mod names;
 mod packages;
 mod roots;

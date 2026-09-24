@@ -4,6 +4,7 @@
 
 use crate::checks::rust_versions::parse;
 use crate::runner::{Cmd, Job, Outcome, Step, input};
+use std::fs;
 
 /// The oldest Cargo whose `package --workspace` takes a member's dependency on
 /// another member from the workspace, where older ones look it up on crates.io.
@@ -60,8 +61,8 @@ fn run() -> Outcome {
     }
     package.run()?;
     let lockfile = project.join("Cargo.lock");
-    let checked = std::fs::read(&lockfile).map_err(|error| format!("Cargo.lock: {error}"))?;
-    std::fs::write(temp.join("checked.lock"), &checked)
+    let checked = fs::read(&lockfile).map_err(|error| format!("Cargo.lock: {error}"))?;
+    fs::write(temp.join("checked.lock"), &checked)
         .map_err(|error| format!("cannot copy Cargo.lock: {error}"))?;
     // cargo-cyclonedx has no --locked; reject any resolution change explicitly.
     Cmd::new(
@@ -69,7 +70,7 @@ fn run() -> Outcome {
     )
     .cwd(project)
     .run()?;
-    if std::fs::read(&lockfile).map_err(|error| format!("Cargo.lock: {error}"))? != checked {
+    if fs::read(&lockfile).map_err(|error| format!("Cargo.lock: {error}"))? != checked {
         return Err(
             "Cargo.lock changed while the SBOM was generated; commit a resolved lockfile".into(),
         );

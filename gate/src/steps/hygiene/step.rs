@@ -5,6 +5,7 @@
 use crate::checks::findings::{excuse, publish_findings};
 use crate::checks::quality_config;
 use crate::runner::{Cmd, Failure, Job, Outcome, Step, input};
+use std::fs;
 use std::path::Path;
 
 /// What this step declares: its inputs, its tools and its reports.
@@ -26,7 +27,7 @@ const RULES: &[&str] = &[
 /// Run the step.
 fn run() -> Outcome {
     let job = Job::current()?;
-    let workspace = std::fs::canonicalize(input("GITHUB_WORKSPACE")?)
+    let workspace = fs::canonicalize(input("GITHUB_WORKSPACE")?)
         .map_err(|error| format!("GITHUB_WORKSPACE: {error}"))?;
     let config = quality_config::read_config(&workspace)?;
     let files = tracked_files(&workspace)?;
@@ -40,11 +41,18 @@ fn run() -> Outcome {
     publish_findings(&report, "Hygiene", &kept, &excused, &[])
 }
 
-/// Every file git tracks in the checkout, relative to it.
+/// Every file git tracks in the checkout, relative to it, and every new
+/// file it does not ignore, so a local run sees what the next commit adds.
 fn tracked_files(workspace: &Path) -> Result<Vec<String>, Failure> {
     let listing = Cmd::new("git -C")
         .arg(workspace)
-        .args(["ls-files", "-z"])
+        .args([
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+        ])
         .capture()?;
     Ok(split_listing(&listing))
 }

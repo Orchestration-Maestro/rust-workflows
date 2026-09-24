@@ -96,6 +96,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── Cargo.lock                          # Locked resolution for the test crate
 │   │   ├── Cargo.toml                          # Isolated workflow-contract test target
 │   │   ├── LICENSE                             # MIT notice included in the Cargo package
+│   │   ├── README.md                           # What the fixture is, for crates.io
 │   │   └── rust-toolchain.toml                 # Exact stable compiler pin for tests
 │   ├── library/                                # Library-only package fixture
 │   │   ├── src/                                # Workspace library sources
@@ -103,6 +104,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── Cargo.lock                          # Locked resolution for the test crate
 │   │   ├── Cargo.toml                          # Isolated workflow-contract test target
 │   │   ├── LICENSE                             # MIT notice included in the Cargo package
+│   │   ├── README.md                           # What the fixture is, for crates.io
 │   │   └── rust-toolchain.toml                 # Exact stable compiler pin for tests
 │   └── workspace/                              # Multi-member Cargo workspace fixture
 │       ├── app/                                # Workspace binary package
@@ -116,7 +118,8 @@ generated SBOM output and local download markers are intentionally excluded.
 │       │   ├── src/                            # Workspace library sources
 │       │   │   └── lib.rs                      # Workspace library surface with doc comments
 │       │   ├── Cargo.toml                      # Isolated workflow-contract test target
-│       │   └── LICENSE                         # MIT notice included in the Cargo package
+│       │   ├── LICENSE                         # MIT notice included in the Cargo package
+│       │   └── README.md                       # What the member is, for crates.io
 │       ├── Cargo.lock                          # Locked resolution for the test crate
 │       ├── Cargo.toml                          # Isolated workflow-contract test target
 │       ├── deny.toml                           # Licence allowlist, dependency bans and source policy
@@ -128,6 +131,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── checkout_paths.rs               # Canonical forms, containment in the checkout, symlinks, Rust sources
 │   │   │   ├── findings.rs                     # A rule's finding as one report line, and the exceptions that excuse some
 │   │   │   ├── inputs.rs                       # The ci.yml inputs with a shape of their own: policies, threshold and key, typed
+│   │   │   ├── lint_policy.rs                  # LNT-001: the organization's lints and clippy.toml, written and compared
 │   │   │   ├── manifests.rs                    # What Cargo says beyond module trees: packages, the workspace, what members inherit
 │   │   │   ├── mod.rs                          # The registry of every step, run and describe, the two doors main.rs calls
 │   │   │   ├── module_tree.rs                  # Every Cargo target's module tree: files, items, named paths and re-exports
@@ -150,6 +154,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   │   ├── cycles.rs                   # ARC-001: no import cycle between the files of a crate
 │   │   │   │   ├── doors.rs                    # ARC-002 and ARC-003: doors only declare, and paths go through them
 │   │   │   │   ├── layers.rs                   # ARC-004: imports run only to the layers on the right
+│   │   │   │   ├── lints.rs                    # LNT-001: the lints denied in the root manifest, clippy.toml no looser
 │   │   │   │   ├── mod.rs                      # The step's door: its modules and its declaration
 │   │   │   │   ├── names.rs                    # NAME-001 and NAME-002: package names and test names
 │   │   │   │   ├── packages.rs                 # LIB-002, TST-003, WSP-001 and WSP-002, read from the manifests
@@ -197,7 +202,8 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── unused_dependencies.rs          # rust-gate unused: cargo-machete on declared-but-unused dependencies
 │   │   │   ├── validate_inputs.rs              # rust-gate validate: every ci.yml input checked before any side effect
 │   │   │   ├── verify_payload.rs               # rust-gate verify-payload: manifest, checksums, symlinks, revision and provenance
-│   │   │   └── vulnerability_audit.rs          # rust-gate audit: the lockfile against RustSec, yanked and unsound denied
+│   │   │   ├── vulnerability_audit.rs          # rust-gate audit: the lockfile against RustSec, yanked and unsound denied
+│   │   │   └── write_lints.rs                  # rust-gate lints --write: the organization's lints into the root manifest
 │   │   └── main.rs                             # Argument parsing only; every step runs through steps::run, describe prints the steps
 │   ├── Cargo.lock                              # Locked resolution for the test crate
 │   ├── Cargo.toml                              # Isolated workflow-contract test target
@@ -214,6 +220,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── input_validation.rs                 # unsafe-audit.yml and fuzz.yml: every malformed input refused before a toolchain is touched
 │   │   ├── install_tools.rs                    # rust-gate install-tools: what it refuses, honours, and ci.yml installs
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
+│   │   ├── organization_lints.rs               # LNT-001: written, refused when missing or looser, and read by real Clippy
 │   │   ├── platform_portability.rs             # ci.yml: named platforms become pinned runners that the required status holds
 │   │   ├── quality_gates.rs                    # ci.yml: lint, documentation, coverage and analysis gates, each proven to fail
 │   │   ├── quality_reports.rs                  # ci.yml: diagnostics survive failing tools without changing their verdict
@@ -262,7 +269,6 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── north_star.rs                       # Promised controls run, every gate names its proof, no lint silenced
 │   │   ├── pinned_tool_usage.rs                # Every job installs every pinned tool it invokes before a step reads it
 │   │   ├── secret_and_advisory_scans.rs        # Gitleaks over the tree; RustSec audits under CHECK_NETWORK=1
-│   │   ├── size_limits.rs                      # Clippy thresholds, and a binary that never panics
 │   │   ├── tool_updates.rs                     # Every install row is what mise locked; update-tools moves a pin everywhere at once
 │   │   ├── toolbelt_and_shellcheck.rs          # Toolbelt links to the locked builds; ShellCheck over every Bash line left
 │   │   ├── version_pins.rs                     # Tool versions, the toolchain pin and the speed target, one copy each

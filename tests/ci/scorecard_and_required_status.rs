@@ -22,8 +22,8 @@ fn the_scorecard_reports_what_ran_and_refuses_to_imply_more() {
         "OUT_STAGE",
         "OUT_API",
     ];
-    let read = |f: &Fixture, key: &str| -> String {
-        let text = fs::read_to_string(f.root.join("reports/scorecard.json")).unwrap();
+    let read = |fixture: &Fixture, key: &str| -> String {
+        let text = fs::read_to_string(fixture.root.join("reports/scorecard.json")).unwrap();
         let value: Value = serde_json::from_str(&text).unwrap();
         value[key].to_string()
     };
@@ -105,9 +105,9 @@ fn the_diagram_counts_the_same_controls_the_scorecard_does() {
     // takes that number for the truth. It comes from the same list the run
     // scores itself against, so a control added or removed moves both or
     // fails here.
-    let mut f = Fixture::new();
-    f.set("RUSTUP_TOOLCHAIN", "1.98.1");
-    f.set("DENY_CONFIG", "");
+    let mut fixture = Fixture::new();
+    fixture.set("RUSTUP_TOOLCHAIN", "1.98.1");
+    fixture.set("DENY_CONFIG", "");
     for key in [
         "OUT_QUALITY",
         "OUT_COVERAGE",
@@ -121,12 +121,13 @@ fn the_diagram_counts_the_same_controls_the_scorecard_does() {
         "OUT_STAGE",
         "OUT_API",
     ] {
-        f.set(key, "success");
+        fixture.set(key, "success");
     }
-    succeeds(&f.run("ci", "scorecard"));
-    let scorecard: Value =
-        serde_json::from_str(&fs::read_to_string(f.root.join("reports/scorecard.json")).unwrap())
-            .unwrap();
+    succeeds(&fixture.run("ci", "scorecard"));
+    let scorecard: Value = serde_json::from_str(
+        &fs::read_to_string(fixture.root.join("reports/scorecard.json")).unwrap(),
+    )
+    .unwrap();
     let claim = format!("{} controls", scorecard["available"]);
 
     let diagram = fs::read_to_string(root().join(".github/assets/how-it-works.svg")).unwrap();
@@ -140,50 +141,50 @@ fn the_diagram_counts_the_same_controls_the_scorecard_does() {
 fn a_failing_consumer_command_fails_the_step_with_its_own_status() {
     // The consumer's tool decides; the gate carries its exit status through
     // unchanged rather than folding every failure into 1.
-    let f = Fixture::new();
-    f.stub("cargo", "exit 42");
-    assert_eq!(f.run("ci", "quality").status.code(), Some(42));
+    let fixture = Fixture::new();
+    fixture.stub("cargo", "exit 42");
+    assert_eq!(fixture.run("ci", "quality").status.code(), Some(42));
 }
 
 #[test]
 fn the_required_status_fails_unless_every_result_succeeded() {
     // The one status a branch protection can require: green only when every
     // upstream result was a success, in ci.yml and in the consumer matrix alike.
-    let mut f = Fixture::new();
+    let mut fixture = Fixture::new();
     for status in ["failure", "cancelled", "skipped", ""] {
-        f.set("RESULT", status);
+        fixture.set("RESULT", status);
         refused(
-            &f.run("ci", "required"),
+            &fixture.run("ci", "required"),
             "Required Rust checks failed or were skipped",
         );
     }
-    f.set("RESULT", "success");
-    succeeds(&f.run("ci", "required"));
+    fixture.set("RESULT", "success");
+    succeeds(&fixture.run("ci", "required"));
     for key in [
         "CI_RESULT",
         "BINARY_RESULT",
         "CRATE_RESULT",
         "PORTABILITY_RESULT",
     ] {
-        f.set(key, "success");
+        fixture.set(key, "success");
     }
-    succeeds(&f.run("ci-internal", "required"));
+    succeeds(&fixture.run("ci-internal", "required"));
     for key in [
         "CI_RESULT",
         "BINARY_RESULT",
         "CRATE_RESULT",
         "PORTABILITY_RESULT",
     ] {
-        f.set(key, "skipped");
-        assert!(!f.run("ci-internal", "required").status.success());
-        f.set(key, "success");
+        fixture.set(key, "skipped");
+        assert!(!fixture.run("ci-internal", "required").status.success());
+        fixture.set(key, "success");
     }
 }
 
 /// Stand-ins for a mutation run: git answers `rev-parse` with `parent` and
 /// prints a one-file diff, cargo-mutants catches its one mutant.
-fn prepare_mutants(f: &Fixture, parent: &str) {
-    f.stub(
+fn prepare_mutants(fixture: &Fixture, parent: &str) {
+    fixture.stub(
         "git",
         &format!(
             r#"case "$1" in
@@ -192,7 +193,7 @@ fn prepare_mutants(f: &Fixture, parent: &str) {
 esac"#
         ),
     );
-    f.stub(
+    fixture.stub(
         "cargo",
         r#"[[ "$1" == mutants ]] || exit 0
 out=""
@@ -287,26 +288,26 @@ fn mutation_testing_accepts_real_diffs_without_applicable_mutants() {
             (case, "", "SKIPPED: no mutants apply to this commit"),
         ]
     }) {
-        let mut f = Fixture::new();
-        f.set("MUTATION_TEST", "true");
-        f.set("GITHUB_BASE_REF", base);
-        f.set("CARGO_TERM_COLOR", "always");
-        f.set("CARGO_MUTANTS_TRACE_LEVEL", "error");
-        fs::write(f.root.join("project/src/lib.rs"), code).unwrap();
-        fs::write(f.root.join("project/README.md"), "Documentation.\n").unwrap();
-        fs::write(f.root.join("changes.diff"), diff).unwrap();
+        let mut fixture = Fixture::new();
+        fixture.set("MUTATION_TEST", "true");
+        fixture.set("GITHUB_BASE_REF", base);
+        fixture.set("CARGO_TERM_COLOR", "always");
+        fixture.set("CARGO_MUTANTS_TRACE_LEVEL", "error");
+        fs::write(fixture.root.join("project/src/lib.rs"), code).unwrap();
+        fs::write(fixture.root.join("project/README.md"), "Documentation.\n").unwrap();
+        fs::write(fixture.root.join("changes.diff"), diff).unwrap();
         // Only Git is a stand-in: discovery and diff filtering use the pinned tool.
-        f.stub(
+        fixture.stub(
             "git",
             "case \"$1\" in rev-parse) exit 0 ;; diff) cat \"$RUNNER_TEMP/changes.diff\" ;; esac",
         );
-        succeeds(&f.run("ci", "mutants"));
-        let report = fs::read_to_string(f.root.join("reports/mutants.txt")).unwrap();
+        succeeds(&fixture.run("ci", "mutants"));
+        let report = fs::read_to_string(fixture.root.join("reports/mutants.txt")).unwrap();
         assert!(report.contains(reason), "{report}");
         assert!(report.contains(skipped), "{report}");
-        assert!(!f.root.join("reports/mutants.json").exists());
+        assert!(!fixture.root.join("reports/mutants.json").exists());
         assert!(
-            fs::read_to_string(f.root.join("output"))
+            fs::read_to_string(fixture.root.join("output"))
                 .unwrap()
                 .ends_with("applied=false\n")
         );
@@ -333,69 +334,70 @@ fn mutation_testing_never_treats_an_unexplained_missing_report_as_a_skip() {
              echo 'INFO Diff file is empty' >&2",
         ),
     ] {
-        let mut f = Fixture::new();
-        f.set("MUTATION_TEST", "true");
-        f.set("GITHUB_BASE_REF", base);
-        f.stub("git", git);
-        f.stub("cargo", cargo);
+        let mut fixture = Fixture::new();
+        fixture.set("MUTATION_TEST", "true");
+        fixture.set("GITHUB_BASE_REF", base);
+        fixture.stub("git", git);
+        fixture.stub("cargo", cargo);
         refused(
-            &f.run("ci", "mutants"),
+            &fixture.run("ci", "mutants"),
             "cargo-mutants produced no outcomes",
         );
     }
-    let mut f = Fixture::new();
-    f.set("MUTATION_TEST", "true");
-    f.set("GITHUB_BASE_REF", "main");
-    f.stub("git", "exit 0");
-    f.stub("cargo", "echo 'INFO Diff file is empty' >&2; exit 7");
-    assert_eq!(f.run("ci", "mutants").status.code(), Some(7));
+    let mut fixture = Fixture::new();
+    fixture.set("MUTATION_TEST", "true");
+    fixture.set("GITHUB_BASE_REF", "main");
+    fixture.stub("git", "exit 0");
+    fixture.stub("cargo", "echo 'INFO Diff file is empty' >&2; exit 7");
+    assert_eq!(fixture.run("ci", "mutants").status.code(), Some(7));
 }
 
 #[test]
 fn mutation_testing_keeps_real_survivors_and_invalid_diffs_blocking() {
-    let mut f = Fixture::new();
-    f.set("MUTATION_TEST", "true");
-    f.set("GITHUB_BASE_REF", "main");
+    let mut fixture = Fixture::new();
+    fixture.set("MUTATION_TEST", "true");
+    fixture.set("GITHUB_BASE_REF", "main");
     fs::write(
-        f.root.join("project/src/lib.rs"),
+        fixture.root.join("project/src/lib.rs"),
         "pub fn answer() -> u32 { 42 }\n",
     )
     .unwrap();
-    succeeds(&f.run_body("cd \"$PROJECT\"; cargo generate-lockfile --offline"));
+    succeeds(&fixture.run_body("cd \"$PROJECT\"; cargo generate-lockfile --offline"));
     fs::write(
-        f.root.join("changes.diff"),
+        fixture.root.join("changes.diff"),
         "--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n\
          -pub fn answer() -> u32 { 41 }\n+pub fn answer() -> u32 { 42 }\n",
     )
     .unwrap();
-    f.stub(
+    fixture.stub(
         "git",
         "case \"$1\" in rev-parse) exit 0 ;; diff) cat \"$RUNNER_TEMP/changes.diff\" ;; esac",
     );
-    assert_eq!(f.run("ci", "mutants").status.code(), Some(2));
+    assert_eq!(fixture.run("ci", "mutants").status.code(), Some(2));
     let outcomes: Value = serde_json::from_str(
-        &fs::read_to_string(f.root.join("mutants/mutants.out/outcomes.json")).unwrap(),
+        &fs::read_to_string(fixture.root.join("mutants/mutants.out/outcomes.json")).unwrap(),
     )
     .unwrap();
     assert!(outcomes["missed"].as_u64().unwrap() > 0);
     assert!(
-        f.root.join("reports/mutants.json").is_file(),
+        fixture.root.join("reports/mutants.json").is_file(),
         "failed outcomes must be archived"
     );
-    let archived: Value =
-        serde_json::from_str(&fs::read_to_string(f.root.join("reports/mutants.json")).unwrap())
-            .unwrap();
+    let archived: Value = serde_json::from_str(
+        &fs::read_to_string(fixture.root.join("reports/mutants.json")).unwrap(),
+    )
+    .unwrap();
     assert_eq!(archived, outcomes);
-    fs::write(f.root.join("changes.diff"), "not a unified diff\n").unwrap();
-    assert!(!f.run("ci", "mutants").status.success());
+    fs::write(fixture.root.join("changes.diff"), "not a unified diff\n").unwrap();
+    assert!(!fixture.run("ci", "mutants").status.success());
 }
 
 #[test]
 fn mutation_failures_keep_their_reports_and_original_status() {
     for (code, timeout) in [(3, 1), (4, 0)] {
-        let mut f = Fixture::new();
-        f.set("MUTATION_TEST", "true");
-        f.stub(
+        let mut fixture = Fixture::new();
+        fixture.set("MUTATION_TEST", "true");
+        fixture.stub(
             "cargo",
             &format!(
                 "mkdir -p \"$RUNNER_TEMP/mutants/mutants.out\"\n\
@@ -403,8 +405,8 @@ fn mutation_failures_keep_their_reports_and_original_status() {
              > \"$RUNNER_TEMP/mutants/mutants.out/outcomes.json\"\nexit {code}"
             ),
         );
-        assert_eq!(f.run("ci", "mutants").status.code(), Some(code));
-        assert!(f.root.join("reports/mutants.json").is_file());
+        assert_eq!(fixture.run("ci", "mutants").status.code(), Some(code));
+        assert!(fixture.root.join("reports/mutants.json").is_file());
     }
 }
 

@@ -10,19 +10,19 @@ fn the_example_replay_includes_the_feature_gate() {
 
 #[test]
 fn real_features_reject_broken_isolated_and_combined_builds() {
-    let mut f = Fixture::new();
-    f.set("CARGO_NET_OFFLINE", "true");
+    let mut fixture = Fixture::new();
+    fixture.set("CARGO_NET_OFFLINE", "true");
     fs::write(
-        f.root.join("project/Cargo.toml"),
+        fixture.root.join("project/Cargo.toml"),
         "[package]\nname = 'features-fixture'\nversion = '0.1.0'\nedition = '2024'\n\
          rust-version = '1.85'\n[features]\ndefault = ['alpha']\nalpha = []\nbeta = []\n",
     )
     .unwrap();
-    succeeds(&f.run_body(
+    succeeds(&fixture.run_body(
         "cd \"$PROJECT\"; cargo metadata --format-version 1 --offline \
          > \"$RUNNER_TEMP/metadata.json\"",
     ));
-    let result = f.run("ci", "features");
+    let result = fixture.run("ci", "features");
     succeeds(&result);
     let log = format!(
         "{}{}",
@@ -39,27 +39,27 @@ fn real_features_reject_broken_isolated_and_combined_builds() {
         assert!(log.contains(selection), "{selection}: {log}");
     }
     assert_eq!(
-        fs::read_to_string(f.root.join("reports/features.txt")).unwrap(),
+        fs::read_to_string(fixture.root.join("reports/features.txt")).unwrap(),
         "alpha\nbeta\ndefault"
     );
     assert!(
-        fs::read_to_string(f.root.join("output"))
+        fs::read_to_string(fixture.root.join("output"))
             .unwrap()
             .contains("applied=true\n")
     );
-    fs::remove_file(f.root.join("output")).unwrap();
+    fs::remove_file(fixture.root.join("output")).unwrap();
     for condition in [
         "all(feature = \"alpha\", feature = \"beta\")",
         "all(feature = \"beta\", not(feature = \"alpha\"))",
     ] {
         fs::write(
-            f.root.join("project/src/lib.rs"),
+            fixture.root.join("project/src/lib.rs"),
             format!("#[cfg({condition})]\ncompile_error!(\"invalid_feature_selection\");\n"),
         )
         .unwrap();
-        let result = f.run("ci", "features");
+        let result = fixture.run("ci", "features");
         assert!(!result.status.success());
         assert!(String::from_utf8_lossy(&result.stderr).contains("invalid_feature_selection"));
-        assert!(!f.root.join("output").exists());
+        assert!(!fixture.root.join("output").exists());
     }
 }

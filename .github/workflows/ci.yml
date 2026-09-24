@@ -243,7 +243,7 @@ jobs:
       - name: Install the toolchain
         id: tools
         run: rust-gate tools
-      - name: Source rules ARC, SIZE, NAME, DOC, LIB, TST and WSP
+      - name: Source rules ARC, SIZE, NAME, DOC, LIB, TST, WSP and LNT
         id: architecture
         # Always on from v2.0.0. Until then only on request: this repository's
         # own CI still runs the previously pinned gate, which lacks the step.

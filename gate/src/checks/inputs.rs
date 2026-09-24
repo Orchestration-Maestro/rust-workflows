@@ -183,8 +183,10 @@ fn is_decimal(value: &str) -> bool {
     let fraction = parts.next();
     parts.next().is_none()
         && !whole.is_empty()
-        && whole.bytes().all(|b| b.is_ascii_digit())
-        && fraction.is_none_or(|f| !f.is_empty() && f.bytes().all(|b| b.is_ascii_digit()))
+        && whole.bytes().all(|byte| byte.is_ascii_digit())
+        && fraction.is_none_or(|digits| {
+            !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit())
+        })
 }
 
 #[cfg(test)]

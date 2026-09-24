@@ -35,5 +35,6 @@ mod unused_dependencies;
 mod validate_inputs;
 mod verify_payload;
 mod vulnerability_audit;
+mod write_lints;
 
 pub(crate) use registry::{describe, run};

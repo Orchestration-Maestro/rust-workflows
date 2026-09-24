@@ -7,11 +7,28 @@ use crate::harness::{
 };
 use serde_json::{Value, json};
 use std::fs;
+use std::path::Path;
 
 /// The example gate: `ci.yml`'s own step bodies, read by id, replayed against
 /// every owned fixture with the pinned toolbelt. `just check` is its one
 /// caller; plain `cargo test` skips it because it needs the toolbelt and builds
 /// three projects.
+/// Every member with a `CycloneDX` document in `payload` has an SPDX 2.3
+/// document beside it.
+fn spdx_beside_every_cyclonedx(payload: &Path) {
+    let names = fs::read_dir(payload)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned());
+    for member in names.filter_map(|name| name.strip_suffix(".cdx.json").map(str::to_owned)) {
+        let spdx = fs::read_to_string(payload.join(format!("{member}.spdx.json")))
+            .unwrap_or_else(|_| panic!("{member} has no SPDX document"));
+        assert!(
+            spdx.contains("SPDX-2.3"),
+            "{member}: not an SPDX 2.3 document"
+        );
+    }
+}
+
 #[test]
 #[ignore = "needs the pinned toolbelt; just check runs it"]
 fn example_gate_replays_ci_step_bodies_against_every_fixture() {
@@ -20,9 +37,9 @@ fn example_gate_replays_ci_step_bodies_against_every_fixture() {
         ("library", "maestro-bounded-arithmetic"),
         ("workspace", "maestro-workspace-arithmetic"),
     ] {
-        let mut f = Fixture::example(example);
+        let mut fixture = Fixture::example(example);
         for id in GATE_STEPS {
-            let output = f.run("ci", id);
+            let output = fixture.run("ci", id);
             assert!(
                 output.status.success(),
                 "{example}/{id} failed\n--- stdout\n{}\n--- stderr\n{}",
@@ -31,9 +48,10 @@ fn example_gate_replays_ci_step_bodies_against_every_fixture() {
             );
         }
         // Owned fixtures additionally require every mutant to be caught.
-        let mutants: Value =
-            serde_json::from_str(&fs::read_to_string(f.root.join("reports/mutants.json")).unwrap())
-                .unwrap();
+        let mutants: Value = serde_json::from_str(
+            &fs::read_to_string(fixture.root.join("reports/mutants.json")).unwrap(),
+        )
+        .unwrap();
         assert!(
             mutants["unviable"] == 0 && mutants["caught"].as_u64().unwrap_or(0) > 0,
             "{example}: every mutant must be caught: {mutants}"
@@ -42,7 +60,7 @@ fn example_gate_replays_ci_step_bodies_against_every_fixture() {
         // applies when the fixture commits deny.toml and is skipped otherwise.
         // The CI step also checks advisories, which reads the registry index, so
         // its body is not replayed offline.
-        let project = f.root.join("project");
+        let project = fixture.root.join("project");
         if project.join("deny.toml").is_file() {
             let deny = tool("cargo")
                 .args([
@@ -56,16 +74,16 @@ fn example_gate_replays_ci_step_bodies_against_every_fixture() {
                     "sources",
                 ])
                 .current_dir(&project)
-                .envs(&f.env)
+                .envs(&fixture.env)
                 .output()
                 .unwrap();
             succeeds(&deny);
         } else {
             // The default policy the step generates, run for real against the
             // fixture's lockfile, offline: it must parse and it must pass.
-            f.set("DENY_CONFIG", "");
-            f.set("CARGO_NET_OFFLINE", "true");
-            succeeds(&f.run("ci", "licenses"));
+            fixture.set("DENY_CONFIG", "");
+            fixture.set("CARGO_NET_OFFLINE", "true");
+            succeeds(&fixture.run("ci", "licenses"));
         }
         for (key, value) in [
             ("PACKAGE", package),
@@ -73,9 +91,9 @@ fn example_gate_replays_ci_step_bodies_against_every_fixture() {
             ("REF", "refs/heads/local-check"),
             ("REGISTRY", ""),
         ] {
-            f.set(key, value);
+            fixture.set(key, value);
         }
-        succeeds(&f.run("publish-crate", "package"));
+        succeeds(&fixture.run("publish-crate", "package"));
         if example == "binary" {
             // The one crates.io dependency must reach the payload SBOM, and the
             // release binary must carry its embedded dependency list: this is
@@ -83,7 +101,7 @@ fn example_gate_replays_ci_step_bodies_against_every_fixture() {
             // each member's components under the member, so the whole document
             // is searched.
             let sbom: Value = serde_json::from_str(
-                &fs::read_to_string(f.root.join("reports/payload.cdx.json")).unwrap(),
+                &fs::read_to_string(fixture.root.join("reports/payload.cdx.json")).unwrap(),
             )
             .unwrap();
             assert!(
@@ -92,7 +110,7 @@ fn example_gate_replays_ci_step_bodies_against_every_fixture() {
                     .contains("\"name\":\"anyhow\""),
                 "the payload SBOM must name the fixture dependency"
             );
-            let hardening = fs::read_to_string(f.root.join("reports/hardening.txt")).unwrap();
+            let hardening = fs::read_to_string(fixture.root.join("reports/hardening.txt")).unwrap();
             assert!(
                 hardening.contains(concat!(
                     "maestro-bounded-sum reproducible pie relro bind-now ",
@@ -111,18 +129,18 @@ fn example_gate_replays_ci_step_bodies_against_every_fixture() {
 fn the_release_build_must_be_reproducible_and_auditable_or_fail() {
     // Every guarantee this step makes is a refusal, so each one is provoked. A
     // reproducibility check that cannot fail proves nothing about the build.
-    let prepare = |f: &Fixture| {
-        let target = f.root.join("target");
+    let prepare = |fixture: &Fixture| {
+        let target = fixture.root.join("target");
         fs::create_dir_all(target.join("release")).unwrap();
         fs::write(target.join("release/app"), "first").unwrap();
         fs::write(
-            f.root.join("build.jsonl"),
+            fixture.root.join("build.jsonl"),
             json!({"reason": "compiler-artifact", "executable": target.join("release/app"),
                    "target": {"name": "app"}})
             .to_string(),
         )
         .unwrap();
-        f.root.join("target")
+        fixture.root.join("target")
     };
 
     // A rebuild producing different bytes must fail: that is the whole point.
@@ -217,10 +235,10 @@ fn release_payload_carries_both_sbom_formats_and_auditable_binaries() {
     // every consumer that has a binary and an integration test. The order is
     // read from the trace of a build against a cargo that records its calls.
     assert_eq!(step("ci", "build").trim(), "rust-gate build");
-    let f = Fixture::new();
-    f.stub("cargo", "");
-    succeeds(&f.run("ci", "build"));
-    let trace = f.trace();
+    let fixture = Fixture::new();
+    fixture.stub("cargo", "");
+    succeeds(&fixture.run("ci", "build"));
+    let trace = fixture.trace();
     let tests = trace
         .find("cargo test --workspace --release --locked")
         .expect("release tests must run");
@@ -250,12 +268,12 @@ fn packaging_uses_a_cargo_that_can_package_a_workspace() {
         ("1.90.0", None),
         ("1.98.1", None),
     ] {
-        let mut f = Fixture::new();
-        f.set("RUSTUP_TOOLCHAIN", selected);
-        f.stub("cargo", "");
-        f.stub("rustup", "");
-        succeeds(&f.run("ci", "build"));
-        let trace = f.trace();
+        let mut fixture = Fixture::new();
+        fixture.set("RUSTUP_TOOLCHAIN", selected);
+        fixture.stub("cargo", "");
+        fixture.stub("rustup", "");
+        succeeds(&fixture.run("ci", "build"));
+        let trace = fixture.trace();
         let package = trace
             .lines()
             .find(|line| line.ends_with("cargo package --workspace --locked"))
@@ -283,27 +301,32 @@ fn packaging_uses_a_cargo_that_can_package_a_workspace() {
 #[test]
 fn sbom_staging_rejects_malformed_data_and_emits_verifiable_payload() {
     for valid in [false, true] {
-        let mut f = Fixture::new();
-        let target = f.root.join("target");
+        let mut fixture = Fixture::new();
+        let target = fixture.root.join("target");
         fs::create_dir(&target).unwrap();
-        f.set("CARGO_TARGET_DIR", &target.display().to_string());
-        f.set("REVISION", &"a".repeat(40));
+        fixture.set("CARGO_TARGET_DIR", &target.display().to_string());
+        fixture.set("REVISION", &"a".repeat(40));
+        let manifest = fixture.root.join("project/Cargo.toml");
         let metadata = json!({"workspace_members": ["fixture"], "packages": [{
-            "id": "fixture", "name": "fixture", "manifest_path": f.root.join("project/Cargo.toml")
+            "id": "fixture", "name": "fixture", "manifest_path": manifest
         }]});
-        fs::write(f.root.join("metadata.json"), metadata.to_string()).unwrap();
-        fs::write(f.root.join("build.jsonl"), "").unwrap();
+        fs::write(fixture.root.join("metadata.json"), metadata.to_string()).unwrap();
+        fs::write(fixture.root.join("build.jsonl"), "").unwrap();
         let bom = json!({"bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1,
             "metadata": {"component": {"name": "fixture", "type": "library"}},
             "components": if valid { json!([]) } else { json!([1]) }});
-        fs::write(f.root.join("project/fixture.cdx.json"), bom.to_string()).unwrap();
-        let output = f.run("ci", "stage");
+        fs::write(
+            fixture.root.join("project/fixture.cdx.json"),
+            bom.to_string(),
+        )
+        .unwrap();
+        let output = fixture.run("ci", "stage");
         if valid {
             succeeds(&output);
             // Both formats come from the one member list: the SPDX document
             // is generated natively per member, never converted, and every
             // member with a CycloneDX document has an SPDX one beside it.
-            let trace = f.trace();
+            let trace = fixture.trace();
             assert!(
                 trace.contains("cargo sbom --cargo-package fixture --output-format spdx_json_2_3"),
                 "SPDX must be generated natively per member"
@@ -312,27 +335,21 @@ fn sbom_staging_rejects_malformed_data_and_emits_verifiable_payload() {
                 !trace.contains("cyclonedx convert"),
                 "SPDX must not come from a lossy CycloneDX conversion"
             );
-            let payload = f.root.join("rust-release");
-            for entry in fs::read_dir(&payload).unwrap() {
-                let name = entry.unwrap().file_name().to_string_lossy().into_owned();
-                if let Some(member) = name.strip_suffix(".cdx.json") {
-                    let spdx = fs::read_to_string(payload.join(format!("{member}.spdx.json")))
-                        .unwrap_or_else(|_| panic!("{member} has no SPDX document"));
-                    assert!(
-                        spdx.contains("SPDX-2.3"),
-                        "{member}: not an SPDX 2.3 document"
-                    );
-                }
-            }
-            succeeds(&f.run_body("rust-gate verify-payload"));
-            f.set("REQUIRE_BINARIES", "true");
-            assert!(!f.run_body("rust-gate verify-payload").status.success());
+            spdx_beside_every_cyclonedx(&fixture.root.join("rust-release"));
+            succeeds(&fixture.run_body("rust-gate verify-payload"));
+            fixture.set("REQUIRE_BINARIES", "true");
+            assert!(
+                !fixture
+                    .run_body("rust-gate verify-payload")
+                    .status
+                    .success()
+            );
         } else {
             refused(
                 &output,
                 "Invalid CycloneDX JSON envelope or component metadata",
             );
-            assert!(!f.root.join("rust-release/payload.tar.gz").exists());
+            assert!(!fixture.root.join("rust-release/payload.tar.gz").exists());
         }
     }
 }

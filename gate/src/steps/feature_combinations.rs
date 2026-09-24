@@ -8,6 +8,7 @@
 //! step says so rather than spending a compile to prove it.
 
 use crate::runner::{Cmd, Job, Outcome, Step, output};
+use std::fs;
 
 /// What this step declares: its inputs, its tools and its reports.
 pub(crate) const STEPS: &[Step] = &[Step {
@@ -44,7 +45,7 @@ fn run() -> Outcome {
     names.sort_unstable();
     names.dedup();
     let report = job.report("features.txt")?;
-    std::fs::write(&report, names.join("\n"))
+    fs::write(&report, names.join("\n"))
         .map_err(|error| format!("cannot write {}: {error}", report.display()))?;
     if names.is_empty() {
         println!("SKIPPED: the workspace declares no feature");

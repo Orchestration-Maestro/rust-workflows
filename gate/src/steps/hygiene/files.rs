@@ -5,6 +5,8 @@
 
 use crate::checks::findings::Finding;
 use std::collections::BTreeMap;
+use std::fs;
+use std::fs::Metadata;
 use std::path::Path;
 
 /// The largest file a repository tracks without an exception, in bytes.
@@ -37,11 +39,11 @@ pub(super) fn findings(workspace: &Path, files: &[String]) -> Vec<Finding> {
 /// shebang, or where it points when it is a symlink.
 fn content_findings(workspace: &Path, file: &str, path: &Path) -> Vec<Finding> {
     let finding = |rule: &str, message: String| Finding::new(rule, file.to_owned(), 0, message);
-    let Ok(metadata) = std::fs::symlink_metadata(path) else {
+    let Ok(metadata) = fs::symlink_metadata(path) else {
         return Vec::new();
     };
     if metadata.file_type().is_symlink() {
-        let message = match std::fs::canonicalize(path) {
+        let message = match fs::canonicalize(path) {
             Err(_) => "a symlink whose target is missing",
             Ok(target) if !target.starts_with(workspace) => "a symlink that leaves the repository",
             Ok(_) => return Vec::new(),
@@ -57,7 +59,7 @@ fn content_findings(workspace: &Path, file: &str, path: &Path) -> Vec<Finding> {
         );
         found.push(finding("HYG-003", message));
     }
-    let shebang = std::fs::read(path).is_ok_and(|bytes| {
+    let shebang = fs::read(path).is_ok_and(|bytes| {
         bytes.starts_with(b"#!") && bytes.get(2).is_some_and(|&byte| byte != b'[')
     });
     match (executable(&metadata), shebang) {
@@ -76,7 +78,7 @@ fn content_findings(workspace: &Path, file: &str, path: &Path) -> Vec<Finding> {
 
 /// Whether the file's mode lets anybody execute it.
 #[cfg(unix)]
-fn executable(metadata: &std::fs::Metadata) -> bool {
+fn executable(metadata: &Metadata) -> bool {
     use std::os::unix::fs::PermissionsExt as _;
     metadata.permissions().mode() & 0o111 != 0
 }
@@ -84,7 +86,7 @@ fn executable(metadata: &std::fs::Metadata) -> bool {
 /// Whether the file's mode lets anybody execute it: never, where modes are
 /// not Unix modes.
 #[cfg(not(unix))]
-fn executable(_metadata: &std::fs::Metadata) -> bool {
+fn executable(_metadata: &Metadata) -> bool {
     false
 }
 

@@ -4,6 +4,7 @@
 use crate::harness::{Fixture, root, step, succeeds, tool, workflow};
 use serde_json::Value;
 use std::fs;
+use std::iter;
 use std::os::unix::fs::symlink;
 use std::path::Path;
 
@@ -62,11 +63,16 @@ fn permissions_timeouts_and_shell_policy_hold_in_every_workflow() {
             if job.get("steps").is_some() {
                 assert!(job.get("timeout-minutes").is_some());
             }
-            for item in std::iter::once(job).chain(job["steps"].as_array().into_iter().flatten()) {
-                assert!(item.get("continue-on-error").is_none());
-                if let Some(command) = item["run"].as_str() {
-                    body_follows_the_shell_policy(command);
-                }
+            let items: Vec<&Value> = iter::once(job)
+                .chain(job["steps"].as_array().into_iter().flatten())
+                .collect();
+            assert!(
+                items
+                    .iter()
+                    .all(|item| item.get("continue-on-error").is_none())
+            );
+            for command in items.iter().filter_map(|item| item["run"].as_str()) {
+                body_follows_the_shell_policy(command);
             }
         }
     }
@@ -193,12 +199,12 @@ fn the_path_guard_is_identical_in_every_workflow_that_takes_a_directory() {
         assert_eq!(step(workflow, "validate").trim(), command);
         let mut seen = Vec::new();
         for (directory, refusal) in cases {
-            let mut f = Fixture::new();
+            let mut fixture = Fixture::new();
             if directory == "project/out" {
-                symlink("/", f.root.join("project/out")).unwrap();
+                symlink("/", fixture.root.join("project/out")).unwrap();
             }
-            f.set("DIRECTORY", directory);
-            let output = f.run(workflow, "validate");
+            fixture.set("DIRECTORY", directory);
+            let output = fixture.run(workflow, "validate");
             assert!(!output.status.success(), "{workflow} accepted {directory}");
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
             assert!(
@@ -307,7 +313,7 @@ fn the_consumer_matrix_calls_every_local_workflow_and_fixture() {
         for (name, dependency) in manifest["dependencies"]
             .as_object()
             .into_iter()
-            .flat_map(|d| d.iter())
+            .flat_map(|entries| entries.iter())
         {
             let dependency = resolved(dependency, &workspace["dependencies"][name]);
             assert!(
@@ -371,8 +377,8 @@ fn dependabot_updates_merge_through_the_bot_unless_one_is_major() {
         (&["minor", "major"][..], false),
         (&[][..], false),
     ] {
-        let mut f = Fixture::new();
-        f.set("PR_URL", pull_request);
+        let mut fixture = Fixture::new();
+        fixture.set("PR_URL", pull_request);
         let trailer = types
             .iter()
             .map(|kind| {
@@ -380,7 +386,7 @@ fn dependabot_updates_merge_through_the_bot_unless_one_is_major() {
             })
             .collect::<Vec<_>>()
             .concat();
-        f.stub(
+        fixture.stub(
             "gh",
             &format!(
                 "if [[ $1 == pr && $2 == view ]]; then cat <<'BODY'\n\
@@ -388,9 +394,10 @@ fn dependabot_updates_merge_through_the_bot_unless_one_is_major() {
                  Signed-off-by: dependabot[bot]\nBODY\nfi"
             ),
         );
-        succeeds(&f.run("dependabot-auto-merge", "merge"));
+        succeeds(&fixture.run("dependabot-auto-merge", "merge"));
         assert_eq!(
-            f.calls()
+            fixture
+                .calls()
                 .contains(&format!("pr merge --auto --squash {pull_request}")),
             merges,
             "{types:?}"

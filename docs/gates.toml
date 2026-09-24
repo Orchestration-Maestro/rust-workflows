@@ -187,7 +187,7 @@ proofs = [
 name = "Source rules"
 kind = "opt-in"
 switch = "`quality-preview: true`, until v2.0.0 runs it always"
-standard = "ARC, SIZE, NAME, DOC, LIB, TST and WSP"
+standard = "ARC, SIZE, NAME, DOC, LIB, TST, WSP and LNT"
 proofs = [
   "an_import_cycle_between_two_files_is_refused_by_name",
   "a_door_holding_a_function_is_refused_and_a_listing_door_passes",
@@ -209,6 +209,9 @@ proofs = [
   "workspace_members_inherit_their_settings_and_dependencies",
   "edition_resolver_and_lockfile_are_held",
   "tightened_limits_apply_and_loosened_ones_are_refused",
+  "a_manifest_without_the_organization_lints_is_refused_until_written",
+  "a_clippy_toml_looser_than_the_organization_s_is_refused",
+  "clippy_knows_every_organization_lint_and_applies_it",
 ]
 
 [[gate]]

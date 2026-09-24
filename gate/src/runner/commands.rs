@@ -4,8 +4,12 @@
 
 use super::outcome::{Failure, Outcome};
 use super::step_declaration::{Kind, declared, tool_key};
+use std::env;
 use std::ffi::OsStr;
 use std::fmt::Write as _;
+use std::fs;
+use std::fs::OpenOptions;
+use std::io;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, ExitStatus, Output, Stdio};
@@ -103,7 +107,7 @@ impl Cmd {
     /// contract tests read instead of the gate's source. Only reviewed,
     /// non-sensitive environment values are visible; all others are redacted.
     fn trace(&self) -> Outcome {
-        let Some(path) = std::env::var_os("RUST_GATE_TRACE") else {
+        let Some(path) = env::var_os("RUST_GATE_TRACE") else {
             return Ok(());
         };
         let quoted = |word: &OsStr| {
@@ -169,7 +173,7 @@ impl Cmd {
         let output = self.execute(Stdio::piped(), Stdio::piped())?;
         let mut combined = output.stdout;
         combined.extend_from_slice(&output.stderr);
-        std::io::stdout()
+        io::stdout()
             .write_all(&combined)
             .map_err(|error| Failure::from(format!("cannot write the log: {error}")))?;
         write(path, &combined, append)?;
@@ -185,7 +189,7 @@ pub(crate) fn tee_line(line: &str, path: &Path, append: bool) -> Outcome {
 
 /// Refuse an empty or missing report, like `test -s path`.
 pub(crate) fn non_empty(path: &Path) -> Outcome {
-    match std::fs::metadata(path) {
+    match fs::metadata(path) {
         Ok(metadata) if metadata.len() > 0 => Ok(()),
         _ => Err(Failure::from(format!(
             "{} is missing or empty",
@@ -196,7 +200,7 @@ pub(crate) fn non_empty(path: &Path) -> Outcome {
 
 /// Write a file, truncating or appending, with one message on failure.
 pub(crate) fn write(path: &Path, bytes: &[u8], append: bool) -> Outcome {
-    let mut file = std::fs::OpenOptions::new()
+    let mut file = OpenOptions::new()
         .create(true)
         .write(true)
         .append(append)

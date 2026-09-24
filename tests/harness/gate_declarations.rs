@@ -76,12 +76,16 @@ pub(crate) fn described() -> Vec<Described> {
 }
 
 /// The described step a `rust-gate` body runs: one word names a `ci.yml`
-/// step or a shared command, two words a workflow and its step.
+/// step, a shared command or a local command, a flag after it a local
+/// command, and two words a workflow and its step.
 pub(crate) fn described_step<'a>(steps: &'a [Described], body: &str) -> Option<&'a Described> {
     let mut words = body.trim().strip_prefix("rust-gate ")?.split_whitespace();
     let (first, second) = (words.next()?, words.next());
     steps.iter().find(|step| match second {
+        Some(flag) if flag.starts_with("--") => {
+            step.workflow == "local" && step.id == format!("{first} {flag}")
+        }
         Some(id) => step.workflow == first && step.id == id,
-        None => step.id == first && matches!(step.workflow.as_str(), "ci" | "shared"),
+        None => step.id == first && matches!(step.workflow.as_str(), "ci" | "shared" | "local"),
     })
 }

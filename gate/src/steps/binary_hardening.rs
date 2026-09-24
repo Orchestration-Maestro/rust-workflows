@@ -4,6 +4,8 @@
 
 use crate::checks::cargo_metadata::EXECUTABLES;
 use crate::runner::{Cmd, Failure, Job, Outcome, Step, input, write};
+use std::fs;
+use std::io::ErrorKind;
 use std::path::Path;
 
 /// What this step declares: its inputs, its tools and its reports.
@@ -53,8 +55,8 @@ fn run() -> Outcome {
         // Hardening flags the linker must have applied. Rust does not emit C
         // stack canaries, so __stack_chk is deliberately not required here.
         let header = readelf("-h", first)?;
-        if !header.lines().any(|l| {
-            l.trim_start()
+        if !header.lines().any(|line| {
+            line.trim_start()
                 .strip_prefix("Type:")
                 .is_some_and(|rest| rest.trim_start().starts_with("DYN"))
         }) {
@@ -65,16 +67,15 @@ fn run() -> Outcome {
             return Err(format!("{name} lacks RELRO").into());
         }
         let dynamic = readelf("-d", first)?;
-        if !dynamic
-            .lines()
-            .any(|l| l.contains("BIND_NOW") || (l.contains("FLAGS") && l.contains("NOW")))
-        {
+        if !dynamic.lines().any(|line| {
+            line.contains("BIND_NOW") || (line.contains("FLAGS") && line.contains("NOW"))
+        }) {
             return Err(format!("{name} lacks full RELRO").into());
         }
         let lines: Vec<&str> = program_headers.lines().collect();
-        let executable_stack = lines.iter().enumerate().any(|(index, l)| {
-            l.contains("GNU_STACK")
-                && (l.contains("RWE")
+        let executable_stack = lines.iter().enumerate().any(|(index, line)| {
+            line.contains("GNU_STACK")
+                && (line.contains("RWE")
                     || lines
                         .get(index + 1)
                         .is_some_and(|next| next.contains("RWE")))
@@ -97,8 +98,8 @@ fn run() -> Outcome {
             true,
         )?;
     }
-    if let Err(error) = std::fs::remove_dir_all(&verify) {
-        if error.kind() != std::io::ErrorKind::NotFound {
+    if let Err(error) = fs::remove_dir_all(&verify) {
+        if error.kind() != ErrorKind::NotFound {
             return Err(format!("cannot remove {}: {error}", verify.display()).into());
         }
     }
@@ -112,6 +113,6 @@ fn readelf(flag: &str, binary: &str) -> Result<String, Failure> {
 
 /// The digest of a file's bytes, as `sha256sum < file` printed it.
 fn digest(file: &Path) -> Result<String, Failure> {
-    let bytes = std::fs::read(file).map_err(|error| format!("{}: {error}", file.display()))?;
+    let bytes = fs::read(file).map_err(|error| format!("{}: {error}", file.display()))?;
     Cmd::new("sha256sum").stdin_bytes(&bytes).capture()
 }

@@ -16,8 +16,8 @@ fn complexity_is_reported_but_never_fails_the_run() {
             "spans": [{"file_name": "src/lib.rs", "line_start": line, "is_primary": true}]}})
         .to_string()
     };
-    let mut f = Fixture::new();
-    f.set(
+    let mut fixture = Fixture::new();
+    fixture.set(
         "MESSAGES",
         &format!(
             "{}\n{}\n{{\"reason\":\"build-finished\"}}\n",
@@ -25,15 +25,15 @@ fn complexity_is_reported_but_never_fails_the_run() {
             message("clippy::cognitive_complexity", 20, 15, 40)
         ),
     );
-    f.stub(
+    fixture.stub(
         "cargo",
         r#"printf 'CLIPPY_CONF_DIR=%s\n' "${CLIPPY_CONF_DIR:-}" >> "$CALLS"
 printf '%s' "$MESSAGES""#,
     );
     let long = "fn a() {}\n".repeat(301);
-    fs::write(f.root.join("project/src/long.rs"), &long).unwrap();
-    succeeds(&f.run("ci", "complexity"));
-    let report = fs::read_to_string(f.root.join("reports/complexity.txt")).unwrap();
+    fs::write(fixture.root.join("project/src/long.rs"), &long).unwrap();
+    succeeds(&fixture.run("ci", "complexity"));
+    let report = fs::read_to_string(fixture.root.join("reports/complexity.txt")).unwrap();
     assert!(
         report.contains("clippy::too_many_lines\t140\t100\tsrc/lib.rs:3"),
         "{report}"
@@ -43,28 +43,32 @@ printf '%s' "$MESSAGES""#,
         report.contains("thresholds from this workflow's defaults"),
         "{report}"
     );
-    let data = fs::read_to_string(f.root.join("reports/complexity.json")).unwrap();
+    let data = fs::read_to_string(fixture.root.join("reports/complexity.json")).unwrap();
     assert!(
         data.contains("\"functions_over\":2") && data.contains("\"files_over\":1"),
         "{data}"
     );
     assert!(
-        f.calls().contains("CLIPPY_CONF_DIR=/"),
+        fixture.calls().contains("CLIPPY_CONF_DIR=/"),
         "without a consumer clippy.toml the defaults must be handed to Clippy: {}",
-        f.calls()
+        fixture.calls()
     );
 
     // A committed clippy.toml is the consumer's own bar, and is left alone.
     fs::write(
-        f.root.join("project/clippy.toml"),
+        fixture.root.join("project/clippy.toml"),
         "too-many-lines-threshold = 50\n",
     )
     .unwrap();
-    fs::write(f.root.join("calls"), "").unwrap();
-    succeeds(&f.run("ci", "complexity"));
-    assert!(f.calls().contains("CLIPPY_CONF_DIR=\n"), "{}", f.calls());
+    fs::write(fixture.root.join("calls"), "").unwrap();
+    succeeds(&fixture.run("ci", "complexity"));
     assert!(
-        fs::read_to_string(f.root.join("reports/complexity.txt"))
+        fixture.calls().contains("CLIPPY_CONF_DIR=\n"),
+        "{}",
+        fixture.calls()
+    );
+    assert!(
+        fs::read_to_string(fixture.root.join("reports/complexity.txt"))
             .unwrap()
             .contains("thresholds from the consumer's clippy.toml")
     );
@@ -83,26 +87,26 @@ printf '%s' "$MESSAGES""#,
         "OUT_STAGE",
         "OUT_API",
     ] {
-        f.set(key, "success");
+        fixture.set(key, "success");
     }
-    succeeds(&f.run("ci", "scorecard"));
-    let scorecard = fs::read_to_string(f.root.join("reports/scorecard.md")).unwrap();
+    succeeds(&fixture.run("ci", "scorecard"));
+    let scorecard = fs::read_to_string(fixture.root.join("reports/scorecard.md")).unwrap();
     assert!(
         scorecard
             .contains("Complexity, informational: 2 functions over the size thresholds, 1 files"),
         "{scorecard}"
     );
     assert!(
-        fs::read_to_string(f.root.join("reports/scorecard.json"))
+        fs::read_to_string(fixture.root.join("reports/scorecard.json"))
             .unwrap()
             .contains("\"complexity\":{\"measured\":true"),
     );
 
     // Clippy failing is reported, not propagated.
-    f.stub("cargo", "exit 1");
-    succeeds(&f.run("ci", "complexity"));
+    fixture.stub("cargo", "exit 1");
+    succeeds(&fixture.run("ci", "complexity"));
     assert!(
-        fs::read_to_string(f.root.join("reports/complexity.txt"))
+        fs::read_to_string(fixture.root.join("reports/complexity.txt"))
             .unwrap()
             .starts_with("NOT MEASURED")
     );

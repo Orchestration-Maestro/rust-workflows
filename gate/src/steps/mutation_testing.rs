@@ -5,6 +5,8 @@
 //! parent, mutates the whole workspace.
 
 use crate::runner::{Cmd, Job, Outcome, Step, flag, non_empty, optional, output, tee_line};
+use std::fs;
+use std::path::Path;
 
 /// What this step declares: its inputs, its tools and its reports.
 pub(crate) const STEPS: &[Step] = &[Step {
@@ -67,7 +69,7 @@ fn run() -> Outcome {
             .tee(&report, true);
     let outcomes = output_dir.join("mutants.out/outcomes.json");
     let saved = if outcomes.is_file() {
-        std::fs::copy(&outcomes, job.report("mutants.json")?)
+        fs::copy(&outcomes, job.report("mutants.json")?)
             .map(|_| ())
             .map_err(|error| format!("cannot copy the outcomes: {error}"))
     } else {
@@ -80,10 +82,10 @@ fn run() -> Outcome {
 
 /// Interpret only successful tool runs, after their raw outcomes were preserved.
 /// `change` names the diff that was mutated, or is `None` for the whole workspace.
-fn report_outcomes(job: &Job, outcomes: &std::path::Path, change: Option<&str>) -> Outcome {
+fn report_outcomes(job: &Job, outcomes: &Path, change: Option<&str>) -> Outcome {
     let report = job.report("mutants.txt")?;
     if !outcomes.exists() {
-        let log = std::fs::read_to_string(&report)
+        let log = fs::read_to_string(&report)
             .map_err(|error| format!("{}: {error}", report.display()))?;
         // ponytail: pinned 25.3.1 reports these skips only as text; use a structured
         // skip when upstream provides one. Silence is never proof of no work.

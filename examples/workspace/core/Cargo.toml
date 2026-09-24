@@ -5,6 +5,9 @@ edition.workspace = true
 rust-version.workspace = true
 description = "Dependency-free Rust workflow consumer example"
 license.workspace = true
+repository = "https://github.com/Orchestration-Maestro/rust-workflows"
+keywords = ["ci", "example"]
+categories = ["development-tools"]
 
 [lints]
 workspace = true

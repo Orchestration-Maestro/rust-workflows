@@ -193,3 +193,21 @@ Rulings taken while executing, newest last.
    and passes, as before this plan: failing the run on a tool outage would make
    every consumer's CI depend on one tool's uptime. Cost if wrong: a broken
    similarity-rs lets a third copy through until the report is read.
+8. LNT-001's manifest and `clippy.toml` checks run in `architecture`, not in
+   `quality`: they read manifests like the other source rules, stay behind
+   `quality-preview` until phase E, and give the commit hook the same refusal.
+   The list adds `cognitive_complexity` and `excessive_nesting`, which SIZE-001
+   names and whose `clippy.toml` thresholds do nothing while the lints are off;
+   `unsafe_code` stays with the `quality` step, per `unsafe-policy`; the `cargo`
+   group applies to every package, since Clippy's `cargo_common_metadata`
+   skips `publish = false`.
+9. The commands a developer or a hook runs are steps of a `local` workflow:
+   `rust-gate lints --write` names the step `lints --write`. The registry test
+   takes the justfile as what runs a local step; `just docs` rewrites every
+   crate's block.
+10. The module reader gives an inner attribute to its module, never to the
+    next item, so an integration-test crate may open with `#![cfg(test)]`,
+    which Clippy needs to read the whole crate as test code.
+11. `hygiene` reads the new files git does not ignore as well as the tracked
+    ones, so a local run sees what the next commit adds; HYG-001 leaves a
+    marker in backticks alone, since it names the word and leaves no work.

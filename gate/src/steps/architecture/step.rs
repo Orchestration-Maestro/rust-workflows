@@ -7,13 +7,14 @@ use crate::checks::manifests::{cargo_packages, read_cargo_metadata, workspace_of
 use crate::checks::module_tree::module_trees;
 use crate::checks::quality_config::{self, QualityConfig};
 use crate::runner::{Failure, Job, Outcome, Step, input};
+use std::fs;
 use std::path::Path;
 
 /// What this step declares: its inputs, its tools and its reports.
 pub(crate) const STEPS: &[Step] = &[Step {
     workflow: "ci",
     id: "architecture",
-    summary: "Source rules ARC, SIZE, NAME, DOC, LIB, TST and WSP",
+    summary: "Source rules ARC, SIZE, NAME, DOC, LIB, TST, WSP and LNT",
     inputs: &["GITHUB_WORKSPACE"],
     tools: &["cargo metadata", "git", "jaq"],
     reports: &["architecture.txt"],
@@ -24,13 +25,13 @@ pub(crate) const STEPS: &[Step] = &[Step {
 const RULES: &[&str] = &[
     "ARC-001", "ARC-002", "ARC-003", "ARC-004", "ARC-005", "ARC-006", "ARC-007", "SIZE-002",
     "SIZE-003", "NAME-001", "NAME-002", "DOC-001", "LIB-001", "LIB-002", "TST-001", "TST-003",
-    "WSP-001", "WSP-002",
+    "WSP-001", "WSP-002", "LNT-001",
 ];
 
 /// Run the step.
 fn run() -> Outcome {
     let job = Job::current()?;
-    let workspace = std::fs::canonicalize(input("GITHUB_WORKSPACE")?)
+    let workspace = fs::canonicalize(input("GITHUB_WORKSPACE")?)
         .map_err(|error| format!("GITHUB_WORKSPACE: {error}"))?;
     let config = quality_config::read_config(&workspace)?;
     let scope = scope(&workspace, &job.project);
@@ -74,6 +75,7 @@ fn findings(
         &cargo_workspace,
         workspace,
     )?);
+    found.extend(super::lints::findings(&cargo_workspace, workspace)?);
     found.sort();
     found.dedup();
     Ok((found, notes))
@@ -83,7 +85,7 @@ fn findings(
 /// slash, or nothing when the project is the repository: this run judges the
 /// exceptions under it.
 fn scope(workspace: &Path, project: &Path) -> String {
-    let project = std::fs::canonicalize(project).unwrap_or_else(|_| project.to_path_buf());
+    let project = fs::canonicalize(project).unwrap_or_else(|_| project.to_path_buf());
     let directory = relative(workspace, &project);
     if directory.is_empty() {
         directory

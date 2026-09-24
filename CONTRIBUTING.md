@@ -116,9 +116,10 @@ names the cycle it finds (`an_import_cycle_between_two_files_is_refused_by_name`
 
 Five more tests hold the crate and its proof to the same bar. The binary never
 panics: Clippy's `unwrap_used`, `expect_used`, `panic`, `unreachable`, `todo`,
-`unimplemented` and `dbg_macro` lints are denied in its manifest, and
-`the_binary_refuses_every_way_to_panic` keeps them there; a refusal is a
-message and an exit status, never a stack trace. Every step it declares is
+`unimplemented` and `dbg_macro` lints are denied in its manifest, among the
+organization's lints `rust-gate architecture` keeps there
+(`a_manifest_without_the_organization_lints_is_refused_until_written`); a
+refusal is a message and an exit status, never a stack trace. Every step it declares is
 run by a contract test (`a_contract_test_runs_every_registered_step`), and every refusal it
 composes is asserted by a test, in its own words
 (`a_test_asserts_every_refusal_the_gate_can_print`); a message that relays an

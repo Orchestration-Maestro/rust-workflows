@@ -3,6 +3,8 @@
 //! read as an import, each line where it was; and the top-level items of a
 //! file, each with its attributes, visibility, kind and name.
 
+use std::iter;
+
 /// One top-level item of a file.
 #[derive(Debug)]
 pub(crate) struct Item {
@@ -162,7 +164,7 @@ fn raw_string_end(bytes: &[u8], at: usize) -> Option<usize> {
         return None;
     }
     let mut closing = vec![b'"'];
-    closing.extend(std::iter::repeat_n(b'#', hashes));
+    closing.extend(iter::repeat_n(b'#', hashes));
     let body = at + hashes + 1;
     let found = bytes
         .get(body..)?
@@ -225,6 +227,15 @@ pub(crate) fn items(code: &str) -> Vec<Item> {
     let mut found = Vec::new();
     let mut index = 0;
     while let Some(start) = next_word(code, index) {
+        // An inner attribute is the enclosing module's, never the next item's:
+        // a crate root's `#![cfg(test)]` makes no single item test-only.
+        if code
+            .get(start..)
+            .is_some_and(|rest| rest.starts_with("#!["))
+        {
+            index = attribute_end(code.as_bytes(), start + 2);
+            continue;
+        }
         let Some(first) = next_word(code, attributes_end(code, start)) else {
             break;
         };
@@ -258,7 +269,7 @@ pub(crate) fn without_tests(code: &str) -> String {
 /// The offset of the first non-whitespace byte at or after `from`.
 fn next_word(code: &str, from: usize) -> Option<usize> {
     code.get(from..)?
-        .find(|c: char| !c.is_whitespace())
+        .find(|character: char| !character.is_whitespace())
         .map(|offset| from + offset)
 }
 
@@ -276,30 +287,33 @@ fn attributes_end(code: &str, start: usize) -> usize {
         } else {
             return index;
         };
-        let mut depth = 0usize;
-        let mut cursor = index + open;
-        while let Some(&byte) = bytes.get(cursor) {
-            cursor += 1;
-            match byte {
-                b'[' => depth += 1,
-                b']' => {
-                    depth = depth.saturating_sub(1);
-                    if depth == 0 {
-                        break;
-                    }
-                }
-                _ => {}
-            }
-        }
+        let cursor = attribute_end(bytes, index + open);
         index = next_word(code, cursor).unwrap_or(bytes.len());
     }
+}
+
+/// The byte after the `]` that closes the attribute whose `[` is at `cursor`.
+fn attribute_end(bytes: &[u8], mut cursor: usize) -> usize {
+    let mut depth = 0usize;
+    while let Some(&byte) = bytes.get(cursor) {
+        cursor += 1;
+        match byte {
+            b'[' => depth += 1,
+            b']' if depth <= 1 => break,
+            b']' => depth -= 1,
+            _ => {}
+        }
+    }
+    cursor
 }
 
 /// The visibility, kind and name an item's text opens with.
 fn head(text: &str) -> (String, String, String) {
     let (visibility, rest) = visibility_of(text);
     let mut words = rest
-        .split(|c: char| !(c.is_alphanumeric() || c == '_' || c == '!'))
+        .split(|character: char| {
+            !(character.is_alphanumeric() || character == '_' || character == '!')
+        })
         .filter(|word| !word.is_empty())
         .take(8)
         .peekable();
@@ -333,7 +347,7 @@ fn visibility_of(text: &str) -> (String, &str) {
     let Some(after) = text.strip_prefix("pub") else {
         return (String::new(), text);
     };
-    if after.starts_with(|c: char| c.is_alphanumeric() || c == '_') {
+    if after.starts_with(|character: char| character.is_alphanumeric() || character == '_') {
         return (String::new(), text);
     }
     let after = after.trim_start();
@@ -461,7 +475,16 @@ mod tests {
         assert!(found[3].is_test() && !found[0].is_test());
         assert!(found[0].is_module_file() && !found[3].is_module_file());
         assert!(found[1].is_offered() && found[2].is_offered() && !found[0].is_offered());
-        assert!(found[0].attributes.contains("forbid"));
+        assert!(found[0].attributes.is_empty(), "{}", found[0].attributes);
+    }
+
+    #[test]
+    fn an_inner_attribute_belongs_to_the_module_not_the_next_item() {
+        let code = blanked("//! Tests.\n#![cfg(test)]\n#![forbid(unsafe_code)]\n\nmod ci;\n");
+        let found = items(&code);
+        assert_eq!(found.len(), 1);
+        assert!(!found[0].is_test());
+        assert_eq!(without_tests(&code), code);
     }
 
     #[test]

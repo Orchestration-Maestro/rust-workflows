@@ -6,6 +6,7 @@
 use super::scorecard::{Control, Scorecard, State};
 use crate::checks::inputs::{LicensePolicy, UnsafePolicy, license_policy, unsafe_policy};
 use crate::runner::{Failure, Job, Outcome, Step, flag, input, optional, summary, write};
+use std::fs;
 
 /// What this step declares: its inputs, its tools and its reports.
 pub(crate) const STEPS: &[Step] = &[Step {
@@ -47,7 +48,7 @@ fn run() -> Outcome {
     let job = Job::current()?;
     // A failed coverage gate leaves no report; that is a missing value, not
     // an error to swallow, so the absence is handled rather than silenced.
-    let coverage = std::fs::read_to_string(job.earlier("coverage.lcov"))
+    let coverage = fs::read_to_string(job.earlier("coverage.lcov"))
         .ok()
         .and_then(|lcov| line_coverage(&lcov));
     let scorecard = Scorecard {
@@ -58,7 +59,7 @@ fn run() -> Outcome {
     };
     // Informational, so its absence is not an error: the line appears only
     // when the complexity step ran.
-    let complexity = std::fs::read_to_string(job.earlier("complexity.json")).ok();
+    let complexity = fs::read_to_string(job.earlier("complexity.json")).ok();
     let mut json = scorecard.json();
     if let Some(data) = &complexity {
         json = json.replacen("}\n", &format!(",\"complexity\":{}}}\n", data.trim()), 1);

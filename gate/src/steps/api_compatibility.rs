@@ -130,7 +130,7 @@ fn declares_break(title: &str) -> bool {
     title.split_once(':').is_some_and(|(header, _)| {
         header.strip_suffix('!').is_some_and(|kind| {
             let name = kind.split_once('(').map_or(kind, |(name, _)| name);
-            !name.is_empty() && name.chars().all(|c| c.is_ascii_lowercase())
+            !name.is_empty() && name.chars().all(|character| character.is_ascii_lowercase())
         })
     })
 }

@@ -1,7 +1,10 @@
 //! The pins the local gate shares with CI: tool versions, the toolchain, and
 //! the speed target.
 
+use crate::harness::{described, described_step, root, tool_rows, workflow};
+use std::collections::BTreeMap;
 use std::fs;
+use std::path::Path;
 
 #[test]
 fn the_local_gate_and_ci_install_the_same_tool_versions() {
@@ -9,7 +12,7 @@ fn the_local_gate_and_ci_install_the_same_tool_versions() {
     // CI gate. Two different versions of the same tool is the quiet way that
     // stops being true: the gate passes locally and fails in CI, or worse, the
     // reverse.
-    let root = crate::harness::root();
+    let root = root();
     let version = |url: &str| -> Option<String> {
         let tail = url.split("/download/").nth(1)?;
         // A tag can carry a path, URL-encoded: `cargo-audit%2Fv0.22.2`. Reading
@@ -19,8 +22,8 @@ fn the_local_gate_and_ci_install_the_same_tool_versions() {
         let tag = tag.rsplit('/').next()?;
         let digits: String = tag
             .chars()
-            .skip_while(|c| !c.is_ascii_digit())
-            .take_while(|c| c.is_ascii_digit() || *c == '.')
+            .skip_while(|character| !character.is_ascii_digit())
+            .take_while(|character| character.is_ascii_digit() || *character == '.')
             .collect();
         (!digits.is_empty()).then_some(digits)
     };
@@ -29,12 +32,12 @@ fn the_local_gate_and_ci_install_the_same_tool_versions() {
     assert!(local.len() > 5, "no pinned tools found in mise.toml");
 
     // ci.yml's pins are the tables of its `rust-gate install-tools` steps.
-    let ci = crate::harness::workflow("ci");
+    let ci = workflow("ci");
     let rows: Vec<_> = ci["jobs"]["checks"]["steps"]
         .as_array()
         .unwrap()
         .iter()
-        .flat_map(crate::harness::tool_rows)
+        .flat_map(tool_rows)
         .collect();
     let mut compared = 0;
     for row in &rows {
@@ -63,9 +66,9 @@ fn the_local_gate_and_ci_install_the_same_tool_versions() {
 
     // Release evidence uses the runner's GitHub CLI and the same pinned parser
     // as CI. No corporate client or authentication bootstrap remains.
-    let steps = crate::harness::described();
+    let steps = described();
     assert!(
-        crate::harness::described_step(&steps, "rust-gate publish-evidence upload")
+        described_step(&steps, "rust-gate publish-evidence upload")
             .is_some_and(|upload| upload.tools == ["gh", "jaq"])
     );
 }
@@ -75,7 +78,7 @@ fn the_local_toolchain_pin_has_one_copy() {
     // bootstrap.sh and the justfile used to carry their own `1.x.y`; a bump in
     // one and not the other installed a toolchain nothing ran on. Both now
     // read the root rust-toolchain.toml, so no literal may creep back.
-    let root = crate::harness::root();
+    let root = root();
     let pin = fs::read_to_string(root.join("rust-toolchain.toml")).unwrap();
     assert!(
         pin.contains("channel = \"1."),
@@ -107,7 +110,7 @@ fn the_speed_target_is_the_one_the_gate_prints() {
     // The North Star's speed KPI is measured by the justfile: `just check`
     // prints its wall time against the target. The number lives in the
     // justfile, so the table cannot promise a target the gate does not measure.
-    let root = crate::harness::root();
+    let root = root();
     let justfile = fs::read_to_string(root.join("justfile")).unwrap();
     let target = justfile
         .lines()
@@ -151,7 +154,7 @@ fn every_pinned_tool_has_a_row_in_the_readme_toolbelt() {
     // to mise.toml and not to the table is one nobody knows to expect; a row
     // left behind after a removal describes something `just setup` no longer
     // installs. Only mise itself is a row without a pin: it installs the rest.
-    let root = crate::harness::root();
+    let root = root();
     let pinned = pinned_tools(&root);
     let readme = fs::read_to_string(root.join("README.md")).unwrap();
     let toolbelt = readme
@@ -182,8 +185,8 @@ fn every_pinned_tool_has_a_row_in_the_readme_toolbelt() {
 /// The tools `mise.toml` pins, name to version: `name = "1.2.3"` or `name =
 /// { version = "1.2.3", ... }` under `[tools]`. Its aliases give the plugins
 /// that live in a monorepo the same names their release assets install them under.
-fn pinned_tools(root: &std::path::Path) -> std::collections::BTreeMap<String, String> {
-    let mut pinned = std::collections::BTreeMap::new();
+fn pinned_tools(root: &Path) -> BTreeMap<String, String> {
+    let mut pinned = BTreeMap::new();
     let mut in_tools = false;
     for line in fs::read_to_string(root.join("mise.toml")).unwrap().lines() {
         if line.starts_with('[') {

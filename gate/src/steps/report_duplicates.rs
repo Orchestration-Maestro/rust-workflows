@@ -11,6 +11,7 @@ use crate::checks::quality_config;
 use crate::runner::{Cmd, Failure, Job, Outcome, Step, input, summary, write};
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
+use std::fs;
 use std::path::Path;
 
 /// What this step declares: its inputs, its tools and its reports.
@@ -56,7 +57,7 @@ fn run() -> Outcome {
             "## Duplicated functions\n\nNot measured: similarity-rs failed, see the log.\n",
         );
     };
-    let workspace = std::fs::canonicalize(input("GITHUB_WORKSPACE")?)
+    let workspace = fs::canonicalize(input("GITHUB_WORKSPACE")?)
         .map_err(|error| format!("GITHUB_WORKSPACE: {error}"))?;
     let config = quality_config::read_config(&workspace)?;
     let found = shapes(&listing, &workspace);

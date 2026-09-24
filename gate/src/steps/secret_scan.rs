@@ -3,6 +3,7 @@
 //! consumer allowlist honoured.
 
 use crate::runner::{Cmd, Job, Outcome, Step, flag, non_empty, path};
+use std::fs;
 use std::path::Path;
 
 /// What this step declares: its inputs, its tools and its reports.
@@ -21,7 +22,7 @@ fn run() -> Outcome {
     let job = Job::current()?;
     let temp = &job.temp;
     let source = temp.join("secret-source");
-    std::fs::create_dir_all(&source)
+    fs::create_dir_all(&source)
         .map_err(|error| format!("cannot create {}: {error}", source.display()))?;
     let archive = Cmd::new("git -C")
         .arg(path("GITHUB_WORKSPACE")?)
@@ -32,7 +33,7 @@ fn run() -> Outcome {
         .stdin_bytes(&archive)
         .run()?;
     let config = temp.join("gitleaks.toml");
-    std::fs::write(&config, "[extend]\nuseDefault = true\n")
+    fs::write(&config, "[extend]\nuseDefault = true\n")
         .map_err(|error| format!("cannot write {}: {error}", config.display()))?;
     let scan = |format: &str, report: &Path| -> Outcome {
         Cmd::new("gitleaks dir")

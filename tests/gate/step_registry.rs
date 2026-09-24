@@ -3,7 +3,7 @@
 //! nothing the gate does not register, and the source uses nothing a step
 //! did not declare.
 
-use crate::harness::{Described, describe_text, described, described_step, root, workflow};
+use crate::harness::{Described, describe_text, described, described_step, root, workflow_steps};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
@@ -23,28 +23,26 @@ fn the_steps_document_is_the_one_the_gate_describes() {
 fn every_workflow_body_runs_a_registered_step_and_every_step_is_run() {
     // A body naming a step the gate does not register fails on the runner;
     // a registered step no workflow runs is dead code with a document row.
+    // A local command runs where a developer or a hook runs it: the justfile
+    // names each one.
     let steps = described();
     let mut run: BTreeSet<(String, String)> = BTreeSet::new();
-    for entry in fs::read_dir(root().join(".github/workflows")).unwrap() {
-        let path = entry.unwrap().path();
-        let name = path.file_stem().unwrap().to_string_lossy().into_owned();
-        let data = workflow(&name);
-        let Some(jobs) = data["jobs"].as_object() else {
+    for (name, _, step) in workflow_steps() {
+        let Some(body) = step["run"].as_str() else {
             continue;
         };
-        for job in jobs.values() {
-            for step in job["steps"].as_array().into_iter().flatten() {
-                let Some(body) = step["run"].as_str() else {
-                    continue;
-                };
-                if !body.trim().starts_with("rust-gate ") {
-                    continue;
-                }
-                let found = described_step(&steps, body).unwrap_or_else(|| {
-                    panic!("{name}.yml runs {body:?}, which the gate does not register")
-                });
-                run.insert((found.workflow.clone(), found.id.clone()));
-            }
+        if !body.trim().starts_with("rust-gate ") {
+            continue;
+        }
+        let found = described_step(&steps, body).unwrap_or_else(|| {
+            panic!("{name}.yml runs {body:?}, which the gate does not register")
+        });
+        run.insert((found.workflow.clone(), found.id.clone()));
+    }
+    let justfile = fs::read_to_string(root().join("justfile")).unwrap();
+    for step in steps.iter().filter(|step| step.workflow == "local") {
+        if justfile.contains(&format!(" -- {}", step.id)) {
+            run.insert((step.workflow.clone(), step.id.clone()));
         }
     }
     for step in &steps {
@@ -65,34 +63,24 @@ fn a_workflow_names_a_step_what_the_gate_says_it_does() {
     // shared commands carry the name of each call site instead.
     let steps = described();
     let mut checked = 0;
-    for entry in fs::read_dir(root().join(".github/workflows")).unwrap() {
-        let path = entry.unwrap().path();
-        let name = path.file_stem().unwrap().to_string_lossy().into_owned();
-        let data = workflow(&name);
-        let Some(jobs) = data["jobs"].as_object() else {
+    for (name, _, step) in workflow_steps() {
+        let Some(found) = step["run"]
+            .as_str()
+            .and_then(|body| described_step(&steps, body))
+        else {
             continue;
         };
-        for job in jobs.values() {
-            for step in job["steps"].as_array().into_iter().flatten() {
-                let Some(found) = step["run"]
-                    .as_str()
-                    .and_then(|body| described_step(&steps, body))
-                else {
-                    continue;
-                };
-                if found.workflow == "shared" {
-                    continue;
-                }
-                assert_eq!(
-                    step["name"].as_str().unwrap_or_default(),
-                    found.summary,
-                    "{name}.yml names rust-gate {} {} differently from the gate",
-                    found.workflow,
-                    found.id
-                );
-                checked += 1;
-            }
+        if found.workflow == "shared" {
+            continue;
         }
+        assert_eq!(
+            step["name"].as_str().unwrap_or_default(),
+            found.summary,
+            "{name}.yml names rust-gate {} {} differently from the gate",
+            found.workflow,
+            found.id
+        );
+        checked += 1;
     }
     assert!(checked > 30, "only {checked} step names checked");
 }
@@ -139,7 +127,10 @@ fn reads_of_check_source(text: &str) -> BTreeMap<String, String> {
         }
         let body = &text[index..];
         let name = body[3..].split('(').next().unwrap_or_default().to_owned();
-        if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        if !name
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '_')
+        {
             continue;
         }
         let end = body.find("\n}\n").unwrap_or(body.len());
@@ -276,7 +267,10 @@ fn names_used(text: &str, checks: &BTreeMap<String, String>) -> [BTreeSet<String
     let mut reports = quoted_after(&body, ".report(");
     for (index, _) in body.match_indices(".report(&format!(\"") {
         let name = body[index + 18..].split('"').next().unwrap_or_default();
-        reports.insert(format!("*{}", name.trim_start_matches(|c: char| c != '.')));
+        reports.insert(format!(
+            "*{}",
+            name.trim_start_matches(|character: char| character != '.')
+        ));
     }
     [inputs, tools, reports]
 }
@@ -394,9 +388,8 @@ fn every_step_module_declares_what_its_source_uses_and_nothing_else() {
         }
     }
     assert!(checked > 0, "the walk checked no name at all");
-    let seen: std::collections::BTreeSet<&str> = visited.iter().map(String::as_str).collect();
-    let registered: std::collections::BTreeSet<&str> =
-        steps.iter().map(|step| step.id.as_str()).collect();
+    let seen: BTreeSet<&str> = visited.iter().map(String::as_str).collect();
+    let registered: BTreeSet<&str> = steps.iter().map(|step| step.id.as_str()).collect();
     assert_eq!(
         seen, registered,
         "the walk did not reach every registered step"

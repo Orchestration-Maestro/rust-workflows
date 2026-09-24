@@ -56,11 +56,9 @@ pub(super) fn tests(trees: &[Tree], workspace: &Path) -> Vec<Finding> {
                     format!("test module `{stem}` names what it proves in fewer than two words");
                 found.push(Finding::new("NAME-002", file.clone(), 0, message));
             }
-            for (line, name) in functions {
-                if let Some(message) = claim(&name) {
-                    found.push(Finding::new("NAME-002", file.clone(), line, message));
-                }
-            }
+            found.extend(functions.into_iter().filter_map(|(line, name)| {
+                claim(&name).map(|message| Finding::new("NAME-002", file.clone(), line, message))
+            }));
         }
     }
     found
@@ -87,7 +85,7 @@ fn claim(name: &str) -> Option<String> {
 /// not snake case.
 fn words(name: &str) -> Option<usize> {
     let words: Vec<&str> = name.split('_').collect();
-    let snake = name.starts_with(|c: char| c.is_ascii_lowercase())
+    let snake = name.starts_with(|character: char| character.is_ascii_lowercase())
         && words.iter().all(|word| {
             !word.is_empty()
                 && word
@@ -100,7 +98,7 @@ fn words(name: &str) -> Option<usize> {
 /// Whether a package name is lowercase kebab-case without a Rust suffix.
 fn kebab(name: &str) -> bool {
     let parts: Vec<&str> = name.split('-').collect();
-    name.starts_with(|c: char| c.is_ascii_lowercase())
+    name.starts_with(|character: char| character.is_ascii_lowercase())
         && parts.iter().all(|part| {
             !part.is_empty()
                 && part

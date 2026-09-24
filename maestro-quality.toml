@@ -25,12 +25,6 @@ reason = "the fourth GITHUB_* writer, beside export, output and summary"
 [[exception]]
 rule = "ARC-005"
 path = "tests/harness/mod.rs"
-item = "Described"
-reason = "the gate's description of itself is read through the harness alone"
-
-[[exception]]
-rule = "ARC-005"
-path = "tests/harness/mod.rs"
 item = "describe_text"
 reason = "the gate's description of itself is read through the harness alone"
 

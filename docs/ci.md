@@ -145,8 +145,8 @@ says so and the step does not guess.
 ### Repository hygiene
 
 Preview until v2.0.0, with `quality-preview: true` like the source rules:
-`rust-gate hygiene` reads every file git tracks in the checkout, whatever its
-language, and refuses:
+`rust-gate hygiene` reads every file git tracks in the checkout, and every new
+file it does not ignore, whatever its language, and refuses:
 
 | Rule | Refuses |
 | --- | --- |
@@ -187,6 +187,20 @@ and refuses each finding by its identifier, file and line:
 | TST-003 | More than one integration-test crate without required features |
 | WSP-001 | A workspace member that does not inherit `[lints]`, `edition`, `rust-version`, `license` or its dependencies |
 | WSP-002 | An edition other than 2024, a virtual workspace resolver other than 3, a missing or untracked `Cargo.lock` |
+| LNT-001 | A lint of the organization's list not denied in the root manifest's `[workspace.lints]` or `[lints]`, or a `clippy.toml` looser than the organization's, or none |
+
+The organization's lints are one list the gate holds: Clippy's `all`,
+`pedantic` and `cargo` groups, the lints that keep a panic out of product code
+(`unwrap_used`, `expect_used`, `panic`, `indexing_slicing` and their kin), one
+module layout (`self_named_module_files`), short paths and real names
+(`absolute_paths`, `min_ident_chars`), the size lints SIZE-001 reads, and
+rustc's `missing_docs`, `unreachable_pub` and `unused_qualifications` among
+others. `rust-gate lints --write`, run where the root `Cargo.toml` is, writes
+them between two markers; a repository adds its own lints below the block as
+dotted keys, `clippy.own_lint = "deny"`, and removes none. Test code keeps
+`unwrap`, `expect`, `panic`, indexing and printing through the `clippy.toml`
+allowances; an integration-test crate opens with `#![cfg(test)]` so Clippy
+reads all of it as test code.
 
 `architecture.txt` lists every finding, then every finding an exception
 excuses, with its reason, then the files over 300 lines. `maestro-quality.toml`,

@@ -146,17 +146,17 @@ fn ci_configures_direct_crates_io_without_writing_credentials() {
 
 #[test]
 fn scanners_propagate_findings_execution_errors_and_missing_tools() {
-    let f = Fixture::new();
-    f.stub("git", "tar -cf - --files-from /dev/null");
+    let fixture = Fixture::new();
+    fixture.stub("git", "tar -cf - --files-from /dev/null");
     for (command, id) in [("cargo", "audit"), ("gitleaks", "secrets")] {
         for status in [1, 2, 127] {
-            f.stub(command, &format!("exit {status}"));
-            assert_eq!(f.run("ci", id).status.code(), Some(status));
-            assert!(f.calls().contains(command));
+            fixture.stub(command, &format!("exit {status}"));
+            assert_eq!(fixture.run("ci", id).status.code(), Some(status));
+            assert!(fixture.calls().contains(command));
         }
-        f.stub(command, "exit 0");
+        fixture.stub(command, "exit 0");
         assert!(
-            !f.run("ci", id).status.success(),
+            !fixture.run("ci", id).status.success(),
             "Missing scanner report must fail"
         );
     }

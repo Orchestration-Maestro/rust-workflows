@@ -2,9 +2,11 @@
 
 #![forbid(unsafe_code)]
 
+use std::process;
+
 fn main() {
     match maestro_workspace_arithmetic::checked_sum(20, 22) {
         Some(total) => println!("{total}"),
-        None => std::process::exit(1),
+        None => process::exit(1),
     }
 }

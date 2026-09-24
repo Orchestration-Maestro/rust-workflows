@@ -5,7 +5,9 @@
 use crate::checks::checkout_paths::project_directory;
 use crate::checks::rust_versions::is_nightly;
 use crate::checks::simple_names::simple;
-use crate::runner::{Cmd, Job, Outcome, Step, export, input, native_linux, summary};
+use crate::runner::{Cmd, Failure, Job, Outcome, Step, export, input, native_linux, summary};
+use std::fs;
+use std::path::Path;
 
 /// What each step declares: its inputs, its tools and its reports.
 pub(crate) const STEPS: &[Step] = &[
@@ -65,7 +67,7 @@ fn validate() -> Outcome {
         return Err("target must be a simple fuzz target name".into());
     }
     let budget = input("MAX_TOTAL_TIME")?;
-    if budget.is_empty() || !budget.bytes().all(|b| b.is_ascii_digit()) {
+    if budget.is_empty() || !budget.bytes().all(|byte| byte.is_ascii_digit()) {
         return Err("max-total-time must be a whole number of seconds".into());
     }
     if !(10..=1800).contains(&budget.parse::<u64>().unwrap_or(u64::MAX)) {
@@ -85,7 +87,7 @@ fn toolchain() -> Outcome {
     let job = Job::current()?;
     native_linux()?;
     let reports = &job.reports;
-    std::fs::create_dir_all(reports)
+    fs::create_dir_all(reports)
         .map_err(|error| format!("cannot create {}: {error}", reports.display()))?;
     let toolchain = input("RUSTUP_TOOLCHAIN")?;
     Cmd::new("rustup toolchain install")
@@ -99,6 +101,22 @@ fn toolchain() -> Outcome {
         .tee(&job.report("toolchain.txt")?, false)
 }
 
+/// Every fuzz target the project declares, one `.rs` file each under
+/// `fuzz/fuzz_targets`, sorted.
+fn fuzz_targets(project: &Path) -> Result<Vec<String>, Failure> {
+    let entries = fs::read_dir(project.join("fuzz/fuzz_targets"))
+        .map_err(|error| format!("fuzz/fuzz_targets: {error}"))?;
+    let mut targets = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("fuzz/fuzz_targets: {error}"))?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let stem = name.strip_suffix(".rs").map(str::to_owned);
+        targets.extend(stem.filter(|_| entry.file_type().is_ok_and(|kind| kind.is_file())));
+    }
+    targets.sort();
+    Ok(targets)
+}
+
 /// Replay the committed corpus of every target, explore for the budget,
 /// and summarize what ran.
 fn replay() -> Outcome {
@@ -106,23 +124,11 @@ fn replay() -> Outcome {
     let project = &job.project;
     let report = job.report("fuzz.txt")?;
     let requested = input("TARGET")?;
-    let mut targets = Vec::new();
-    if requested.is_empty() {
-        let entries = std::fs::read_dir(project.join("fuzz/fuzz_targets"))
-            .map_err(|error| format!("fuzz/fuzz_targets: {error}"))?;
-        for entry in entries {
-            let entry = entry.map_err(|error| format!("fuzz/fuzz_targets: {error}"))?;
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if entry.file_type().is_ok_and(|kind| kind.is_file()) {
-                if let Some(stem) = name.strip_suffix(".rs") {
-                    targets.push(stem.to_owned());
-                }
-            }
-        }
-        targets.sort();
+    let targets = if requested.is_empty() {
+        fuzz_targets(project)?
     } else {
-        targets.push(requested);
-    }
+        vec![requested]
+    };
     if targets.is_empty() {
         return Err("No fuzz targets found".into());
     }

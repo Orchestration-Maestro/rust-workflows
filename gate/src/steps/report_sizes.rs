@@ -7,7 +7,9 @@
 
 use crate::checks::checkout_paths::rust_sources;
 use crate::runner::{Cmd, Failure, Job, Outcome, Step, summary, write};
+use std::cmp::Reverse;
 use std::fmt::Write as _;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 /// What this step declares: its inputs, its tools and its reports.
@@ -73,7 +75,7 @@ fn run() -> Outcome {
         return write(&data, b"{\"measured\":false}\n", false);
     }
     let mut functions = findings(&messages)?;
-    functions.sort_by_key(|finding| std::cmp::Reverse(finding.1));
+    functions.sort_by_key(|finding| Reverse(finding.1));
     let mut files: Vec<(String, usize)> = rust_sources(&job.project)?
         .into_iter()
         .filter_map(|path| {
@@ -84,7 +86,7 @@ fn run() -> Outcome {
             })
         })
         .collect();
-    files.sort_by_key(|file| std::cmp::Reverse(file.1));
+    files.sort_by_key(|file| Reverse(file.1));
     let mut text = format!(
         "# rust-gate complexity, informational: thresholds from {thresholds}\n\
          # functions over the thresholds: {}; files over {FILE_LIMIT} lines of code: {}\n",
@@ -126,9 +128,9 @@ fn thresholds_for(job: &Job) -> Result<(&'static str, Option<PathBuf>), String> 
         return Ok(("the consumer's clippy.toml", None));
     }
     let directory = job.temp.join("complexity-config");
-    std::fs::create_dir_all(&directory)
+    fs::create_dir_all(&directory)
         .map_err(|error| format!("cannot create {}: {error}", directory.display()))?;
-    std::fs::write(directory.join("clippy.toml"), DEFAULT_THRESHOLDS)
+    fs::write(directory.join("clippy.toml"), DEFAULT_THRESHOLDS)
         .map_err(|error| format!("cannot write the default thresholds: {error}"))?;
     Ok(("this workflow's defaults", Some(directory)))
 }
@@ -150,7 +152,7 @@ fn findings(messages: &Path) -> Result<Vec<Finding>, Failure> {
 
 /// Lines that are not doc comments.
 fn code_lines(path: &Path) -> usize {
-    std::fs::read_to_string(path)
+    fs::read_to_string(path)
         .unwrap_or_default()
         .lines()
         .filter(|line| {

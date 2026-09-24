@@ -6,6 +6,7 @@ use crate::checks::release_boundary::{is_approved_environment, is_protected_rele
 use crate::checks::rust_versions::{channel_value, is_exact_stable};
 use crate::checks::simple_names::is_hex;
 use crate::runner::{Cmd, Outcome, Step, export, flag, input, output, path};
+use std::fs;
 use std::path::Path;
 
 /// What each step declares: its inputs, its tools and its reports.
@@ -91,10 +92,10 @@ fn authorize() -> Outcome {
         && package
             .chars()
             .next()
-            .is_some_and(|c| c.is_ascii_alphanumeric() || c == '_')
-        && package
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+            .is_some_and(|character| character.is_ascii_alphanumeric() || character == '_')
+        && package.chars().all(|character| {
+            character.is_ascii_alphanumeric() || character == '_' || character == '-'
+        });
     if !safe {
         return Err("package must be a safe exact Cargo package name".into());
     }
@@ -125,7 +126,7 @@ fn install_and_export(project: &Path, version: &str) -> Outcome {
 /// validated rather than through a TOML parser.
 fn toolchain() -> Outcome {
     let project = path("GITHUB_WORKSPACE")?.join(input("DIRECTORY")?);
-    let file = std::fs::read_to_string(project.join("rust-toolchain.toml"))
+    let file = fs::read_to_string(project.join("rust-toolchain.toml"))
         .map_err(|error| format!("rust-toolchain.toml: {error}"))?;
     let pinned = file.lines().find_map(channel_value).unwrap_or_default();
     if !is_exact_stable(&pinned) {

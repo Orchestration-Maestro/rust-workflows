@@ -18,7 +18,7 @@ pub(crate) fn test_functions(code: &str) -> Vec<(usize, String)> {
             .get(offset + 2..end.saturating_sub(1))
             .unwrap_or_default()
             .chars()
-            .filter(|c| !c.is_whitespace())
+            .filter(|character| !character.is_whitespace())
             .collect();
         let path = attribute.split('(').next().unwrap_or_default();
         if path != "test" && !path.ends_with("::test") {
@@ -144,7 +144,7 @@ fn function_after(code: &str, from: usize) -> Option<(usize, String)> {
         }
         let word: String = rest
             .chars()
-            .take_while(|&c| c.is_alphanumeric() || c == '_')
+            .take_while(|&character| character.is_alphanumeric() || character == '_')
             .collect();
         index += word.len();
         match word.as_str() {
@@ -154,7 +154,7 @@ fn function_after(code: &str, from: usize) -> Option<(usize, String)> {
                 let name: String = code
                     .get(start..)?
                     .chars()
-                    .take_while(|&c| c.is_alphanumeric() || c == '_')
+                    .take_while(|&character| character.is_alphanumeric() || character == '_')
                     .collect();
                 return (!name.is_empty()).then_some((start, name));
             }

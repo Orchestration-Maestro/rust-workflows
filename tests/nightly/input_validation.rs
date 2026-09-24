@@ -62,8 +62,8 @@ fn nightly_workflows_reject_every_malformed_input_before_touching_a_toolchain() 
         ),
     ] {
         // fuzz refuses a project with no corpus, so the accepted case needs one.
-        let prepare = |f: &Fixture| {
-            fs::create_dir_all(f.root.join("project/fuzz/fuzz_targets")).unwrap();
+        let prepare = |fixture: &Fixture| {
+            fs::create_dir_all(fixture.root.join("project/fuzz/fuzz_targets")).unwrap();
         };
         let mut good = Fixture::new();
         prepare(&good);
@@ -72,13 +72,13 @@ fn nightly_workflows_reject_every_malformed_input_before_touching_a_toolchain() 
         }
         succeeds(&good.run(workflow, "validate"));
         for (key, bad, message) in cases {
-            let mut f = Fixture::new();
-            prepare(&f);
-            for (k, v) in &ok {
-                f.set(k, v);
+            let mut fixture = Fixture::new();
+            prepare(&fixture);
+            for (key, value) in &ok {
+                fixture.set(key, value);
             }
-            f.set(key, bad);
-            refused(&f.run(workflow, "validate"), message);
+            fixture.set(key, bad);
+            refused(&fixture.run(workflow, "validate"), message);
         }
     }
 

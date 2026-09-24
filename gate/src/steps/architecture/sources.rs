@@ -39,18 +39,19 @@ pub(super) fn library_prints(trees: &[Tree], workspace: &Path) -> Vec<Finding> {
     for tree in trees.iter().filter(|tree| tree.is_library()) {
         for module in &tree.modules {
             let code = without_tests(&module.code);
-            for (offset, name) in macro_calls(&code) {
-                if PRINTS.contains(&name) {
-                    found.push(Finding::new(
-                        "LIB-001",
-                        relative(workspace, &module.file),
-                        line_at(&code, offset),
-                        format!(
-                            "`{name}!` in a library; return the value or report through \
-                             tracing, and let the binary print"
-                        ),
-                    ));
-                }
+            let prints = macro_calls(&code)
+                .into_iter()
+                .filter(|(_, name)| PRINTS.contains(name));
+            for (offset, name) in prints {
+                found.push(Finding::new(
+                    "LIB-001",
+                    relative(workspace, &module.file),
+                    line_at(&code, offset),
+                    format!(
+                        "`{name}!` in a library; return the value or report through tracing, \
+                         and let the binary print"
+                    ),
+                ));
             }
         }
     }
@@ -106,11 +107,12 @@ fn macro_calls(code: &str) -> Vec<(usize, &str)> {
 #[cfg(test)]
 mod tests {
     use super::{library_prints, module_comments, test_sleeps};
+    use crate::checks::findings::Finding;
     use crate::checks::module_tree::sample;
     use std::path::Path;
 
     /// Every finding as its report line.
-    fn lines(found: &[crate::checks::findings::Finding]) -> Vec<String> {
+    fn lines(found: &[Finding]) -> Vec<String> {
         found.iter().map(ToString::to_string).collect()
     }
 

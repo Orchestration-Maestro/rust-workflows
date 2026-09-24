@@ -7,6 +7,7 @@ use crate::checks::checkout_paths::is_symlink;
 use crate::checks::simple_names::is_hex;
 use crate::runner::{Cmd, Outcome, Step, flag, input, output};
 use std::collections::BTreeSet;
+use std::fs;
 use std::path::Path;
 
 /// What this step declares: its inputs, its tools and its reports.
@@ -40,8 +41,7 @@ fn run() -> Outcome {
     // The manifest must name exactly the two release files, each once, and
     // neither may be a symlink: a link would have the job hash, and then
     // release, whatever it points at rather than the payload it was handed.
-    let text =
-        std::fs::read_to_string(&manifest).map_err(|_| "Missing required release checksums")?;
+    let text = fs::read_to_string(&manifest).map_err(|_| "Missing required release checksums")?;
     let mut seen = BTreeSet::new();
     for line in text.lines() {
         let Some((digest, name)) = line.split_once("  ") else {

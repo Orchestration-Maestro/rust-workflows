@@ -1,5 +1,6 @@
 //! Native Windows execution, distinct from the Linux workflow/ELF replay.
 
+#![cfg(test)]
 #![forbid(unsafe_code)]
 
 mod native_runtime;

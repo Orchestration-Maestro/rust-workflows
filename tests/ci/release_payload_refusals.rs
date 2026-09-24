@@ -9,12 +9,12 @@ use std::os::unix::fs::symlink;
 
 /// A first build: one executable under `target/release` and the build's
 /// JSON record naming it.
-fn built(f: &Fixture) -> String {
-    let target = f.root.join("target");
+fn built(fixture: &Fixture) -> String {
+    let target = fixture.root.join("target");
     fs::create_dir_all(target.join("release")).unwrap();
     fs::write(target.join("release/app"), "first").unwrap();
     fs::write(
-        f.root.join("build.jsonl"),
+        fixture.root.join("build.jsonl"),
         json!({"reason": "compiler-artifact", "executable": target.join("release/app"),
                "target": {"name": "app"}})
         .to_string(),
@@ -48,13 +48,13 @@ esac"#
 
 #[test]
 fn a_lockfile_that_drifts_during_sbom_generation_fails_the_build() {
-    let f = Fixture::new();
-    f.stub(
+    let fixture = Fixture::new();
+    fixture.stub(
         "cargo",
         r#"[[ "$1" == cyclonedx ]] && echo drift >> Cargo.lock; exit 0"#,
     );
     refused(
-        &f.run("ci", "build"),
+        &fixture.run("ci", "build"),
         "Cargo.lock changed while the SBOM was generated; commit a resolved lockfile",
     );
 }
@@ -68,37 +68,44 @@ printf 'first' > "$RUNNER_TEMP/rust-target-verify/release/app""#;
         ("bind-now", "lacks full RELRO"),
         ("stack", "has an executable stack"),
     ] {
-        let mut f = Fixture::new();
-        let target = built(&f);
-        f.set("CARGO_TARGET_DIR", &target);
-        f.stub("cargo", rebuilt);
-        f.stub("readelf", &readelf(flaw));
-        refused(&f.run("ci", "hardening"), message);
+        let mut fixture = Fixture::new();
+        let target = built(&fixture);
+        fixture.set("CARGO_TARGET_DIR", &target);
+        fixture.stub("cargo", rebuilt);
+        fixture.stub("readelf", &readelf(flaw));
+        refused(&fixture.run("ci", "hardening"), message);
     }
-    let mut f = Fixture::new();
-    let target = built(&f);
-    f.set("CARGO_TARGET_DIR", &target);
-    f.stub("cargo", "");
-    refused(&f.run("ci", "hardening"), "Rebuilt binary missing for");
+    let mut fixture = Fixture::new();
+    let target = built(&fixture);
+    fixture.set("CARGO_TARGET_DIR", &target);
+    fixture.stub("cargo", "");
+    refused(
+        &fixture.run("ci", "hardening"),
+        "Rebuilt binary missing for",
+    );
 }
 
 /// A staging fixture: one member whose `CycloneDX` document is valid, one
 /// executable, and the revision the payload records.
-fn staged(f: &mut Fixture) {
-    let target = f.root.join("target");
+fn staged(fixture: &mut Fixture) {
+    let target = fixture.root.join("target");
     fs::create_dir_all(&target).unwrap();
-    f.set("CARGO_TARGET_DIR", &target.display().to_string());
-    f.set("REVISION", &"a".repeat(40));
-    let manifest = f.root.join("project/Cargo.toml");
+    fixture.set("CARGO_TARGET_DIR", &target.display().to_string());
+    fixture.set("REVISION", &"a".repeat(40));
+    let manifest = fixture.root.join("project/Cargo.toml");
     fs::write(
-        f.root.join("metadata.json"),
+        fixture.root.join("metadata.json"),
         members(&[("fixture", &manifest.display().to_string())]),
     )
     .unwrap();
-    fs::write(f.root.join("build.jsonl"), "").unwrap();
+    fs::write(fixture.root.join("build.jsonl"), "").unwrap();
     let bom = json!({"bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1,
         "metadata": {"component": {"name": "fixture", "type": "library"}}, "components": []});
-    fs::write(f.root.join("project/fixture.cdx.json"), bom.to_string()).unwrap();
+    fs::write(
+        fixture.root.join("project/fixture.cdx.json"),
+        bom.to_string(),
+    )
+    .unwrap();
 }
 
 /// The `cargo metadata` record of the given members.
@@ -114,9 +121,9 @@ fn members(members: &[(&str, &str)]) -> String {
 #[test]
 fn staging_refuses_names_paths_and_documents_it_cannot_trust() {
     let fresh = || {
-        let mut f = Fixture::new();
-        staged(&mut f);
-        f
+        let mut fixture = Fixture::new();
+        staged(&mut fixture);
+        fixture
     };
     let first = fresh();
     let manifest = first.root.join("project/Cargo.toml").display().to_string();
@@ -130,9 +137,9 @@ fn staging_refuses_names_paths_and_documents_it_cannot_trust() {
             "Workspace member escapes checkout",
         ),
     ] {
-        let f = fresh();
-        fs::write(f.root.join("metadata.json"), table).unwrap();
-        refused(&f.run("ci", "stage"), message);
+        let fixture = fresh();
+        fs::write(fixture.root.join("metadata.json"), table).unwrap();
+        refused(&fixture.run("ci", "stage"), message);
     }
     let linked = fresh();
     fs::remove_file(linked.root.join("project/fixture.cdx.json")).unwrap();
@@ -146,8 +153,8 @@ fn staging_refuses_names_paths_and_documents_it_cannot_trust() {
         ("bad name", false, "Invalid binary name"),
         ("app", true, "Invalid or duplicate binary output"),
     ] {
-        let f = fresh();
-        let inside = f.root.join("target/release/app");
+        let fixture = fresh();
+        let inside = fixture.root.join("target/release/app");
         fs::create_dir_all(inside.parent().unwrap()).unwrap();
         fs::write(&inside, "binary").unwrap();
         let path = if outside {
@@ -157,8 +164,8 @@ fn staging_refuses_names_paths_and_documents_it_cannot_trust() {
         };
         let record = json!({"reason": "compiler-artifact", "executable": path,
                             "target": {"name": name}});
-        fs::write(f.root.join("build.jsonl"), record.to_string()).unwrap();
-        refused(&f.run("ci", "stage"), message);
+        fs::write(fixture.root.join("build.jsonl"), record.to_string()).unwrap();
+        refused(&fixture.run("ci", "stage"), message);
     }
     let merged = fresh();
     merged.stub(

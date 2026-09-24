@@ -7,6 +7,7 @@ use super::manifests::LIBRARY_KINDS;
 use super::rust_code::{Item, blanked, items, without_tests};
 use super::rust_paths::{NamedPath, paths, use_leaves};
 use crate::runner::{Cmd, Failure};
+use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Cargo's targets, one line each: their kinds and their root file.
@@ -160,8 +161,8 @@ fn walk(root: &Path) -> Result<Vec<Module>, Failure> {
     let mut modules = Vec::new();
     let mut pending = vec![(Vec::new(), root.to_path_buf())];
     while let Some((path, file)) = pending.pop() {
-        let source = std::fs::read_to_string(&file)
-            .map_err(|error| format!("{}: {error}", file.display()))?;
+        let source =
+            fs::read_to_string(&file).map_err(|error| format!("{}: {error}", file.display()))?;
         let module = Module::read(path, file, &source);
         let directory = children_directory(&module);
         for child in module.children() {
@@ -228,7 +229,10 @@ pub(crate) fn sample(kinds: &[&str], files: &[(&str, &str)]) -> Tree {
 #[cfg(test)]
 mod tests {
     use super::{Module, sample, target_tree, walk};
+    use std::env;
+    use std::fs;
     use std::path::PathBuf;
+    use std::process;
 
     /// Owned segments.
     fn owned(path: &[&str]) -> Vec<String> {
@@ -288,10 +292,10 @@ mod tests {
 
     #[test]
     fn a_walk_follows_declarations_into_both_file_layouts() {
-        let root = std::env::temp_dir().join(format!("module-tree-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
+        let root = env::temp_dir().join(format!("module-tree-{}", process::id()));
+        fs::remove_dir_all(&root).ok();
         for directory in ["a", "b"] {
-            std::fs::create_dir_all(root.join(directory)).unwrap();
+            fs::create_dir_all(root.join(directory)).unwrap();
         }
         for (file, source) in [
             (
@@ -303,7 +307,7 @@ mod tests {
             ("b/mod.rs", ""),
             ("tests.rs", ""),
         ] {
-            std::fs::write(root.join(file), source).unwrap();
+            fs::write(root.join(file), source).unwrap();
         }
         let modules = walk(&root.join("lib.rs")).unwrap();
         let paths: Vec<String> = modules
@@ -311,7 +315,7 @@ mod tests {
             .map(|module| module.path.join("::"))
             .collect();
         assert_eq!(paths, ["", "a", "a::c", "b"]);
-        std::fs::remove_dir_all(&root).unwrap();
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

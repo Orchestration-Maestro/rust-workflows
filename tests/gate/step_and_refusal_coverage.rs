@@ -2,26 +2,13 @@
 //! and every refusal it can print is asserted by a test somewhere, so no step
 //! and no refusal is held by nothing.
 
-use crate::harness::{described, root, test_sources};
+use crate::harness::{described, root, rust_files, test_sources};
 use std::fs;
 use std::path::PathBuf;
 
 /// Every Rust file of the gate crate.
 fn product_sources() -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    let mut queue = vec![root().join("gate/src")];
-    while let Some(directory) = queue.pop() {
-        for entry in fs::read_dir(&directory).unwrap() {
-            let path = entry.unwrap().path();
-            if path.is_dir() {
-                queue.push(path);
-            } else if path.extension().is_some_and(|extension| extension == "rs") {
-                files.push(path);
-            }
-        }
-    }
-    files.sort();
-    files
+    rust_files(&root().join("gate/src"))
 }
 
 /// Everything the tests assert against, as one string: the contract tests
@@ -50,8 +37,8 @@ fn span(text: &str, start: usize) -> &str {
     let mut depth = 0usize;
     let mut quoted = false;
     let mut escaped = false;
-    for (offset, c) in text[start..].char_indices() {
-        match c {
+    for (offset, character) in text[start..].char_indices() {
+        match character {
             _ if escaped => escaped = false,
             '\\' if quoted => escaped = true,
             '"' => quoted = !quoted,
@@ -71,8 +58,8 @@ fn span(text: &str, start: usize) -> &str {
 /// The body of the string literal `rest` opens, up to its closing quote.
 fn literal(rest: &str) -> &str {
     let mut escaped = false;
-    for (offset, c) in rest.char_indices() {
-        match c {
+    for (offset, character) in rest.char_indices() {
+        match character {
             _ if escaped => escaped = false,
             '\\' => escaped = true,
             '"' => return &rest[..offset],
@@ -110,6 +97,22 @@ fn fixed_fragment(text: &str) -> String {
 /// `Err(`, `Failure::from(`, `map_err(`, `ok_or(` and `ok_or_else(` spans,
 /// outside comments and its own tests, as their longest fixed fragment. A
 /// message that relays an operating system error, `{error}` in its text, is
+/// The fixed fragment of every string literal in `call` long enough to
+/// name a refusal, `{error}` passthroughs left out.
+fn fragments(call: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    let mut rest = call;
+    while let Some(open) = rest.find('"') {
+        let text = literal(&rest[open + 1..]);
+        let fragment = fixed_fragment(text);
+        if fragment.len() >= 12 && !text.contains("{error}") {
+            found.push(fragment);
+        }
+        rest = &rest[(open + 1 + text.len() + 1).min(rest.len())..];
+    }
+    found
+}
+
 /// the system's wording and is left out.
 fn refusals(source: &str) -> Vec<String> {
     let body: Vec<&str> = source
@@ -130,18 +133,12 @@ fn refusals(source: &str) -> Vec<String> {
     ] {
         for (index, _) in body.match_indices(marker) {
             let preceded = body[..index].chars().next_back();
-            if marker == "Err(" && preceded.is_some_and(|c| c.is_alphanumeric() || c == '_') {
+            if marker == "Err("
+                && preceded.is_some_and(|character| character.is_alphanumeric() || character == '_')
+            {
                 continue;
             }
-            let mut rest = span(&body, index + marker.len() - 1);
-            while let Some(open) = rest.find('"') {
-                let text = literal(&rest[open + 1..]);
-                let fragment = fixed_fragment(text);
-                if fragment.len() >= 12 && !text.contains("{error}") {
-                    found.push(fragment);
-                }
-                rest = &rest[(open + 1 + text.len() + 1).min(rest.len())..];
-            }
+            found.extend(fragments(span(&body, index + marker.len() - 1)));
         }
     }
     found.sort();
@@ -187,7 +184,7 @@ fn a_contract_test_runs_every_registered_step() {
         .collect();
     let mut missing = Vec::new();
     for step in described() {
-        let body = if matches!(step.workflow.as_str(), "ci" | "shared") {
+        let body = if matches!(step.workflow.as_str(), "ci" | "shared" | "local") {
             format!("rust-gate {}", step.id)
         } else {
             format!("rust-gate {} {}", step.workflow, step.id)

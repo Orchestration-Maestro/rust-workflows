@@ -3,11 +3,12 @@
 //! sources of a tree.
 
 use crate::runner::{Failure, Outcome, input};
+use std::fs;
 use std::path::{Path, PathBuf};
 
 /// The real path of something that must exist, symlinks resolved.
 pub(crate) fn canonical(path: &Path) -> Result<PathBuf, String> {
-    std::fs::canonicalize(path).map_err(|error| format!("{}: {error}", path.display()))
+    fs::canonicalize(path).map_err(|error| format!("{}: {error}", path.display()))
 }
 
 /// Whether `path` is `root` itself or lies under it, compared by components.
@@ -22,7 +23,7 @@ pub(crate) fn strictly_inside(path: &Path, root: &Path) -> bool {
 
 /// Whether the path itself is a symbolic link, without following it.
 pub(crate) fn is_symlink(path: &Path) -> bool {
-    std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink())
+    fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink())
 }
 
 /// The consumer's project directory, once `DIRECTORY` is confirmed to be a
@@ -34,10 +35,10 @@ pub(crate) fn project_directory() -> Result<PathBuf, Failure> {
         || (directory
             .chars()
             .next()
-            .is_some_and(|c| c.is_ascii_alphanumeric() || c == '_')
+            .is_some_and(|character| character.is_ascii_alphanumeric() || character == '_')
             && directory
                 .chars()
-                .all(|c| c.is_ascii_alphanumeric() || "_./-".contains(c)));
+                .all(|character| character.is_ascii_alphanumeric() || "_./-".contains(character)));
     if !simple {
         return Err("working-directory must be a simple relative path".into());
     }
@@ -72,7 +73,7 @@ pub(crate) fn rust_sources(root: &Path) -> Result<Vec<PathBuf>, String> {
     let mut files = Vec::new();
     let mut pending = vec![root.to_path_buf()];
     while let Some(directory) = pending.pop() {
-        let entries = std::fs::read_dir(&directory)
+        let entries = fs::read_dir(&directory)
             .map_err(|error| format!("{}: {error}", directory.display()))?;
         for entry in entries {
             let path = entry
@@ -82,11 +83,10 @@ pub(crate) fn rust_sources(root: &Path) -> Result<Vec<PathBuf>, String> {
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned())
                 .unwrap_or_default();
-            if path.is_dir() {
-                if name != "target" && !name.starts_with('.') {
-                    pending.push(path);
-                }
-            } else if path.extension().is_some_and(|extension| extension == "rs") {
+            let rust = path.extension().is_some_and(|extension| extension == "rs");
+            if path.is_dir() && name != "target" && !name.starts_with('.') {
+                pending.push(path);
+            } else if !path.is_dir() && rust {
                 files.push(path);
             }
         }
@@ -97,21 +97,24 @@ pub(crate) fn rust_sources(root: &Path) -> Result<Vec<PathBuf>, String> {
 #[cfg(test)]
 mod tests {
     use super::{canonical, inside, is_symlink, rust_sources, strictly_inside};
+    use std::env;
+    use std::fs;
+    use std::os::unix::fs::symlink;
     use std::path::{Path, PathBuf};
+    use std::process;
 
     /// A fresh tree: `src/a.rs`, `target/b.rs`, `.hidden/c.rs` and a link.
     fn tree(name: &str) -> PathBuf {
-        let root =
-            std::env::temp_dir().join(format!("checkout-paths-{}-{name}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
+        let root = env::temp_dir().join(format!("checkout-paths-{}-{name}", process::id()));
+        fs::remove_dir_all(&root).ok();
         for directory in ["src", "target", ".hidden"] {
-            std::fs::create_dir_all(root.join(directory)).unwrap();
+            fs::create_dir_all(root.join(directory)).unwrap();
         }
         for file in ["src/a.rs", "target/b.rs", ".hidden/c.rs"] {
-            std::fs::write(root.join(file), "").unwrap();
+            fs::write(root.join(file), "").unwrap();
         }
         #[cfg(unix)]
-        std::os::unix::fs::symlink("src/a.rs", root.join("link")).unwrap();
+        symlink("src/a.rs", root.join("link")).unwrap();
         #[cfg(windows)]
         std::os::windows::fs::symlink_file("src/a.rs", root.join("link")).unwrap();
         root
@@ -135,6 +138,6 @@ mod tests {
                 .unwrap_err()
                 .contains("missing")
         );
-        std::fs::remove_dir_all(&root).unwrap();
+        fs::remove_dir_all(&root).unwrap();
     }
 }

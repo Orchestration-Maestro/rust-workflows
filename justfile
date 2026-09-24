@@ -192,12 +192,17 @@ update-tools:
       echo "codecov-cli ${used} -> ${cli}"
     fi
 
-# Regenerate every generated document: the steps, then every generated table.
+# Regenerate every generated document: the steps, every generated table, and
+# the organization's lints in every crate's manifest.
 [linux]
 docs:
     cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- describe \
       > docs/steps.md
     just _tables
+    for crate in gate tests examples/binary examples/library examples/workspace; do \
+      (cd "$crate" && cargo run --manifest-path "{{ justfile_directory() }}/gate/Cargo.toml" \
+        --locked --offline --quiet -- lints --write); \
+    done
 
 # Commit every changed file of the checkout onto $BRANCH as the organization's
 # bot: through createCommitOnBranch, which GitHub signs, where a commit made on

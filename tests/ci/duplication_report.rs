@@ -7,7 +7,7 @@ use std::fmt::Write as _;
 use std::fs;
 
 /// A similarity-rs stand-in that prints `pairs`, each two functions.
-fn listing(f: &Fixture, pairs: &[(&str, &str)]) {
+fn listing(fixture: &Fixture, pairs: &[(&str, &str)]) {
     let mut body = String::from("printf '%s\\n' \"$*\" >> \"$CALLS\"\n");
     for (left, right) in pairs {
         let _ = writeln!(
@@ -20,15 +20,15 @@ fn listing(f: &Fixture, pairs: &[(&str, &str)]) {
         "printf 'Total duplicate pairs found: {}\\n'",
         pairs.len()
     );
-    f.stub("similarity-rs", &body);
+    fixture.stub("similarity-rs", &body);
 }
 
 #[test]
 fn similar_pairs_are_reported_and_three_alike_are_refused() {
     // Two pairs of four different functions: reported, counted, never refused.
-    let f = Fixture::new();
+    let fixture = Fixture::new();
     listing(
-        &f,
+        &fixture,
         &[
             ("src/lib.rs:10-30 function a", "src/lib.rs:40-60 function b"),
             (
@@ -37,14 +37,14 @@ fn similar_pairs_are_reported_and_three_alike_are_refused() {
             ),
         ],
     );
-    succeeds(&f.run("ci", "duplication"));
-    let report = fs::read_to_string(f.root.join("reports/duplication.txt")).unwrap();
+    succeeds(&fixture.run("ci", "duplication"));
+    let report = fs::read_to_string(fixture.root.join("reports/duplication.txt")).unwrap();
     assert!(report.contains("# pairs: 2"), "{report}");
     assert!(
         report.contains("function a <-> src/lib.rs:40-60 function b"),
         "{report}"
     );
-    let calls = f.calls();
+    let calls = fixture.calls();
     assert!(
         calls.contains("--threshold 0.9 --min-lines 8 --exclude target"),
         "{calls}"
@@ -56,7 +56,7 @@ fn similar_pairs_are_reported_and_three_alike_are_refused() {
 
     // Two pairs joining three functions: one shape, the rule of three.
     listing(
-        &f,
+        &fixture,
         &[
             ("src/lib.rs:10-30 function a", "src/lib.rs:40-60 function b"),
             (
@@ -66,10 +66,10 @@ fn similar_pairs_are_reported_and_three_alike_are_refused() {
         ],
     );
     refused(
-        &f.run("ci", "duplication"),
+        &fixture.run("ci", "duplication"),
         "duplication: 1 finding; each names its rule, its file and what to do",
     );
-    let report = fs::read_to_string(f.root.join("reports/duplication.txt")).unwrap();
+    let report = fs::read_to_string(fixture.root.join("reports/duplication.txt")).unwrap();
     assert!(
         report.starts_with(
             "DUP-001 src/lib.rs:10: 3 functions share one shape (a, b, c); extract what they \
@@ -80,13 +80,13 @@ fn similar_pairs_are_reported_and_three_alike_are_refused() {
 
     // A shape shared on purpose, recorded with its reason.
     fs::write(
-        f.root.join("maestro-quality.toml"),
+        fixture.root.join("maestro-quality.toml"),
         "[[exception]]\nrule = \"DUP-001\"\npath = \"src/lib.rs\"\nitem = \"a\"\n\
          reason = \"three parsers of three formats\"\n",
     )
     .unwrap();
-    succeeds(&f.run("ci", "duplication"));
-    let report = fs::read_to_string(f.root.join("reports/duplication.txt")).unwrap();
+    succeeds(&fixture.run("ci", "duplication"));
+    let report = fs::read_to_string(fixture.root.join("reports/duplication.txt")).unwrap();
     assert!(
         report.starts_with("EXCUSED DUP-001 src/lib.rs:10:"),
         "{report}"
@@ -94,9 +94,9 @@ fn similar_pairs_are_reported_and_three_alike_are_refused() {
 
     // The tool failing is recorded, not guessed: the report says so and the
     // step exits zero.
-    f.stub("similarity-rs", "exit 1");
-    succeeds(&f.run("ci", "duplication"));
-    let report = fs::read_to_string(f.root.join("reports/duplication.txt")).unwrap();
+    fixture.stub("similarity-rs", "exit 1");
+    succeeds(&fixture.run("ci", "duplication"));
+    let report = fs::read_to_string(fixture.root.join("reports/duplication.txt")).unwrap();
     assert!(
         report.starts_with("NOT MEASURED: similarity-rs failed"),
         "{report}"

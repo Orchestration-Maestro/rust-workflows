@@ -2,6 +2,7 @@
 
 use super::simple_names::is_hex;
 use crate::runner::{Cmd, Outcome, flag, input, summary};
+use std::fs;
 use std::path::Path;
 
 /// The checks every live publication shares: a push or a dispatch, on a
@@ -75,7 +76,7 @@ pub(crate) fn upload_release(files: &[&str]) -> Outcome {
         return Err("Publication revision must match this source".into());
     }
     for file in files {
-        if !std::fs::symlink_metadata(file).is_ok_and(|meta| meta.is_file() && meta.len() > 0) {
+        if !fs::symlink_metadata(file).is_ok_and(|meta| meta.is_file() && meta.len() > 0) {
             return Err("Release asset is missing or unsafe".into());
         }
     }
@@ -155,11 +156,14 @@ fn is_release_tag(reference: &str) -> bool {
     let core = numeric.len() == 3
         && numeric
             .iter()
-            .all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()));
+            .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()));
     let suffix_ok = rest.split_once('-').is_none()
-        || suffix
-            .split(['.', '-'])
-            .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_alphanumeric()));
+        || suffix.split(['.', '-']).all(|part| {
+            !part.is_empty()
+                && part
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric())
+        });
     core && suffix_ok
 }
 

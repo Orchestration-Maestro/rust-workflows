@@ -20,8 +20,8 @@ fn attestation_signs_only_bytes_it_verified_itself() {
     // made-up constant would test nothing.
     let digest = "6050124dee4359af2b8698c987f3a9a33bfd29f2869822273f38bdc2e894929d";
 
-    let prepare = |f: &mut Fixture| -> PathBuf {
-        let root = f.root.clone();
+    let prepare = |fixture: &mut Fixture| -> PathBuf {
+        let root = fixture.root.clone();
         let dir = root.join("rust-release");
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("payload.tar.gz"), payload).unwrap();
@@ -44,13 +44,13 @@ fn attestation_signs_only_bytes_it_verified_itself() {
         .unwrap();
         // tar hands back the SBOM the fixture prepared, standing in for
         // extraction from a tarball whose checksum was just confirmed.
-        f.stub(
+        fixture.stub(
             "tar",
             r#"cp "${GITHUB_WORKSPACE}/sbom-source/payload.cdx.json" \
 "${RUNNER_TEMP}/payload.cdx.json""#,
         );
-        f.set("GITHUB_WORKSPACE", &root.display().to_string());
-        f.set("REVISION", &revision);
+        fixture.set("GITHUB_WORKSPACE", &root.display().to_string());
+        fixture.set("REVISION", &revision);
         dir
     };
 
@@ -79,8 +79,8 @@ fn attestation_signs_only_bytes_it_verified_itself() {
             "Duplicate checksum selector or symlink",
         ),
     ] {
-        let mut f = Fixture::new();
-        let dir = prepare(&mut f);
+        let mut fixture = Fixture::new();
+        let dir = prepare(&mut fixture);
         match damage {
             "unusable digest" => {
                 fs::write(dir.join("SHA256SUMS"), "notadigest  payload.tar.gz\n").unwrap();
@@ -95,7 +95,7 @@ fn attestation_signs_only_bytes_it_verified_itself() {
                 symlink("/etc/hostname", dir.join("payload.tar.gz")).unwrap();
             }
         }
-        refused(&f.run("attest-binaries", "verify"), message);
+        refused(&fixture.run("attest-binaries", "verify"), message);
     }
 
     // A revision that is not the checked-out one would bind provenance to a
@@ -106,10 +106,10 @@ fn attestation_signs_only_bytes_it_verified_itself() {
         ("b".repeat(40), "Release revision does not match source"),
         ("a".repeat(39), sha),
     ] {
-        let mut f = Fixture::new();
-        prepare(&mut f);
-        f.set("REVISION", &wrong);
-        refused(&f.run("attest-binaries", "verify"), message);
+        let mut fixture = Fixture::new();
+        prepare(&mut fixture);
+        fixture.set("REVISION", &wrong);
+        refused(&fixture.run("attest-binaries", "verify"), message);
     }
 
     // An SBOM that is not the payload's own must not be attested as if it were.
@@ -144,13 +144,13 @@ fn a_skipped_attestation_is_reported_and_never_reads_as_a_signed_release() {
         ("false", "failure", "skipped", "skipped", "false", false),
         ("", "skipped", "skipped", "skipped", "false", false),
     ] {
-        let mut f = Fixture::new();
-        f.set("RUN", run);
-        f.set("ATTEST", attest);
-        f.set("SBOM", sbom);
-        f.set("VERIFY", verify);
-        f.set("DIGEST", &digest);
-        let result = f.run("attest-binaries", "outcome");
+        let mut fixture = Fixture::new();
+        fixture.set("RUN", run);
+        fixture.set("ATTEST", attest);
+        fixture.set("SBOM", sbom);
+        fixture.set("VERIFY", verify);
+        fixture.set("DIGEST", &digest);
+        let result = fixture.run("attest-binaries", "outcome");
         if accepted {
             succeeds(&result);
         } else {
@@ -159,13 +159,13 @@ fn a_skipped_attestation_is_reported_and_never_reads_as_a_signed_release() {
                 "Attestation signing or verification did not succeed",
             );
         }
-        let output = fs::read_to_string(f.root.join("output")).unwrap();
+        let output = fs::read_to_string(fixture.root.join("output")).unwrap();
         assert!(
             output.contains(&format!("attested={expected}")),
             "attest={attest} sbom={sbom} must report attested={expected}"
         );
 
-        let summary = fs::read_to_string(f.root.join("summary")).unwrap();
+        let summary = fs::read_to_string(fixture.root.join("summary")).unwrap();
         if expected == "true" {
             assert!(
                 summary.contains(&digest),
@@ -307,17 +307,17 @@ fn only_confirmed_server_unavailability_can_skip_attestation() {
         ("skip", r#"{"installed_version":null}"#, "true"),
         ("skip", r#"{"installed_version":""}"#, "true"),
     ] {
-        let mut f = Fixture::new();
-        f.set("ON_UNAVAILABLE", policy);
+        let mut fixture = Fixture::new();
+        fixture.set("ON_UNAVAILABLE", policy);
         // Execute the actual JSON selector, with the local pinned jaq in place
         // of gh's embedded jq, against the documented metadata response shape.
-        f.stub("gh", &format!("printf '%s' '{metadata}' | jaq -r \"$4\""));
-        succeeds(&f.run_body("rust-gate attest-binaries validate"));
+        fixture.stub("gh", &format!("printf '%s' '{metadata}' | jaq -r \"$4\""));
+        succeeds(&fixture.run_body("rust-gate attest-binaries validate"));
         assert_eq!(
-            fs::read_to_string(f.root.join("output")).unwrap(),
+            fs::read_to_string(fixture.root.join("output")).unwrap(),
             format!("run={expected}\n")
         );
-        assert!(f.calls().contains("api meta --jq"));
+        assert!(fixture.calls().contains("api meta --jq"));
     }
     for (response, message) in [
         (
@@ -333,41 +333,45 @@ fn only_confirmed_server_unavailability_can_skip_attestation() {
             "GitHub platform metadata did not identify the server type",
         ),
     ] {
-        let mut f = Fixture::new();
-        f.set("ON_UNAVAILABLE", "fail");
-        f.stub("gh", &format!("printf '%s' '{response}'"));
-        refused(&f.run_body("rust-gate attest-binaries validate"), message);
-        assert!(!f.root.join("output").exists());
+        let mut fixture = Fixture::new();
+        fixture.set("ON_UNAVAILABLE", "fail");
+        fixture.stub("gh", &format!("printf '%s' '{response}'"));
+        refused(
+            &fixture.run_body("rust-gate attest-binaries validate"),
+            message,
+        );
+        assert!(!fixture.root.join("output").exists());
     }
     // Authentication, API, network and unknown failures cannot become skips.
     for policy in ["skip", "fail"] {
         for message in ["HTTP 403", "HTTP 404", "OIDC failure", "network failure"] {
-            let mut f = Fixture::new();
-            f.set("ON_UNAVAILABLE", policy);
-            f.stub("gh", &format!("printf '%s\\n' '{message}' >&2; exit 7"));
+            let mut fixture = Fixture::new();
+            fixture.set("ON_UNAVAILABLE", policy);
+            fixture.stub("gh", &format!("printf '%s\\n' '{message}' >&2; exit 7"));
             assert_eq!(
-                f.run_body("rust-gate attest-binaries validate")
+                fixture
+                    .run_body("rust-gate attest-binaries validate")
                     .status
                     .code(),
                 Some(7)
             );
-            assert!(!f.root.join("output").exists());
+            assert!(!fixture.root.join("output").exists());
         }
     }
 }
 
 #[test]
 fn the_unavailability_policy_is_skip_or_fail() {
-    let mut f = Fixture::new();
-    f.stub("gh", "printf 'false\\n'");
+    let mut fixture = Fixture::new();
+    fixture.stub("gh", "printf 'false\\n'");
     for value in ["skip", "fail"] {
-        f.set("ON_UNAVAILABLE", value);
-        succeeds(&f.run_body("rust-gate attest-binaries validate"));
+        fixture.set("ON_UNAVAILABLE", value);
+        succeeds(&fixture.run_body("rust-gate attest-binaries validate"));
     }
     for value in ["", "warn", "Skip"] {
-        f.set("ON_UNAVAILABLE", value);
+        fixture.set("ON_UNAVAILABLE", value);
         refused(
-            &f.run_body("rust-gate attest-binaries validate"),
+            &fixture.run_body("rust-gate attest-binaries validate"),
             "on-unavailable must be skip or fail",
         );
     }
