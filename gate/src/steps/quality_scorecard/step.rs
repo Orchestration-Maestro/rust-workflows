@@ -16,22 +16,36 @@ pub(crate) const STEPS: &[Step] = &[Step {
     inputs: &[
         "API_APPLIED",
         "API_COMPATIBILITY",
+        "CHANGED_COVERAGE_APPLIED",
+        "DEPENDENCY_AUDIT",
         "FEATURES_APPLIED",
         "GITHUB_SHA",
+        "HOOKS_APPLIED",
         "LICENSE_POLICY",
         "MUTANTS_APPLIED",
         "MUTATION_TEST",
         "OUT_API",
+        "OUT_ARCHITECTURE",
         "OUT_AUDIT",
+        "OUT_CHANGED_COVERAGE",
         "OUT_COVERAGE",
+        "OUT_DUPLICATION",
         "OUT_FEATURES",
+        "OUT_HOOKS",
+        "OUT_HYGIENE",
         "OUT_LICENCES",
+        "OUT_MANAGED_FILES",
         "OUT_MSRV",
         "OUT_MUTANTS",
+        "OUT_PERFORMANCE",
+        "OUT_PULL_REQUEST",
         "OUT_QUALITY",
         "OUT_SECRETS",
         "OUT_STAGE",
         "OUT_UNUSED",
+        "OUT_VET",
+        "PERFORMANCE_APPLIED",
+        "PULL_REQUEST_APPLIED",
         "RUSTUP_TOOLCHAIN",
         "SARIF_REPORTS",
         "UNSAFE_POLICY",
@@ -51,8 +65,10 @@ fn run() -> Outcome {
     let coverage = fs::read_to_string(job.earlier("coverage.lcov"))
         .ok()
         .and_then(|lcov| line_coverage(&lcov));
+    let mut controls = controls()?;
+    controls.extend(organization_controls()?);
     let scorecard = Scorecard {
-        controls: controls()?,
+        controls,
         revision: input("GITHUB_SHA")?,
         toolchain: input("RUSTUP_TOOLCHAIN")?,
         coverage,
@@ -170,6 +186,66 @@ fn controls() -> Result<Vec<Control>, Failure> {
             "SARIF reports",
             "optional",
             State::from_outcome(sarif, flag("SARIF_REPORTS")?, "true"),
+        ),
+    ])
+}
+
+/// One control per family of the organization's rules, each enforced
+/// wherever it applies, and the two a repository can switch: the recorded
+/// dependency audits and the performance budget.
+fn organization_controls() -> Result<Vec<Control>, Failure> {
+    let state = |name: &str, enabled: bool, applied: &str| -> Result<State, Failure> {
+        Ok(State::from_outcome(&input(name)?, enabled, applied))
+    };
+    Ok(vec![
+        (
+            "source rules",
+            "enforced",
+            state("OUT_ARCHITECTURE", true, "true")?,
+        ),
+        (
+            "repository hygiene",
+            "enforced",
+            state("OUT_HYGIENE", true, "true")?,
+        ),
+        (
+            "managed files",
+            "enforced",
+            state("OUT_MANAGED_FILES", true, "true")?,
+        ),
+        (
+            "commit hooks",
+            "enforced",
+            state("OUT_HOOKS", true, &optional("HOOKS_APPLIED")?)?,
+        ),
+        (
+            "duplication, the rule of three",
+            "enforced",
+            state("OUT_DUPLICATION", true, "true")?,
+        ),
+        (
+            "changed-line coverage",
+            "enforced",
+            state(
+                "OUT_CHANGED_COVERAGE",
+                true,
+                &optional("CHANGED_COVERAGE_APPLIED")?,
+            )?,
+        ),
+        (
+            "pull request rules",
+            "enforced",
+            state("OUT_PULL_REQUEST", true, &optional("PULL_REQUEST_APPLIED")?)?,
+        ),
+        (
+            "recorded dependency audits",
+            "optional",
+            state("OUT_VET", flag("DEPENDENCY_AUDIT")?, "true")?,
+        ),
+        (
+            "performance budget",
+            "optional",
+            state("OUT_PERFORMANCE", true, &optional("PERFORMANCE_APPLIED")?)?,
         ),
     ])
 }

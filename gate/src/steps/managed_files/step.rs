@@ -5,6 +5,7 @@
 use super::pin::{caller_pin, parse_pin};
 use super::render::{Repository, managed_files};
 use crate::checks::quality_config::read_config;
+use crate::checks::workflow_home::is_workflow_home;
 use crate::runner::{Cmd, Failure, Job, Outcome, Step, input, optional, summary, write};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -166,8 +167,7 @@ fn rendered(root: &Path, pin: Option<&str>) -> Result<Vec<(String, String)>, Fai
     };
     let repository = Repository {
         rust: manifest.is_some() || root.join("rust-toolchain.toml").is_file(),
-        home: fs::read_to_string(root.join(CALLER))
-            .is_ok_and(|caller| caller.contains("\n  workflow_call:")),
+        home: is_workflow_home(root),
         manifest,
         config: read_config(root)?,
         pin,

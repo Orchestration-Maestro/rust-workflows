@@ -22,3 +22,4 @@ mod rust_paths;
 pub(crate) mod rust_tests;
 pub(crate) mod rust_versions;
 pub(crate) mod simple_names;
+pub(crate) mod workflow_home;

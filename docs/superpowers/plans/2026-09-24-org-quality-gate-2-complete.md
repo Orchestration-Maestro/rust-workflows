@@ -277,3 +277,10 @@ Rulings taken while executing, newest last.
     through the aqua backend, asks GitHub's API for each release, so the
     `hooks` step and the live hooks test pass it the job's read-only token as
     `MISE_GITHUB_TOKEN`, which no hook reads.
+22. The second run of phase E's pin showed the `hooks` step running prek over
+    the home of the workflows, whose hooks use its local toolbelt: the pinned
+    gate did not know the home yet. The gate's part of phase E ships first,
+    behind `quality-preview` still: the home check, shared by `sync` and
+    `hooks`, an `applied` output on each new step, and one scorecard control
+    per rule family. The repin and the removal of `quality-preview` follow,
+    pinned to that commit.

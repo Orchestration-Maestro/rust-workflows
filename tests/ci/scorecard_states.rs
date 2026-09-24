@@ -1,6 +1,6 @@
 //! Scorecard states distinguish selection, applicability and actual execution.
 
-use crate::harness::{Fixture, succeeds, workflow};
+use crate::harness::{Fixture, SCORECARD_OUTCOMES, succeeds, workflow};
 use serde_json::Value;
 use std::fs;
 
@@ -132,19 +132,7 @@ const INACTIVE: &[(&str, &str, &str, &str, &str, &str)] = &[
 fn the_scorecard_distinguishes_disabled_inapplicable_failed_and_unrun_controls() {
     for &(control, setting, value, outcome, result, expected) in INACTIVE {
         let mut fixture = Fixture::new();
-        for key in [
-            "OUT_QUALITY",
-            "OUT_COVERAGE",
-            "OUT_AUDIT",
-            "OUT_SECRETS",
-            "OUT_MSRV",
-            "OUT_FEATURES",
-            "OUT_LICENCES",
-            "OUT_MUTANTS",
-            "OUT_UNUSED",
-            "OUT_STAGE",
-            "OUT_API",
-        ] {
+        for key in SCORECARD_OUTCOMES {
             fixture.set(key, "success");
         }
         for key in [

@@ -8,7 +8,7 @@
 
 use crate::checks::pull_request::{added_lines, pull_request_diff, title_type, touched_lines};
 use crate::checks::rust_code::{blanked, items, line_at};
-use crate::runner::{Failure, Job, Outcome, Step, input, optional, summary, write};
+use crate::runner::{Failure, Job, Outcome, Step, input, optional, output, summary, write};
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::fs;
@@ -41,8 +41,9 @@ fn run() -> Outcome {
             b"NOT APPLICABLE: a push has no base to compare with\n",
             false,
         )?;
-        return Ok(());
+        return output("applied", "false");
     }
+    output("applied", "true")?;
     let workspace = PathBuf::from(input("GITHUB_WORKSPACE")?);
     let diff = pull_request_diff(&workspace)?;
     let changed = measured_size(&touched_lines(&diff), &workspace);

@@ -159,7 +159,8 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── rust_paths.rs                   # Every path a Rust file names: use trees expanded, a::b chains, visibilities left out
 │   │   │   ├── rust_tests.rs                   # The tests inside Rust source: test functions, test-only code, waits on time
 │   │   │   ├── rust_versions.rs                # Rust version strings compared the way sort -V compared them
-│   │   │   └── simple_names.rs                 # One validator for every simple-name rule, and hex strings
+│   │   │   ├── simple_names.rs                 # One validator for every simple-name rule, and hex strings
+│   │   │   └── workflow_home.rs                # The home of the reusable workflows, whose ci.yml, Dependabot and hooks are its own
 │   │   ├── runner/                             # The runner as the gate sees it: inputs, GITHUB_* files, tools
 │   │   │   ├── commands.rs                     # Running a pinned tool: streamed, captured into a report, or both, and the trace
 │   │   │   ├── github_actions.rs               # Inputs from env, the four GITHUB_* writers, masking, the job's directories

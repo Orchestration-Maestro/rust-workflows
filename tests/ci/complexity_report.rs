@@ -1,7 +1,7 @@
 //! `ci.yml`: the function and file sizes, reported to the consumer and never
 //! held against the run.
 
-use crate::harness::{Fixture, succeeds};
+use crate::harness::{Fixture, SCORECARD_OUTCOMES, succeeds};
 use serde_json::json;
 use std::fs;
 
@@ -74,19 +74,7 @@ printf '%s' "$MESSAGES""#,
     );
 
     // The scorecard carries the numbers as a line that changes no count.
-    for key in [
-        "OUT_QUALITY",
-        "OUT_COVERAGE",
-        "OUT_AUDIT",
-        "OUT_SECRETS",
-        "OUT_MSRV",
-        "OUT_FEATURES",
-        "OUT_LICENCES",
-        "OUT_MUTANTS",
-        "OUT_UNUSED",
-        "OUT_STAGE",
-        "OUT_API",
-    ] {
+    for key in SCORECARD_OUTCOMES {
         fixture.set(key, "success");
     }
     succeeds(&fixture.run("ci", "scorecard"));

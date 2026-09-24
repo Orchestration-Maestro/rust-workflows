@@ -8,7 +8,7 @@
 
 use crate::checks::findings::relative;
 use crate::checks::quality_config::read_config;
-use crate::runner::{Cmd, Failure, Job, Outcome, Step, input, optional, tee_line};
+use crate::runner::{Cmd, Failure, Job, Outcome, Step, input, optional, output, tee_line};
 use std::path::{Path, PathBuf};
 
 /// What this step declares: its inputs, its tools and its reports.
@@ -40,20 +40,18 @@ fn run() -> Outcome {
     let report = job.report("performance.txt")?;
     let workspace = PathBuf::from(input("GITHUB_WORKSPACE")?);
     let config = read_config(&workspace)?;
-    if config.benches.is_empty() {
-        return tee_line(
-            "NOT APPLICABLE: maestro-quality.toml names no [performance] benches",
-            &report,
-            false,
-        );
+    let reason = if config.benches.is_empty() {
+        "NOT APPLICABLE: maestro-quality.toml names no [performance] benches"
+    } else if optional("GITHUB_BASE_REF")?.is_empty() {
+        "NOT APPLICABLE: a push has no base to compare with"
+    } else {
+        ""
+    };
+    if !reason.is_empty() {
+        tee_line(reason, &report, false)?;
+        return output("applied", "false");
     }
-    if optional("GITHUB_BASE_REF")?.is_empty() {
-        return tee_line(
-            "NOT APPLICABLE: a push has no base to compare with",
-            &report,
-            false,
-        );
-    }
+    output("applied", "true")?;
     let locked = Cmd::new("jaq --from toml -r")
         .arg(LOCKED_GUNGRAUN)
         .arg(job.project.join("Cargo.lock"))
