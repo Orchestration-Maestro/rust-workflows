@@ -95,9 +95,6 @@ check:
     cargo test --manifest-path tests/Cargo.toml --locked -- --ignored --nocapture example_gate
     # The toolbelt links, ShellCheck over every Bash line left, Gitleaks over
     # the tree and, under CHECK_NETWORK=1, the RustSec audits are contract tests.
-    # The size report: what is growing, named without refusing it.
-    cargo test --manifest-path tests/Cargo.toml --locked --offline \
-      files_over_three_hundred_lines_are_reported -- --nocapture | grep '^REPORT:'
     if [[ "${CHECK_NETWORK:-0}" != 1 ]]; then
       echo 'NOT RUN: live advisory database check; run CHECK_NETWORK=1 just check'
     fi

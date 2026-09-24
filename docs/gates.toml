@@ -184,10 +184,10 @@ proofs = [
 ]
 
 [[gate]]
-name = "Module structure"
+name = "Source rules"
 kind = "opt-in"
 switch = "`quality-preview: true`, until v2.0.0 runs it always"
-standard = "ARC-001 to ARC-007"
+standard = "ARC, SIZE, NAME, DOC, LIB, TST and WSP"
 proofs = [
   "an_import_cycle_between_two_files_is_refused_by_name",
   "a_door_holding_a_function_is_refused_and_a_listing_door_passes",
@@ -198,6 +198,17 @@ proofs = [
   "a_binary_root_beyond_declarations_and_a_short_main_is_refused",
   "path_attributes_and_rust_includes_are_refused_while_include_str_passes",
   "the_quality_file_refuses_unknown_tables_and_unreasoned_exceptions",
+  "oversized_files_and_lines_are_refused_and_three_hundred_is_reported",
+  "package_names_follow_the_form_and_publishable_ones_the_prefix",
+  "badly_named_tests_and_one_word_test_modules_are_refused",
+  "a_file_without_a_module_comment_is_refused",
+  "printing_from_a_library_is_refused_and_from_a_binary_allowed",
+  "a_library_depending_on_anyhow_is_refused_but_a_binary_is_not",
+  "sleeping_in_a_test_is_refused_unless_excused",
+  "more_than_one_plain_integration_test_crate_is_refused",
+  "workspace_members_inherit_their_settings_and_dependencies",
+  "edition_resolver_and_lockfile_are_held",
+  "tightened_limits_apply_and_loosened_ones_are_refused",
 ]
 
 [[gate]]

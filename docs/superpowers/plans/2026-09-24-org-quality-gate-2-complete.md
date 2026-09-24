@@ -87,7 +87,7 @@ All rules run in `rust-gate architecture`, over the trees plan 1 reads plus the 
 | LIB-001 | Modules of library targets, test items aside | `` `{macro}!` in a library; return the value or report through tracing, and let the binary print `` |
 | LIB-002 | Publishable packages with a library target and no binary target | `a library exposes typed errors; `{dep}` belongs in a binary or in [dev-dependencies]` |
 | TST-001 | Test code: every module of a test target, test items elsewhere; a path ending `thread::sleep`, `time::sleep` or `task::sleep` | `` `{path}` waits on time; wait on a fake clock or a synchronisation primitive ``; exception item: the enclosing function |
-| TST-003 | Every package | `{n} integration-test crates build without required-features ({names}); fold them into one tests/main.rs` |
+| TST-003 | Every package | `{n} integration-test crates build without required-features ({names}); fold them into one test crate, tests/it/main.rs with its modules beside it` |
 | WSP-001 | Members of a workspace of two or more | `member `{name}` does not inherit {what} from the workspace`; `member `{name}` declares {deps} without `workspace = true`; declare them in [workspace.dependencies]` |
 | WSP-002 | Every package; the workspace root | `package `{name}` uses edition {edition}; the organization builds with 2024`; `the workspace sets resolver {r}; set resolver = "3"`; `Cargo.lock is missing; commit it`; `Cargo.lock is not tracked; commit it` (only where `git` finds a work tree) |
 
@@ -169,3 +169,14 @@ One sync pull request per repository, each carrying the fixes it needs to pass: 
 ## Execution record
 
 Rulings taken while executing, newest last.
+
+1. TST-003 advises tests/it/main.rs with its modules beside it, not a tests/main.rs: Cargo builds every file directly in the tests directory as a crate of its own, a module that such a root declares included, while a subdirectory's `main.rs` and its siblings form one crate.
+2. `lockfile_tracked` asks git only when a `.git` entry sits above the root, so
+   a project outside any repository says nothing on stderr and skips the
+   question instead of printing `fatal: not a git repository`.
+3. `Inheritance` lists the settings a member does not inherit rather than
+   holding four booleans, which Clippy's `struct_excessive_bools` refuses.
+4. This repository's example tests take names of four words or more, which the
+   retired naming test never asked of the examples, and the repository test
+   that reads the example manifests resolves the values a member inherits from
+   the workspace root.

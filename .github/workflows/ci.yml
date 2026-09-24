@@ -243,7 +243,7 @@ jobs:
       - name: Install the toolchain
         id: tools
         run: rust-gate tools
-      - name: Module structure rules ARC-001 to ARC-007
+      - name: Source rules ARC, SIZE, NAME, DOC, LIB, TST and WSP
         id: architecture
         # Always on from v2.0.0. Until then only on request: this repository's
         # own CI still runs the previously pinned gate, which lacks the step.

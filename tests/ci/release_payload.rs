@@ -16,9 +16,9 @@ use std::fs;
 #[ignore = "needs the pinned toolbelt; just check runs it"]
 fn example_gate_replays_ci_step_bodies_against_every_fixture() {
     for (example, package) in [
-        ("binary", "bounded-sum"),
-        ("library", "bounded-arithmetic"),
-        ("workspace", "workspace-arithmetic"),
+        ("binary", "maestro-bounded-sum"),
+        ("library", "maestro-bounded-arithmetic"),
+        ("workspace", "maestro-workspace-arithmetic"),
     ] {
         let mut f = Fixture::example(example);
         for id in GATE_STEPS {
@@ -94,8 +94,10 @@ fn example_gate_replays_ci_step_bodies_against_every_fixture() {
             );
             let hardening = fs::read_to_string(f.root.join("reports/hardening.txt")).unwrap();
             assert!(
-                hardening
-                    .contains("bounded-sum reproducible pie relro bind-now noexec-stack auditable"),
+                hardening.contains(concat!(
+                    "maestro-bounded-sum reproducible pie relro bind-now ",
+                    "noexec-stack auditable"
+                )),
                 "{hardening}"
             );
         }

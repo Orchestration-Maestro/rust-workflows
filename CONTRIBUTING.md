@@ -131,10 +131,9 @@ an import cycle (`an_import_cycle_between_two_files_is_refused_by_name`).
 The tests are laid out by what they prove: `tests/ci/`, `tests/publishers/`,
 `tests/nightly/`, `tests/gate/` and `tests/repository/`, with the harness they
 share under `tests/harness/`. A module names what it proves in two words at
-least (`every_test_module_names_what_it_proves_in_two_words_at_least`), a test
-function in four (`every_test_function_names_what_it_proves_in_four_words_at_least`),
-and never behind a `test_` prefix or a `_works`, `_ok` or `_test` suffix
-(`no_test_function_is_named_by_a_test_prefix_or_a_works_ok_or_test_suffix`).
+least, a test function in four, and never behind a `test_` prefix or a
+`_works`, `_ok` or `_test` suffix: NAME-002, which `rust-gate architecture`
+holds in `just check` (`badly_named_tests_and_one_word_test_modules_are_refused`).
 A step declares its inputs, tools and reports in its `STEPS` constant and the
 gate refuses anything else at run time; `just docs` regenerates
 [docs/steps.md](docs/steps.md) from those declarations, and `just check`

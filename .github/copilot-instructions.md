@@ -128,6 +128,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── checkout_paths.rs               # Canonical forms, containment in the checkout, symlinks, Rust sources
 │   │   │   ├── findings.rs                     # A rule's finding as one report line, and the exceptions that excuse some
 │   │   │   ├── inputs.rs                       # The ci.yml inputs with a shape of their own: policies, threshold and key, typed
+│   │   │   ├── manifests.rs                    # What Cargo says beyond module trees: packages, the workspace, what members inherit
 │   │   │   ├── mod.rs                          # The registry of every step, run and describe, the two doors main.rs calls
 │   │   │   ├── module_tree.rs                  # Every Cargo target's module tree: files, items, named paths and re-exports
 │   │   │   ├── private_directories.rs          # Private temporary directories under the runner's own
@@ -135,6 +136,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── release_boundary.rs             # What both publishers ask of a release before anything is published
 │   │   │   ├── rust_code.rs                    # Rust source with comments and literals blanked, and its top-level items
 │   │   │   ├── rust_paths.rs                   # Every path a Rust file names: use trees expanded, a::b chains, visibilities left out
+│   │   │   ├── rust_tests.rs                   # The tests inside Rust source: test functions, test-only code, waits on time
 │   │   │   ├── rust_versions.rs                # Rust version strings compared the way sort -V compared them
 │   │   │   └── simple_names.rs                 # One validator for every simple-name rule, and hex strings
 │   │   ├── runner/                             # The runner as the gate sees it: inputs, GITHUB_* files, tools
@@ -144,13 +146,17 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── outcome.rs                      # How a step ends: complete, or failed with the tool's own status or with one message
 │   │   │   └── step_declaration.rs             # A step as data: what it declares, and the refusal of anything undeclared
 │   │   ├── steps/                              # One module per step, private to the directory; mod.rs is the one door
-│   │   │   ├── architecture/                   # rust-gate architecture: the step and one module per group of rules
+│   │   │   ├── architecture/                   # rust-gate architecture: the step and one module per group of source rules
 │   │   │   │   ├── cycles.rs                   # ARC-001: no import cycle between the files of a crate
 │   │   │   │   ├── doors.rs                    # ARC-002 and ARC-003: doors only declare, and paths go through them
 │   │   │   │   ├── layers.rs                   # ARC-004: imports run only to the layers on the right
 │   │   │   │   ├── mod.rs                      # The step's door: its modules and its declaration
+│   │   │   │   ├── names.rs                    # NAME-001 and NAME-002: package names and test names
+│   │   │   │   ├── packages.rs                 # LIB-002, TST-003, WSP-001 and WSP-002, read from the manifests
 │   │   │   │   ├── roots.rs                    # ARC-006 and ARC-007: thin binary roots, and the module tree is the file tree
 │   │   │   │   ├── seams.rs                    # ARC-005: a seam a door offers serves two callers
+│   │   │   │   ├── sizes.rs                    # SIZE-002 and SIZE-003: lines of code per file and columns per line
+│   │   │   │   ├── sources.rs                  # DOC-001, LIB-001 and TST-001: module comments, library prints, waits in tests
 │   │   │   │   └── step.rs                     # The step: module trees, the rules, the exceptions and the report
 │   │   │   ├── quality_scorecard/              # rust-gate scorecard: the step and the value it renders
 │   │   │   │   ├── mod.rs                      # The step's door: its two modules and its declaration
@@ -209,6 +215,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── release_payload_refusals.rs         # The release payload's refusals: lockfile drift, unhardened or irreproducible binaries, malformed staging
 │   │   ├── scorecard_and_required_status.rs    # ci.yml: the scorecard, the required status and mutation testing
 │   │   ├── scorecard_states.rs                 # ci.yml: selection, applicability and execution reported separately
+│   │   ├── source_rules.rs                     # ci.yml: SIZE, NAME, DOC, LIB, TST and WSP, each refused by name, and the limits a repository tightens
 │   │   ├── supply_chain.rs                     # ci.yml: dependency policy, direct crates.io reads and the scanners
 │   │   └── workspace_boundary.rs               # ci.yml: a workspace whose manifests or sources reach outside the checkout is refused before any lint
 │   ├── gate/                                   # The gate and the tests as structures: layers, no import cycle, the step registry, what holds every step and refusal
@@ -245,11 +252,10 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── generated_documents.rs              # Every generated table and the diagram's count are what just docs writes
 │   │   ├── metadata_and_inventory.rs           # Repository files, hook, editor and release policies, the Copilot inventory
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
-│   │   ├── naming_rules.rs                     # Every test module names what it proves in two words at least, every test function in four, no test_ prefix, no _works, _ok or _test suffix
 │   │   ├── north_star.rs                       # Promised controls run, every gate names its proof, no lint silenced
 │   │   ├── pinned_tool_usage.rs                # Every job installs every pinned tool it invokes before a step reads it
 │   │   ├── secret_and_advisory_scans.rs        # Gitleaks over the tree; RustSec audits under CHECK_NETWORK=1
-│   │   ├── size_limits.rs                      # The size limits: Clippy thresholds, 300-line files, 100-column lines
+│   │   ├── size_limits.rs                      # Clippy thresholds, a binary that never panics, shell and justfile width
 │   │   ├── tool_updates.rs                     # Every install row is what mise locked; update-tools moves a pin everywhere at once
 │   │   ├── toolbelt_and_shellcheck.rs          # Toolbelt links to the locked builds; ShellCheck over every Bash line left
 │   │   ├── version_pins.rs                     # Tool versions, the toolchain pin and the speed target, one copy each
@@ -337,8 +343,8 @@ commands against controlled stand-ins, complemented by real Cargo fixture gates.
 The modules sit in one directory per what they prove, `tests/ci/`,
 `tests/publishers/`, `tests/nightly/`, `tests/gate/` and `tests/repository/`,
 behind the one door of `tests/harness/`; a module is named in two words at
-least and a test function in four, and `tests/repository/naming_rules.rs`
-refuses anything shorter.
+least and a test function in four, and `rust-gate architecture` refuses
+anything shorter.
 
 ## Change and verification procedure
 

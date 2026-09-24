@@ -136,6 +136,29 @@ impl Fixture {
         fixture
     }
 
+    /// A fixture whose project is a Cargo package on the organization's
+    /// edition and not published, holding `files`: each a path under the
+    /// project and its source. What the source rules read, with only the rule
+    /// under test left to speak.
+    pub(crate) fn with_sources(files: &[(&str, &str)]) -> Self {
+        let fixture = Self::new();
+        let project = fixture.root.join("project");
+        fs::write(
+            project.join("Cargo.toml"),
+            concat!(
+                "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n",
+                "edition = \"2024\"\npublish = false\n",
+            ),
+        )
+        .unwrap();
+        for (path, source) in files {
+            let file = project.join(path);
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(file, source).unwrap();
+        }
+        fixture
+    }
+
     pub(crate) fn set(&mut self, key: &str, value: &str) {
         self.env.insert(key.to_owned(), value.to_owned());
     }

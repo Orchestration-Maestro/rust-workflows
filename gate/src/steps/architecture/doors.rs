@@ -7,15 +7,9 @@ use crate::checks::module_tree::Tree;
 use crate::checks::rust_code::Item;
 use std::path::Path;
 
-/// The kinds of target whose root is the crate's public door.
-const LIBRARY_KINDS: &[&str] = &["lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro"];
-
 /// ARC-002: every item of a door that does more than declare.
 pub(super) fn contents(tree: &Tree, workspace: &Path) -> Vec<Finding> {
-    let library = tree
-        .kinds
-        .iter()
-        .any(|kind| LIBRARY_KINDS.contains(&kind.as_str()));
+    let library = tree.is_library();
     let mut found = Vec::new();
     for module in &tree.modules {
         let root_door = module.path.is_empty() && library && module.children().next().is_some();

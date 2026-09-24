@@ -5,6 +5,7 @@ use crate::harness::{Fixture, root, step, succeeds, tool, workflow};
 use serde_json::Value;
 use std::fs;
 use std::os::unix::fs::symlink;
+use std::path::Path;
 
 #[test]
 fn public_workflow_files_exist() {
@@ -273,16 +274,31 @@ fn the_consumer_matrix_calls_every_local_workflow_and_fixture() {
         succeeds(&result);
         assert_eq!(String::from_utf8(result.stdout).unwrap().trim(), "1.98.1");
     }
-    for member in ["binary", "library", "workspace/core", "workspace/app"] {
+    // The workspace fixture's members inherit their settings and their shared
+    // dependencies from its root, the way WSP-001 requires, so a value a member
+    // marks `workspace = true` is read there.
+    let toml = |path: &Path| -> Value {
         let output = tool("jaq")
             .args(["--from", "toml", "."])
-            .arg(root().join("examples").join(member).join("Cargo.toml"))
+            .arg(path)
             .output()
             .unwrap();
         succeeds(&output);
-        let manifest: Value = serde_json::from_slice(&output.stdout).unwrap();
-        assert_eq!(manifest["package"]["edition"], "2024");
-        assert_eq!(manifest["package"]["rust-version"], "1.85");
+        serde_json::from_slice(&output.stdout).unwrap()
+    };
+    let workspace = toml(&root().join("examples/workspace/Cargo.toml"))["workspace"].clone();
+    let resolved = |value: &Value, shared: &Value| -> Value {
+        if value["workspace"] == true {
+            shared.clone()
+        } else {
+            value.clone()
+        }
+    };
+    for member in ["binary", "library", "workspace/core", "workspace/app"] {
+        let manifest = toml(&root().join("examples").join(member).join("Cargo.toml"));
+        let setting = |key: &str| resolved(&manifest["package"][key], &workspace["package"][key]);
+        assert_eq!(setting("edition"), "2024");
+        assert_eq!(setting("rust-version"), "1.85");
         // Fixtures depend on each other by path. The one exception is the
         // binary fixture's single crates.io dependency, there so the dependency
         // policy, the SBOMs and the embedded dependency list are checked against
@@ -293,6 +309,7 @@ fn the_consumer_matrix_calls_every_local_workflow_and_fixture() {
             .into_iter()
             .flat_map(|d| d.iter())
         {
+            let dependency = resolved(dependency, &workspace["dependencies"][name]);
             assert!(
                 dependency.get("path").is_some() || (member == "binary" && name == "anyhow"),
                 "{member}: unexpected registry dependency {name}"

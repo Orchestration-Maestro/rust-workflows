@@ -1,6 +1,7 @@
-//! The size limits the repository holds its own code to: functions through
-//! Clippy's thresholds, files by their non-documentation lines, and lines
-//! by width.
+//! The size limits the repository holds its own code to beyond what
+//! `rust-gate architecture` holds (SIZE-002 and SIZE-003 on every Rust file):
+//! functions through Clippy's thresholds, and the width of shell scripts and
+//! the justfile, which no module tree reaches.
 
 use crate::harness::root;
 use std::fs;
@@ -83,75 +84,6 @@ fn every_crate_holds_the_complexity_limits() {
         justfile.contains("cargo clippy --manifest-path \"$manifest/Cargo.toml\"")
             && justfile.contains("-- -D warnings"),
         "the justfile must run Clippy with -D warnings on every crate"
-    );
-}
-
-/// Every scanned source with its line count, doc comments excluded: explaining
-/// an item must never be the reason to split the module it lives in.
-fn measured_sources(root: &Path) -> Vec<(String, usize)> {
-    let mut sizes = Vec::new();
-    for directory in ["gate/src", "tests", "examples"] {
-        for path in source_files(&root.join(directory), &["rs"], &[]) {
-            let lines = fs::read_to_string(&path)
-                .unwrap()
-                .lines()
-                .filter(|line| {
-                    !line.trim_start().starts_with("///") && !line.trim_start().starts_with("//!")
-                })
-                .count();
-            sizes.push((
-                path.strip_prefix(root).unwrap().display().to_string(),
-                lines,
-            ));
-        }
-    }
-    assert!(
-        sizes.len() > 30,
-        "only {} files scanned; the walk drifted",
-        sizes.len()
-    );
-    sizes
-}
-
-#[test]
-fn no_source_file_exceeds_five_hundred_lines() {
-    // The refusal. Past five hundred lines a file stops being readable whole,
-    // whatever its seams look like. Three hundred is reported rather than
-    // refused, because a ceiling that forces a split lets the split be chosen
-    // by size instead of by what varies, which is how a module lands in a
-    // shared layer with a single caller.
-    let root = root();
-    let over: Vec<String> = measured_sources(&root)
-        .into_iter()
-        .filter(|(_, lines)| *lines > 500)
-        .map(|(name, lines)| format!("{name} ({lines} lines)"))
-        .collect();
-    assert!(
-        over.is_empty(),
-        "files over 500 lines:\n  {}",
-        over.join("\n  ")
-    );
-}
-
-#[test]
-fn files_over_three_hundred_lines_are_reported() {
-    // A report, not a gate: it names what is growing without refusing it, at
-    // the threshold and with the intent of the `complexity` step a consumer
-    // run already carries. `just check` prints the line this writes, and the
-    // line is written even when the list is empty so nothing hides a zero.
-    let root = root();
-    let mut over: Vec<String> = measured_sources(&root)
-        .into_iter()
-        .filter(|(_, lines)| *lines > 300)
-        .map(|(name, lines)| format!("{name} ({lines})"))
-        .collect();
-    over.sort();
-    println!(
-        "REPORT: {} source {} over 300 lines{}{}",
-        over.len(),
-        if over.len() == 1 { "file" } else { "files" },
-        if over.is_empty() { "" } else { ": " },
-        over.join(", ")
     );
 }
 

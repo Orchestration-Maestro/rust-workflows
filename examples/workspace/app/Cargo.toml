@@ -1,11 +1,14 @@
 [package]
 name = "workspace-sum"
 version = "0.1.0"
-edition = "2024"
-rust-version = "1.85"
+edition.workspace = true
+rust-version.workspace = true
 description = "Dependency-free Rust workflow consumer example"
-license = "MIT"
+license.workspace = true
 publish = false
 
+[lints]
+workspace = true
+
 [dependencies]
-workspace-arithmetic = { path = "../core", version = "0.1.0" }
+maestro-workspace-arithmetic = { workspace = true }

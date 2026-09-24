@@ -8,7 +8,6 @@ mod executable_stubs;
 mod gate_action;
 mod generated_documents;
 mod metadata_and_inventory;
-mod naming_rules;
 mod north_star;
 mod pinned_tool_usage;
 mod secret_and_advisory_scans;

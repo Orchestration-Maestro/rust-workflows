@@ -3,6 +3,7 @@
 //! declarations reach from its root, with the items, paths and re-exports of
 //! each.
 
+use super::manifests::LIBRARY_KINDS;
 use super::rust_code::{Item, blanked, items, without_tests};
 use super::rust_paths::{NamedPath, paths, use_leaves};
 use crate::runner::{Cmd, Failure};
@@ -25,6 +26,8 @@ pub(crate) struct Module {
     pub(crate) path: Vec<String>,
     /// The file holding it.
     pub(crate) file: PathBuf,
+    /// The file as written.
+    pub(crate) source: String,
     /// Its code with comments and literals blanked, test items included.
     pub(crate) code: String,
     /// Its top-level items.
@@ -66,6 +69,7 @@ impl Module {
         Self {
             path,
             file,
+            source: source.to_owned(),
             code,
             items,
             paths,
@@ -87,6 +91,13 @@ impl Module {
 }
 
 impl Tree {
+    /// Whether the target is a library: its root is a crate's public door.
+    pub(crate) fn is_library(&self) -> bool {
+        self.kinds
+            .iter()
+            .any(|kind| LIBRARY_KINDS.contains(&kind.as_str()))
+    }
+
     /// The index of the module at `path`.
     pub(crate) fn find(&self, path: &[String]) -> Option<usize> {
         self.modules.iter().position(|module| module.path == path)
@@ -126,13 +137,9 @@ impl Tree {
     }
 }
 
-/// Every target of the Cargo project at `project` and its module tree.
-pub(crate) fn module_trees(project: &Path, temp: &Path) -> Result<Vec<Tree>, Failure> {
-    let metadata = temp.join("module-trees.json");
-    Cmd::new("cargo metadata --no-deps --format-version 1 --offline --manifest-path")
-        .arg(project.join("Cargo.toml"))
-        .stdout_to(&metadata)?;
-    let listing = Cmd::new("jaq -r").arg(TARGETS).arg(&metadata).capture()?;
+/// Every target the Cargo metadata at `metadata` lists, and its module tree.
+pub(crate) fn module_trees(metadata: &Path) -> Result<Vec<Tree>, Failure> {
+    let listing = Cmd::new("jaq -r").arg(TARGETS).arg(metadata).capture()?;
     listing.lines().map(target_tree).collect()
 }
 

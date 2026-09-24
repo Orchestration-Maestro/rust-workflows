@@ -30,6 +30,28 @@ const CRATES: &str = ".crate // [] | .[] | [.root, (.layers | map(if type == \"a
 const EXCEPTIONS: &str =
     ".exception // [] | .[] | [.rule, .path, (.item // \"\"), (.reason // \"\")] | @tsv";
 
+/// Each `[limits]` key and its value, tab-separated.
+const LIMITS: &str = ".limits // {} | to_entries[] | [.key, (.value | tostring)] | @tsv";
+
+/// The organization's floors a repository may tighten: the longest file, in
+/// lines of code, and the widest line, in columns.
+#[derive(Clone, Copy)]
+pub(crate) struct Limits {
+    /// The most lines of code a file may hold, doc comments not counted.
+    pub(crate) file_lines: usize,
+    /// The most columns a line may take.
+    pub(crate) line_columns: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            file_lines: 500,
+            line_columns: 100,
+        }
+    }
+}
+
 /// The layers one target declares, left to right.
 pub(crate) struct Layers {
     /// The target's root file, relative to the repository root.
@@ -57,6 +79,8 @@ pub(crate) struct QualityConfig {
     pub(crate) layers: Vec<Layers>,
     /// The exceptions the repository takes.
     pub(crate) exceptions: Vec<Exception>,
+    /// The limits, the organization's floors unless the file tightens them.
+    pub(crate) limits: Limits,
 }
 
 /// Read the file at the root of `workspace`, refusing a table it does not
@@ -82,7 +106,12 @@ pub(crate) fn read_config(workspace: &Path) -> Result<QualityConfig, Failure> {
             .into());
         }
     }
+    let mut limits = Limits::default();
+    for line in query(LIMITS)?.lines() {
+        parse_limit(&mut limits, line)?;
+    }
     Ok(QualityConfig {
+        limits,
         layers: query(CRATES)?
             .lines()
             .map(parse_layers)
@@ -92,6 +121,35 @@ pub(crate) fn read_config(workspace: &Path) -> Result<QualityConfig, Failure> {
             .map(parse_exception)
             .collect::<Result<_, _>>()?,
     })
+}
+
+/// One `[limits]` line applied to `limits`: a known key, a whole number,
+/// and never looser than the organization's floor.
+fn parse_limit(limits: &mut Limits, line: &str) -> Result<(), Failure> {
+    let (key, value) = line.split_once('\t').unwrap_or((line, ""));
+    let floors = Limits::default();
+    let (slot, floor) = match key {
+        "file-lines" => (&mut limits.file_lines, floors.file_lines),
+        "line-columns" => (&mut limits.line_columns, floors.line_columns),
+        _ => {
+            return Err(format!(
+                "{FILE}: unknown limit `{key}`; it takes file-lines, line-columns"
+            )
+            .into());
+        }
+    };
+    let Ok(number) = value.parse::<usize>() else {
+        return Err(format!("{FILE}: {key} must be a whole number").into());
+    };
+    if number > floor {
+        return Err(format!(
+            "{FILE}: {key} = {number} loosens the organization's {floor}; \
+             a repository may only tighten it"
+        )
+        .into());
+    }
+    *slot = number;
+    Ok(())
 }
 
 /// One line of the layers listing.
@@ -149,7 +207,7 @@ fn parse_exception(line: &str) -> Result<Exception, Failure> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_exception, parse_layers};
+    use super::{Limits, parse_exception, parse_layers, parse_limit};
 
     #[test]
     fn layers_split_into_modules_and_refuse_a_single_layer_or_a_repeated_module() {
@@ -173,6 +231,35 @@ mod tests {
                 .message
                 .as_deref(),
             Some("maestro-quality.toml: module `b` sits in two layers of r.rs")
+        );
+    }
+
+    #[test]
+    fn limits_tighten_the_organization_floors_and_never_loosen_them() {
+        let mut limits = Limits::default();
+        assert_eq!((limits.file_lines, limits.line_columns), (500, 100));
+        parse_limit(&mut limits, "file-lines\t400").unwrap();
+        parse_limit(&mut limits, "line-columns\t90").unwrap();
+        assert_eq!((limits.file_lines, limits.line_columns), (400, 90));
+        let refusal = |line: &str| {
+            parse_limit(&mut Limits::default(), line)
+                .err()
+                .unwrap()
+                .message
+                .unwrap_or_default()
+        };
+        assert_eq!(
+            refusal("file-lines\t600"),
+            "maestro-quality.toml: file-lines = 600 loosens the organization's 500; \
+             a repository may only tighten it"
+        );
+        assert_eq!(
+            refusal("line-columns\twide"),
+            "maestro-quality.toml: line-columns must be a whole number"
+        );
+        assert_eq!(
+            refusal("depth\t3"),
+            "maestro-quality.toml: unknown limit `depth`; it takes file-lines, line-columns"
         );
     }
 

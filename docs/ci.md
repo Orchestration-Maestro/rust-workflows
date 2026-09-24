@@ -138,12 +138,12 @@ similarity-rs. It never fails the run: the listing lands in `duplication.txt`
 and its count in the step summary. A pair is a candidate to merge, or a shape
 two functions share on purpose; the report leaves that call to the consumer.
 
-### Module structure
+### Source rules
 
 Preview until v2.0.0: the step runs only with `quality-preview: true`, and
 always from v2.0.0 on. `rust-gate architecture` reads every target Cargo
-reports and the files its `mod` declarations reach, and refuses each finding
-by its identifier, file and line:
+reports, the files its `mod` declarations reach and every package's manifest,
+and refuses each finding by its identifier, file and line:
 
 | Rule | Refuses |
 | --- | --- |
@@ -154,13 +154,29 @@ by its identifier, file and line:
 | ARC-005 | An item a door offers past its parent that one outside module uses and nothing inside shares |
 | ARC-006 | A binary root holding more than declarations and a `fn main` of at most 25 lines |
 | ARC-007 | A `#[path]` attribute or an `include!` of Rust source |
+| SIZE-002 | A file over 500 lines of code, doc comments not counted; over 300 is reported |
+| SIZE-003 | A line over 100 columns, strings and comments included |
+| NAME-001 | A package name that is not lowercase kebab-case, or a publishable one without the `maestro-` prefix |
+| NAME-002 | A test module named in fewer than two words, a test in fewer than four, a `test_` prefix or a `_works`, `_ok` or `_test` suffix |
+| DOC-001 | A file that does not open with a `//!` comment |
+| LIB-001 | A print macro in a library |
+| LIB-002 | A library-only package that depends on `anyhow`, `eyre` or `color-eyre` |
+| TST-001 | A test that waits on `thread::sleep`, `time::sleep` or `task::sleep` |
+| TST-003 | More than one integration-test crate without required features |
+| WSP-001 | A workspace member that does not inherit `[lints]`, `edition`, `rust-version`, `license` or its dependencies |
+| WSP-002 | An edition other than 2024, a virtual workspace resolver other than 3, a missing or untracked `Cargo.lock` |
 
 `architecture.txt` lists every finding, then every finding an exception
-excuses, with its reason. `maestro-quality.toml`, at the root of the
-repository, declares layers and takes exceptions; among these rules only
-ARC-005 takes one, and an exception that excuses nothing is itself refused:
+excuses, with its reason, then the files over 300 lines. `maestro-quality.toml`,
+at the root of the repository, declares layers, tightens the limits and takes
+exceptions; among these rules only ARC-005 and TST-001 take one, and an
+exception that excuses nothing is itself refused:
 
 ```toml
+[limits]
+file-lines = 400
+line-columns = 100
+
 [[crate]]
 root = "gate/src/main.rs"
 layers = ["steps", "checks", "runner"]
@@ -424,7 +440,7 @@ earlier failure. The scorecard identifies controls that never ran.
 | `tests.xml` | nextest JUnit, including failed tests when nextest produces it | always |
 | `complexity.txt`, `complexity.json` | Functions over the size thresholds and files over 300 lines of code; informational, never fails the run | always |
 | `duplication.txt` | Pairs of functions at or above 90 % similarity, eight lines or more; informational, never fails the run | always |
-| `architecture.txt` | Every ARC finding with its rule, file and line, then each finding an exception excuses, with its reason | `quality-preview: true` until v2.0.0 |
+| `architecture.txt` | Every source-rule finding with its rule, file and line, each finding an exception excuses with its reason, then the files over 300 lines | `quality-preview: true` until v2.0.0 |
 | `coverage.lcov` | Line coverage in LCOV format | always |
 | `audit.json` | RustSec advisory results | always |
 | `secrets.json` | Redacted secret-scan findings | always |

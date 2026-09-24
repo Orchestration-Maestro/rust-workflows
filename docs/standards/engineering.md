@@ -39,7 +39,8 @@ is its one door, in front of `tests/harness/repository.rs`,
 `tests/harness/fixture.rs`, each naming what it takes from a sibling and none
 naming a test module. A module names what it proves in two words at least and
 a test function in four, never behind a `test_` prefix or a `_works`, `_ok` or
-`_test` suffix; `tests/repository/naming_rules.rs` holds both rules.
+`_test` suffix: NAME-002, held by `rust-gate architecture` in `just check`
+(`badly_named_tests_and_one_word_test_modules_are_refused`).
 
 | ID | Rule | Enforced here by |
 | --- | --- | --- |

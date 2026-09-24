@@ -5,18 +5,6 @@
 use crate::harness::{Fixture, refused, succeeds};
 use std::fs;
 
-/// A fixture whose project holds `files`, each a path under the project and
-/// its source.
-fn project(files: &[(&str, &str)]) -> Fixture {
-    let f = Fixture::new();
-    for (path, source) in files {
-        let file = f.root.join("project").join(path);
-        fs::create_dir_all(file.parent().unwrap()).unwrap();
-        fs::write(file, source).unwrap();
-    }
-    f
-}
-
 /// The report the step wrote.
 fn report(f: &Fixture) -> String {
     fs::read_to_string(f.root.join("reports/architecture.txt")).unwrap()
@@ -24,7 +12,7 @@ fn report(f: &Fixture) -> String {
 
 #[test]
 fn a_project_without_findings_passes_with_an_empty_report() {
-    let f = project(&[
+    let f = Fixture::with_sources(&[
         (
             "src/lib.rs",
             "//! Crate.\nmod parse;\npub use parse::parse;\n",
@@ -45,14 +33,14 @@ fn a_project_without_findings_passes_with_an_empty_report() {
 
 #[test]
 fn an_import_cycle_between_two_files_is_refused_by_name() {
-    let f = project(&[
+    let f = Fixture::with_sources(&[
         ("src/lib.rs", "//! Crate.\nmod a;\nmod b;\n"),
         ("src/a.rs", "//! A.\npub(crate) fn f() { crate::b::g() }\n"),
         ("src/b.rs", "//! B.\npub(crate) fn g() { crate::a::f() }\n"),
     ]);
     refused(
         &f.run("ci", "architecture"),
-        "module structure: 1 finding; each names its rule, its file and what to do",
+        "source rules: 1 finding; each names its rule, its file and what to do",
     );
     assert_eq!(
         report(&f),
@@ -63,7 +51,7 @@ fn an_import_cycle_between_two_files_is_refused_by_name() {
 
 #[test]
 fn the_quality_file_refuses_unknown_tables_and_unreasoned_exceptions() {
-    let f = project(&[]);
+    let f = Fixture::with_sources(&[]);
     let file = f.root.join("maestro-quality.toml");
     fs::write(&file, "[typo]\nx = 1\n").unwrap();
     refused(
@@ -99,7 +87,7 @@ fn the_quality_file_refuses_unknown_tables_and_unreasoned_exceptions() {
 
 #[test]
 fn a_door_holding_a_function_is_refused_and_a_listing_door_passes() {
-    let f = project(&[
+    let f = Fixture::with_sources(&[
         ("src/lib.rs", "//! Crate.\nmod shapes;\n"),
         (
             "src/shapes/mod.rs",
@@ -113,7 +101,7 @@ fn a_door_holding_a_function_is_refused_and_a_listing_door_passes() {
             "//! Circle.\npub(crate) fn area() {}\n",
         ),
     ]);
-    refused(&f.run("ci", "architecture"), "module structure: 1 finding");
+    refused(&f.run("ci", "architecture"), "source rules: 1 finding");
     assert_eq!(
         report(&f),
         "ARC-002 project/src/shapes/mod.rs:6: a door holds only mod and use declarations; \
@@ -123,7 +111,7 @@ fn a_door_holding_a_function_is_refused_and_a_listing_door_passes() {
 
 #[test]
 fn a_path_past_a_door_re_export_is_refused() {
-    let f = project(&[
+    let f = Fixture::with_sources(&[
         ("src/lib.rs", "//! Crate.\nmod report;\nmod shapes;\n"),
         (
             "src/report.rs",
@@ -141,7 +129,7 @@ fn a_path_past_a_door_re_export_is_refused() {
             "//! Circle.\npub(crate) fn area() {}\n",
         ),
     ]);
-    refused(&f.run("ci", "architecture"), "module structure: 1 finding");
+    refused(&f.run("ci", "architecture"), "source rules: 1 finding");
     assert_eq!(
         report(&f),
         "ARC-003 project/src/report.rs:2: `crate::shapes::circle::area` walks past the door of \
@@ -151,7 +139,7 @@ fn a_path_past_a_door_re_export_is_refused() {
 
 #[test]
 fn declared_layers_refuse_an_import_within_or_against_the_order() {
-    let f = project(&[
+    let f = Fixture::with_sources(&[
         (
             "src/main.rs",
             "//! Binary.\nmod checks;\nmod runner;\nmod steps;\nmod stray;\nfn main() {}\n",
@@ -176,7 +164,7 @@ fn declared_layers_refuse_an_import_within_or_against_the_order() {
         ),
     )
     .unwrap();
-    refused(&f.run("ci", "architecture"), "module structure: 3 findings");
+    refused(&f.run("ci", "architecture"), "source rules: 3 findings");
     assert_eq!(
         report(&f),
         concat!(
@@ -192,13 +180,13 @@ fn declared_layers_refuse_an_import_within_or_against_the_order() {
 
 #[test]
 fn layers_declared_for_a_root_no_target_has_are_refused() {
-    let f = project(&[]);
+    let f = Fixture::with_sources(&[]);
     fs::write(
         f.root.join("maestro-quality.toml"),
         "[[crate]]\nroot = \"project/src/gone.rs\"\nlayers = [\"a\", \"b\"]\n",
     )
     .unwrap();
-    refused(&f.run("ci", "architecture"), "module structure: 1 finding");
+    refused(&f.run("ci", "architecture"), "source rules: 1 finding");
     assert_eq!(
         report(&f),
         "ARC-004 maestro-quality.toml: declares layers for project/src/gone.rs, which is no \
@@ -208,7 +196,7 @@ fn layers_declared_for_a_root_no_target_has_are_refused() {
 
 #[test]
 fn a_seam_serving_one_outside_caller_is_refused_unless_excused() {
-    let f = project(&[
+    let f = Fixture::with_sources(&[
         (
             "src/lib.rs",
             "//! Crate.\nmod first;\nmod runner;\nmod second;\n",
@@ -227,7 +215,7 @@ fn a_seam_serving_one_outside_caller_is_refused_unless_excused() {
         ),
         ("src/second.rs", "//! Second.\nuse crate::runner::Cmd;\n"),
     ]);
-    refused(&f.run("ci", "architecture"), "module structure: 1 finding");
+    refused(&f.run("ci", "architecture"), "source rules: 1 finding");
     assert_eq!(
         report(&f),
         "ARC-005 project/src/runner/mod.rs:3: `only` serves only project/src/first.rs; move it \
@@ -250,7 +238,7 @@ fn a_seam_serving_one_outside_caller_is_refused_unless_excused() {
         "//! Second.\nuse crate::runner::{Cmd, only};\n",
     )
     .unwrap();
-    refused(&f.run("ci", "architecture"), "module structure: 1 finding");
+    refused(&f.run("ci", "architecture"), "source rules: 1 finding");
     assert_eq!(
         report(&f),
         "ARC-005 project/src/runner/mod.rs: the exception for `only` excuses nothing any more; \
@@ -262,12 +250,12 @@ fn a_seam_serving_one_outside_caller_is_refused_unless_excused() {
 fn a_binary_root_beyond_declarations_and_a_short_main_is_refused() {
     let long_main = format!("fn main() {{\n{}}}\n", "    run();\n".repeat(25));
     let main = format!("//! Binary.\nmod app;\nuse app::run;\n\nstruct Config;\n\n{long_main}");
-    let f = project(&[
+    let f = Fixture::with_sources(&[
         ("src/main.rs", main.as_str()),
         ("src/app.rs", "//! App.\npub(crate) fn run() {}\n"),
     ]);
     fs::remove_file(f.root.join("project/src/lib.rs")).unwrap();
-    refused(&f.run("ci", "architecture"), "module structure: 2 findings");
+    refused(&f.run("ci", "architecture"), "source rules: 2 findings");
     assert_eq!(
         report(&f),
         concat!(
@@ -281,7 +269,7 @@ fn a_binary_root_beyond_declarations_and_a_short_main_is_refused() {
 
 #[test]
 fn path_attributes_and_rust_includes_are_refused_while_include_str_passes() {
-    let f = project(&[
+    let f = Fixture::with_sources(&[
         ("src/lib.rs", "//! Crate.\nmod parts;\n"),
         (
             "src/parts.rs",
@@ -292,7 +280,7 @@ fn path_attributes_and_rust_includes_are_refused_while_include_str_passes() {
             ),
         ),
     ]);
-    refused(&f.run("ci", "architecture"), "module structure: 2 findings");
+    refused(&f.run("ci", "architecture"), "source rules: 2 findings");
     assert_eq!(
         report(&f),
         concat!(
