@@ -68,6 +68,14 @@ check:
         cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- architecture
       rm -rf "$scratch"
     done
+    # And the hygiene every tracked file holds to, once for the whole checkout.
+    scratch=$(mktemp -d)
+    PROJECT="$PWD" REPORTS="$scratch" RUNNER_TEMP="$scratch" \
+      GITHUB_WORKSPACE="$PWD" GITHUB_STEP_SUMMARY="$scratch/summary.md" \
+      cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- hygiene
+    rm -rf "$scratch"
+    # The files the gate renders for every repository are this one's too.
+    cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- sync --check
     RUSTDOCFLAGS='-D warnings -D missing_docs' cargo doc --manifest-path gate/Cargo.toml \
       --no-deps --locked --offline --document-private-items
     cargo test --manifest-path tests/Cargo.toml --locked
@@ -95,9 +103,6 @@ check:
     cargo test --manifest-path tests/Cargo.toml --locked -- --ignored --nocapture example_gate
     # The toolbelt links, ShellCheck over every Bash line left, Gitleaks over
     # the tree and, under CHECK_NETWORK=1, the RustSec audits are contract tests.
-    # The size report: what is growing, named without refusing it.
-    cargo test --manifest-path tests/Cargo.toml --locked --offline \
-      files_over_three_hundred_lines_are_reported -- --nocapture | grep '^REPORT:'
     if [[ "${CHECK_NETWORK:-0}" != 1 ]]; then
       echo 'NOT RUN: live advisory database check; run CHECK_NETWORK=1 just check'
     fi
@@ -189,12 +194,18 @@ update-tools:
       echo "codecov-cli ${used} -> ${cli}"
     fi
 
-# Regenerate every generated document: the steps, then every generated table.
+# Regenerate every generated document: the steps, every generated table, the
+# managed files, and the organization's lints in every crate's manifest.
 [linux]
 docs:
     cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- describe \
       > docs/steps.md
     just _tables
+    cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- sync
+    for crate in gate tests examples/binary examples/library examples/workspace; do \
+      (cd "$crate" && cargo run --manifest-path "{{ justfile_directory() }}/gate/Cargo.toml" \
+        --locked --offline --quiet -- lints --write); \
+    done
 
 # Commit every changed file of the checkout onto $BRANCH as the organization's
 # bot: through createCommitOnBranch, which GitHub signs, where a commit made on

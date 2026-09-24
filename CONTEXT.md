@@ -2,7 +2,7 @@
 
 Shared language for reusable Rust CI and protected publication at Orchestration-Maestro.
 
-Each entry says what the word means *here*. Where our meaning is narrower than the
+Each entry says what the word means _here_. Where our meaning is narrower than the
 usual one, the entry says what it excludes, because the gap is where the
 misunderstandings happen.
 

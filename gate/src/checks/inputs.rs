@@ -128,8 +128,9 @@ pub(crate) fn clippy_level() -> Result<ClippyLevel, String> {
     )
 }
 
-/// `COVERAGE`, `coverage-threshold` in `ci.yml`: a plain decimal between 0
-/// and 100, kept as the consumer wrote it, the way `cargo llvm-cov` takes it.
+/// `COVERAGE`, `coverage-threshold` in `ci.yml`: a plain decimal from the
+/// organization's floor, COV-001's 90, to 100, kept as the consumer wrote it,
+/// the way `cargo llvm-cov` takes it.
 pub(crate) fn coverage_threshold() -> Result<String, String> {
     let coverage = input("COVERAGE")?;
     if !is_decimal(&coverage) {
@@ -137,9 +138,11 @@ pub(crate) fn coverage_threshold() -> Result<String, String> {
     }
     if !coverage
         .parse::<f64>()
-        .is_ok_and(|value| (0.0..=100.0).contains(&value))
+        .is_ok_and(|value| (90.0..=100.0).contains(&value))
     {
-        return Err("coverage-threshold must be between 0 and 100".into());
+        return Err(
+            "coverage-threshold must be between 90, the organization's floor, and 100".into(),
+        );
     }
     Ok(coverage)
 }
@@ -183,8 +186,10 @@ fn is_decimal(value: &str) -> bool {
     let fraction = parts.next();
     parts.next().is_none()
         && !whole.is_empty()
-        && whole.bytes().all(|b| b.is_ascii_digit())
-        && fraction.is_none_or(|f| !f.is_empty() && f.bytes().all(|b| b.is_ascii_digit()))
+        && whole.bytes().all(|byte| byte.is_ascii_digit())
+        && fraction.is_none_or(|digits| {
+            !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit())
+        })
 }
 
 #[cfg(test)]

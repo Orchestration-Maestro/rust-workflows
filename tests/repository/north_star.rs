@@ -1,7 +1,8 @@
 //! The North Star: every control it promises runs, every gate names its proof,
 //! and no lint is silenced.
 
-use crate::harness::{described, root, test_sources};
+use crate::harness::{described, root, rust_files, test_sources};
+use std::collections::BTreeSet;
 use std::fs;
 
 /// Every quality bar and evidence source promised by the North Star must be
@@ -72,7 +73,7 @@ fn north_star_promises_are_enforced_by_the_local_gate() {
     );
     // What the hosted gate runs is what its steps declare; what proves each
     // bar is a test that exists.
-    let hosted: std::collections::BTreeSet<String> = described()
+    let hosted: BTreeSet<String> = described()
         .into_iter()
         .filter(|step| step.workflow == "ci")
         .flat_map(|step| step.tools)
@@ -186,33 +187,21 @@ fn no_lint_is_silenced_in_the_gate_or_the_fixtures() {
     // will turn back on. The gate crate and the fixtures the gate is proven
     // against carry none; a comment may mention the attribute, code may not.
     let root = root();
-    let mut pending = vec![root.join("gate/src"), root.join("examples")];
-    let mut scanned = 0;
-    while let Some(directory) = pending.pop() {
-        for entry in fs::read_dir(&directory).unwrap() {
-            let path = entry.unwrap().path();
-            if path.is_dir() {
-                if path.file_name().is_some_and(|name| name == "target") {
-                    continue;
-                }
-                pending.push(path);
-            } else if path.extension().is_some_and(|extension| extension == "rs") {
-                scanned += 1;
-                for (number, line) in fs::read_to_string(&path).unwrap().lines().enumerate() {
-                    let code = line.trim_start();
-                    if code.starts_with("//") {
-                        continue;
-                    }
-                    assert!(
-                        !["#[allow(", "#![allow(", "#[expect(", "#![expect("]
-                            .iter()
-                            .any(|attribute| code.contains(attribute)),
-                        "{}:{} silences a lint",
-                        path.display(),
-                        number + 1
-                    );
-                }
-            }
+    let mut files = rust_files(&root.join("gate/src"));
+    files.extend(rust_files(&root.join("examples")));
+    let scanned = files.len();
+    for path in files {
+        for (number, line) in fs::read_to_string(&path).unwrap().lines().enumerate() {
+            let code = line.trim_start();
+            let silences = ["#[allow(", "#![allow(", "#[expect(", "#![expect("]
+                .iter()
+                .any(|attribute| code.contains(attribute));
+            assert!(
+                code.starts_with("//") || !silences,
+                "{}:{} silences a lint",
+                path.display(),
+                number + 1
+            );
         }
     }
     assert!(

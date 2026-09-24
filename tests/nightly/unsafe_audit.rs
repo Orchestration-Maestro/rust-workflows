@@ -10,16 +10,16 @@ fn the_undefined_behaviour_audit_refuses_to_pass_without_running_anything() {
     // Miri only reports undefined behaviour on paths a test executes. A run that
     // executed nothing is not evidence of safety, and a narrow test-filter can
     // quietly exclude every unsafe block while still exiting zero.
-    let write_source = |f: &Fixture, body: &str| {
-        fs::create_dir_all(f.root.join("project/src")).unwrap();
-        fs::write(f.root.join("project/src/lib.rs"), body).unwrap();
+    let write_source = |fixture: &Fixture, body: &str| {
+        fs::create_dir_all(fixture.root.join("project/src")).unwrap();
+        fs::write(fixture.root.join("project/src/lib.rs"), body).unwrap();
     };
-    let write_miri = |f: &Fixture, passing: usize| {
+    let write_miri = |fixture: &Fixture, passing: usize| {
         let mut lines = String::new();
         for i in 0..passing {
             let _ = writeln!(lines, "test case_{i} ... ok");
         }
-        fs::write(f.root.join("reports/miri.txt"), lines).unwrap();
+        fs::write(fixture.root.join("reports/miri.txt"), lines).unwrap();
     };
 
     // unsafe present, nothing executed: the combination that proves nothing.

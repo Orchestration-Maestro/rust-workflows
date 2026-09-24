@@ -2,6 +2,7 @@
 
 use crate::harness::{Fixture, refused, succeeds, workflow};
 use serde_json::{Value, json};
+use std::collections::BTreeSet;
 use std::fs;
 use std::os::unix::fs::symlink;
 use std::path::Path;
@@ -19,7 +20,7 @@ fn ci_accepts_any_exact_stable_from_the_msrv_and_keeps_matrix_artifacts_distinct
         workflow("ci")["on"]["workflow_call"]["inputs"]["rust-version"]["default"],
         ""
     );
-    let mut artifacts = std::collections::BTreeSet::new();
+    let mut artifacts = BTreeSet::new();
     for version in versions.into_iter().chain(["1.90.0", "1.99.3"]) {
         let mut fixture = Fixture::new();
         fixture.set("REQUESTED_TOOLCHAIN", version);
@@ -52,7 +53,7 @@ fn matrix_versions_have_distinct_concurrency_groups() {
     let consumers = &caller["jobs"]["consumers"];
     let matrix = &consumers["strategy"]["matrix"];
     let group = ci["concurrency"]["group"].as_str().unwrap();
-    let mut groups = std::collections::BTreeSet::new();
+    let mut groups = BTreeSet::new();
     for example in matrix["example"].as_array().unwrap() {
         for version in matrix["rust-version"].as_array().unwrap() {
             let directory = consumers["with"]["working-directory"]
@@ -94,16 +95,20 @@ fn the_declared_msrv_must_be_real_and_reachable() {
     let metadata =
         |packages: Value| json!({"workspace_members": ["p"], "packages": packages}).to_string();
     let run = |declared: Option<&str>, toolchain: &str| {
-        let mut f = Fixture::new();
+        let mut fixture = Fixture::new();
         let mut package = json!({"id": "p", "name": "fixture"});
         if let Some(value) = declared {
             package["rust_version"] = json!(value);
         }
-        fs::write(f.root.join("metadata.json"), metadata(json!([package]))).unwrap();
-        f.set("RUSTUP_TOOLCHAIN", toolchain);
-        f.stub("rustup", "exit 0");
-        f.stub("cargo", "exit 0");
-        f.run("ci", "msrv")
+        fs::write(
+            fixture.root.join("metadata.json"),
+            metadata(json!([package])),
+        )
+        .unwrap();
+        fixture.set("RUSTUP_TOOLCHAIN", toolchain);
+        fixture.stub("rustup", "exit 0");
+        fixture.stub("cargo", "exit 0");
+        fixture.run("ci", "msrv")
     };
 
     succeeds(&run(Some("1.85.0"), "1.98.1"));
@@ -134,7 +139,7 @@ fn the_declared_msrv_is_the_compiler_the_workspace_is_checked_with() {
     let package =
         |name: &str, version: &str| json!({"id": name, "name": name, "rust_version": version});
     let run = |packages: Value| {
-        let f = Fixture::new();
+        let fixture = Fixture::new();
         let members: Vec<&str> = packages
             .as_array()
             .unwrap()
@@ -142,14 +147,14 @@ fn the_declared_msrv_is_the_compiler_the_workspace_is_checked_with() {
             .map(|entry| entry["id"].as_str().unwrap())
             .collect();
         fs::write(
-            f.root.join("metadata.json"),
+            fixture.root.join("metadata.json"),
             json!({"workspace_members": members, "packages": packages}).to_string(),
         )
         .unwrap();
-        f.stub("rustup", "exit 0");
-        f.stub("cargo", "exit 0");
-        let outcome = f.run("ci", "msrv");
-        (outcome, format!("{}\n{}", f.calls(), f.trace()))
+        fixture.stub("rustup", "exit 0");
+        fixture.stub("cargo", "exit 0");
+        let outcome = fixture.run("ci", "msrv");
+        (outcome, format!("{}\n{}", fixture.calls(), fixture.trace()))
     };
 
     // One declaration: it is the floor, and both commands name it.
@@ -187,32 +192,32 @@ fn the_declared_msrv_is_the_compiler_the_workspace_is_checked_with() {
 
     // The build is the point: a workspace that does not compile at its own
     // declared version fails here rather than passing on the declaration.
-    let f = Fixture::new();
+    let fixture = Fixture::new();
     fs::write(
-        f.root.join("metadata.json"),
+        fixture.root.join("metadata.json"),
         json!({"workspace_members": ["p"], "packages": [package("p", "1.85")]}).to_string(),
     )
     .unwrap();
-    f.stub("rustup", "exit 0");
-    f.stub(
+    fixture.stub("rustup", "exit 0");
+    fixture.stub(
         "cargo",
         "echo 'error[E0658]: use of unstable library feature' >&2; exit 101",
     );
-    assert!(!f.run("ci", "msrv").status.success());
+    assert!(!fixture.run("ci", "msrv").status.success());
 }
 
 #[test]
 fn the_real_msrv_build_uses_the_exact_floor_and_rejects_newer_apis() {
-    let mut f = Fixture::new();
-    f.set("CARGO_NET_OFFLINE", "true");
+    let mut fixture = Fixture::new();
+    fixture.set("CARGO_NET_OFFLINE", "true");
     fs::write(
-        f.root.join("project/Cargo.toml"),
+        fixture.root.join("project/Cargo.toml"),
         "[package]\nname = 'floor-fixture'\nversion = '0.1.0'\nedition = '2024'\n\
          rust-version = '1.85'\n",
     )
     .unwrap();
     fs::write(
-        f.root.join("project/build.rs"),
+        fixture.root.join("project/build.rs"),
         r#"fn main() {
     let compiler = std::env::var_os("RUSTC").unwrap();
     let output = std::process::Command::new(compiler).arg("--version").output().unwrap();
@@ -223,21 +228,21 @@ fn the_real_msrv_build_uses_the_exact_floor_and_rejects_newer_apis() {
 "#,
     )
     .unwrap();
-    succeeds(&f.run_body(
+    succeeds(&fixture.run_body(
         "cd \"$PROJECT\"; cargo metadata --format-version 1 --offline \
          > \"$RUNNER_TEMP/metadata.json\"",
     ));
-    let result = f.run("ci", "msrv");
+    let result = fixture.run("ci", "msrv");
     succeeds(&result);
     assert!(String::from_utf8_lossy(&result.stderr).contains("rustc 1.85.0 "));
-    fs::remove_file(f.root.join("project/build.rs")).unwrap();
+    fs::remove_file(fixture.root.join("project/build.rs")).unwrap();
     fs::write(
-        f.root.join("project/src/lib.rs"),
+        fixture.root.join("project/src/lib.rs"),
         "pub fn newer_api() -> bool { 4_u32.is_multiple_of(2) }\n",
     )
     .unwrap();
-    succeeds(&f.run_body("cd \"$PROJECT\"; cargo check --workspace --locked"));
-    let result = f.run("ci", "msrv");
+    succeeds(&fixture.run_body("cd \"$PROJECT\"; cargo check --workspace --locked"));
+    let result = fixture.run("ci", "msrv");
     assert!(!result.status.success());
     assert!(String::from_utf8_lossy(&result.stderr).contains("is_multiple_of"));
 }
@@ -246,7 +251,7 @@ fn the_real_msrv_build_uses_the_exact_floor_and_rejects_newer_apis() {
 fn ci_rejects_unsafe_paths_and_symlinks() {
     let simple = "working-directory must be a simple relative path";
     let traverse = "working-directory must not traverse or contain option-like components";
-    let mut f = Fixture::new();
+    let mut fixture = Fixture::new();
     for (value, message) in [
         ("../outside", simple),
         ("/", simple),
@@ -259,44 +264,44 @@ fn ci_rejects_unsafe_paths_and_symlinks() {
         ),
         ("project\nname", simple),
     ] {
-        f.set("DIRECTORY", value);
-        refused(&f.run("ci", "validate"), message);
+        fixture.set("DIRECTORY", value);
+        refused(&fixture.run("ci", "validate"), message);
     }
-    symlink(f.root.parent().unwrap(), f.root.join("escape")).unwrap();
-    f.set("DIRECTORY", "escape");
+    symlink(fixture.root.parent().unwrap(), fixture.root.join("escape")).unwrap();
+    fixture.set("DIRECTORY", "escape");
     refused(
-        &f.run("ci", "validate"),
+        &fixture.run("ci", "validate"),
         "working-directory escapes checkout",
     );
-    f.set("DIRECTORY", "project");
-    fs::remove_file(f.root.join("project/Cargo.lock")).unwrap();
-    symlink("/etc/passwd", f.root.join("project/Cargo.lock")).unwrap();
+    fixture.set("DIRECTORY", "project");
+    fs::remove_file(fixture.root.join("project/Cargo.lock")).unwrap();
+    symlink("/etc/passwd", fixture.root.join("project/Cargo.lock")).unwrap();
     refused(
-        &f.run("ci", "validate"),
+        &fixture.run("ci", "validate"),
         "Cargo.lock must be a file inside checkout",
     );
-    assert!(f.calls().is_empty());
+    assert!(fixture.calls().is_empty());
 }
 
 #[test]
 fn ci_validates_toolchain_threshold_and_artifact_identity() {
     // Every input that names or shapes an artifact changes its identity, and
     // every malformed value is refused before the job does any work.
-    let mut f = Fixture::new();
-    succeeds(&f.run("ci", "validate"));
+    let mut fixture = Fixture::new();
+    succeeds(&fixture.run("ci", "validate"));
     assert!(
-        fs::read_to_string(f.root.join("environment"))
+        fs::read_to_string(fixture.root.join("environment"))
             .unwrap()
             .lines()
             .any(|line| line == "CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu")
     );
-    let first = fs::read_to_string(f.root.join("output")).unwrap();
-    let original = f.env.clone();
-    fs::create_dir(f.root.join("other")).unwrap();
+    let first = fs::read_to_string(fixture.root.join("output")).unwrap();
+    let original = fixture.env.clone();
+    fs::create_dir(fixture.root.join("other")).unwrap();
     for file in ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"] {
         fs::copy(
-            f.root.join("project").join(file),
-            f.root.join("other").join(file),
+            fixture.root.join("project").join(file),
+            fixture.root.join("other").join(file),
         )
         .unwrap();
     }
@@ -306,33 +311,43 @@ fn ci_validates_toolchain_threshold_and_artifact_identity() {
         ("GITHUB_RUN_ID", "124"),
         ("DIRECTORY", "other"),
     ] {
-        fs::write(f.root.join("output"), "").unwrap();
-        f.env = original.clone();
-        f.set(key, value);
-        succeeds(&f.run("ci", "validate"));
-        assert_ne!(first, fs::read_to_string(f.root.join("output")).unwrap());
+        fs::write(fixture.root.join("output"), "").unwrap();
+        fixture.env = original.clone();
+        fixture.set(key, value);
+        succeeds(&fixture.run("ci", "validate"));
+        assert_ne!(
+            first,
+            fs::read_to_string(fixture.root.join("output")).unwrap()
+        );
     }
-    f.env = original;
+    fixture.env = original;
     let numeric = "coverage-threshold must be numeric";
     for (value, message) in [
-        ("101", "coverage-threshold must be between 0 and 100"),
+        (
+            "101",
+            "coverage-threshold must be between 90, the organization's floor, and 100",
+        ),
+        (
+            "89.9",
+            "coverage-threshold must be between 90, the organization's floor, and 100",
+        ),
         ("nan", numeric),
         ("-1", numeric),
         ("80;touch hacked", numeric),
         ("", numeric),
     ] {
-        f.set("COVERAGE", value);
-        refused(&f.run("ci", "validate"), message);
+        fixture.set("COVERAGE", value);
+        refused(&fixture.run("ci", "validate"), message);
     }
-    f.set("COVERAGE", "80");
+    fixture.set("COVERAGE", "90");
     for value in ["--bad", "x\ny", "x;touch hacked"] {
-        f.set("ARTIFACT_KEY", value);
+        fixture.set("ARTIFACT_KEY", value);
         refused(
-            &f.run("ci", "validate"),
+            &fixture.run("ci", "validate"),
             "artifact-key must be 1-40 safe characters",
         );
     }
-    f.set("ARTIFACT_KEY", "test");
+    fixture.set("ARTIFACT_KEY", "test");
     let pin = "rust-toolchain.toml must pin an exact stable version";
     for (channel, message) in [
         ("stable", pin),
@@ -341,11 +356,11 @@ fn ci_validates_toolchain_threshold_and_artifact_identity() {
         ("1.84.0", "rust-version must be at least the 1.85.0 MSRV"),
     ] {
         fs::write(
-            f.root.join("project/rust-toolchain.toml"),
+            fixture.root.join("project/rust-toolchain.toml"),
             format!("[toolchain]\nchannel=\"{channel}\"\n"),
         )
         .unwrap();
-        refused(&f.run("ci", "validate"), message);
+        refused(&fixture.run("ci", "validate"), message);
     }
 }
 
@@ -353,11 +368,11 @@ fn ci_validates_toolchain_threshold_and_artifact_identity() {
 fn ci_validates_the_licence_and_unsafe_policies_before_any_work() {
     // The two string policies are closed sets, and the licence policy decides
     // whether a missing deny.toml is acceptable before anything runs.
-    let mut f = Fixture::new();
+    let mut fixture = Fixture::new();
     for value in ["Auto", "strict", "", "auto;touch hacked", "off\nenforce"] {
-        f.set("LICENSE_POLICY", value);
+        fixture.set("LICENSE_POLICY", value);
         assert!(
-            !f.run("ci", "validate").status.success(),
+            !fixture.run("ci", "validate").status.success(),
             "license-policy must reject {value:?}"
         );
     }
@@ -365,23 +380,23 @@ fn ci_validates_the_licence_and_unsafe_policies_before_any_work() {
     // fail a repository that has not committed a licence policy yet, while the
     // explicit `enforce` value must refuse to pass silently without one.
     for policy in ["auto", "off"] {
-        f.set("LICENSE_POLICY", policy);
-        succeeds(&f.run("ci", "validate"));
+        fixture.set("LICENSE_POLICY", policy);
+        succeeds(&fixture.run("ci", "validate"));
     }
-    f.set("LICENSE_POLICY", "enforce");
+    fixture.set("LICENSE_POLICY", "enforce");
     refused(
-        &f.run("ci", "validate"),
+        &fixture.run("ci", "validate"),
         "license-policy=enforce requires a committed deny.toml",
     );
-    symlink("/etc/hostname", f.root.join("project/deny.toml")).unwrap();
-    refused(&f.run("ci", "validate"), "deny.toml escapes checkout");
-    fs::remove_file(f.root.join("project/deny.toml")).unwrap();
-    fs::write(f.root.join("project/deny.toml"), "[licenses]\n").unwrap();
+    symlink("/etc/hostname", fixture.root.join("project/deny.toml")).unwrap();
+    refused(&fixture.run("ci", "validate"), "deny.toml escapes checkout");
+    fs::remove_file(fixture.root.join("project/deny.toml")).unwrap();
+    fs::write(fixture.root.join("project/deny.toml"), "[licenses]\n").unwrap();
     for policy in ["auto", "enforce"] {
-        f.set("LICENSE_POLICY", policy);
-        succeeds(&f.run("ci", "validate"));
+        fixture.set("LICENSE_POLICY", policy);
+        succeeds(&fixture.run("ci", "validate"));
         assert!(
-            fs::read_to_string(f.root.join("environment"))
+            fs::read_to_string(fixture.root.join("environment"))
                 .unwrap()
                 .lines()
                 .any(
@@ -390,12 +405,12 @@ fn ci_validates_the_licence_and_unsafe_policies_before_any_work() {
             "license-policy={policy} must select the consumer deny.toml"
         );
     }
-    fs::remove_file(f.root.join("project/deny.toml")).unwrap();
-    f.set("LICENSE_POLICY", "auto");
+    fs::remove_file(fixture.root.join("project/deny.toml")).unwrap();
+    fixture.set("LICENSE_POLICY", "auto");
     for value in ["Deny", "forbid", "", "deny;touch hacked"] {
-        f.set("UNSAFE_POLICY", value);
+        fixture.set("UNSAFE_POLICY", value);
         assert!(
-            !f.run("ci", "validate").status.success(),
+            !fixture.run("ci", "validate").status.success(),
             "unsafe-policy must reject {value:?}"
         );
     }
@@ -404,37 +419,37 @@ fn ci_validates_the_licence_and_unsafe_policies_before_any_work() {
 #[test]
 fn unused_dependencies_reaches_the_next_step_only_through_exports() {
     for value in ["false", "true"] {
-        let mut f = Fixture::new();
-        f.set("UNUSED_DEPENDENCIES", value);
-        succeeds(&f.run("ci", "validate"));
+        let mut fixture = Fixture::new();
+        fixture.set("UNUSED_DEPENDENCIES", value);
+        succeeds(&fixture.run("ci", "validate"));
         // A step-local env block does not survive into the next GitHub step.
-        f.env.remove("UNUSED_DEPENDENCIES");
-        let exported = fs::read_to_string(f.root.join("environment")).unwrap();
+        fixture.env.remove("UNUSED_DEPENDENCIES");
+        let exported = fs::read_to_string(fixture.root.join("environment")).unwrap();
         for line in exported.lines() {
             let (key, value) = line.split_once('=').unwrap();
-            f.set(key, value);
+            fixture.set(key, value);
         }
-        fs::create_dir_all(&f.env["REPORTS"]).unwrap();
-        succeeds(&f.run("ci", "unused"));
+        fs::create_dir_all(&fixture.env["REPORTS"]).unwrap();
+        succeeds(&fixture.run("ci", "unused"));
         let report =
-            fs::read_to_string(Path::new(&f.env["REPORTS"]).join("unused-dependencies.txt"))
+            fs::read_to_string(Path::new(&fixture.env["REPORTS"]).join("unused-dependencies.txt"))
                 .unwrap();
         assert_eq!(report.contains("SKIPPED:"), value == "false");
-        assert_eq!(f.trace().contains("cargo machete"), value == "true");
+        assert_eq!(fixture.trace().contains("cargo machete"), value == "true");
     }
 }
 
 #[test]
 fn unused_dependencies_is_validated_before_any_export() {
     for value in ["", "False", "0", "true\nINJECT=yes"] {
-        let mut f = Fixture::new();
-        f.set("UNUSED_DEPENDENCIES", value);
+        let mut fixture = Fixture::new();
+        fixture.set("UNUSED_DEPENDENCIES", value);
         refused(
-            &f.run("ci", "validate"),
+            &fixture.run("ci", "validate"),
             "UNUSED_DEPENDENCIES must be true or false",
         );
-        assert!(!f.root.join("environment").exists());
-        assert!(!f.root.join("output").exists());
+        assert!(!fixture.root.join("environment").exists());
+        assert!(!fixture.root.join("output").exists());
     }
 }
 
@@ -449,14 +464,17 @@ fn every_boolean_input_is_validated_before_any_export() {
         "API_COMPATIBILITY",
     ] {
         for value in ["", "False", "true\nINJECT=yes"] {
-            let mut f = Fixture::new();
-            f.set(name, value);
+            let mut fixture = Fixture::new();
+            fixture.set(name, value);
             refused(
-                &f.run("ci", "validate"),
+                &fixture.run("ci", "validate"),
                 &format!("{name} must be true or false"),
             );
-            assert!(!f.root.join("environment").exists(), "{name}={value:?}");
-            assert!(!f.root.join("output").exists(), "{name}={value:?}");
+            assert!(
+                !fixture.root.join("environment").exists(),
+                "{name}={value:?}"
+            );
+            assert!(!fixture.root.join("output").exists(), "{name}={value:?}");
         }
     }
 }

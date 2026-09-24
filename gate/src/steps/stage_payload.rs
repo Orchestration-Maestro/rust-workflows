@@ -8,6 +8,7 @@ use crate::checks::checkout_paths::{canonical, strictly_inside};
 use crate::checks::simple_names::simple;
 use crate::runner::{Cmd, Failure, Job, Outcome, Step, input, path, write};
 use std::fmt::Write as _;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 /// What this step declares: its inputs, its tools and its reports.
@@ -55,7 +56,7 @@ fn run() -> Outcome {
     };
     let release = job.temp.join("rust-release");
     for directory in [&payload.directory, &release] {
-        std::fs::create_dir(directory)
+        fs::create_dir(directory)
             .map_err(|error| format!("cannot create {}: {error}", directory.display()))?;
     }
     let binaries = payload.collect_binaries(&target)?;
@@ -63,7 +64,7 @@ fn run() -> Outcome {
     let merged = payload.merge_sbom(&members)?;
     members.sort();
     payload.write_spdx(&members)?;
-    std::fs::copy(&merged, job.report("payload.cdx.json")?)
+    fs::copy(&merged, job.report("payload.cdx.json")?)
         .map_err(|error| format!("cannot copy the payload SBOM: {error}"))?;
     payload.copy_packages(&target)?;
     payload.seal(&release, &binaries, &members)
@@ -93,7 +94,7 @@ impl Payload<'_> {
             if !strictly_inside(&source, target) || destination.exists() {
                 return Err("Invalid or duplicate binary output".into());
             }
-            std::fs::copy(&source, &destination)
+            fs::copy(&source, &destination)
                 .map_err(|error| format!("cannot copy {name}: {error}"))?;
             binaries.push(name.to_owned());
         }
@@ -126,7 +127,7 @@ impl Payload<'_> {
                 .arg(&source)
                 .capture()
                 .map_err(|_| "Invalid CycloneDX JSON envelope or component metadata")?;
-            std::fs::copy(&source, self.directory.join(format!("{name}.cdx.json")))
+            fs::copy(&source, self.directory.join(format!("{name}.cdx.json")))
                 .map_err(|error| format!("cannot copy the SBOM of {name}: {error}"))?;
             members.push(name.to_owned());
         }
@@ -196,7 +197,7 @@ impl Payload<'_> {
                 .map_err(|_| {
                     format!("SPDX document for {member} is not a usable SPDX 2.3 document")
                 })?;
-            std::fs::copy(&spdx, self.job.report(&format!("{member}.spdx.json"))?)
+            fs::copy(&spdx, self.job.report(&format!("{member}.spdx.json"))?)
                 .map_err(|error| format!("cannot copy the SPDX document of {member}: {error}"))?;
         }
         Ok(())
@@ -205,22 +206,23 @@ impl Payload<'_> {
     /// Every verified package archive, copied into the payload; a symlink in
     /// the package directory is refused rather than followed.
     fn copy_packages(&self, target: &Path) -> Outcome {
-        if let Ok(entries) = std::fs::read_dir(target.join("package")) {
-            for entry in entries {
-                let entry = entry.map_err(|error| format!("cannot read the packages: {error}"))?;
-                let source = entry.path();
-                if source
-                    .extension()
-                    .is_none_or(|extension| extension != "crate")
-                {
-                    continue;
-                }
-                if entry.file_type().is_ok_and(|kind| kind.is_symlink()) {
-                    return Err("Package archive must not be a symlink".into());
-                }
-                std::fs::copy(&source, self.directory.join(entry.file_name()))
-                    .map_err(|error| format!("cannot copy {}: {error}", source.display()))?;
+        let Ok(entries) = fs::read_dir(target.join("package")) else {
+            return Ok(());
+        };
+        for entry in entries {
+            let entry = entry.map_err(|error| format!("cannot read the packages: {error}"))?;
+            let source = entry.path();
+            if source
+                .extension()
+                .is_none_or(|extension| extension != "crate")
+            {
+                continue;
             }
+            if entry.file_type().is_ok_and(|kind| kind.is_symlink()) {
+                return Err("Package archive must not be a symlink".into());
+            }
+            fs::copy(&source, self.directory.join(entry.file_name()))
+                .map_err(|error| format!("cannot copy {}: {error}", source.display()))?;
         }
         Ok(())
     }

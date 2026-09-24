@@ -57,8 +57,8 @@ pub(super) fn path_attributes(tree: &Tree, workspace: &Path) -> Vec<Finding> {
                 .get(offset..)
                 .unwrap_or_default()
                 .chars()
-                .take_while(|&c| c != ']')
-                .filter(|c| !c.is_whitespace())
+                .take_while(|&character| character != ']')
+                .filter(|character| !character.is_whitespace())
                 .collect();
             if compact.starts_with("#[path=")
                 || (compact.starts_with("#[cfg_attr(") && compact.contains(",path="))

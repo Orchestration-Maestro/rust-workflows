@@ -7,9 +7,9 @@ use std::fs;
 #[test]
 fn dry_runs_never_query_release_authorization_or_write_remotely() {
     for name in ["publish-binaries", "publish-crate", "publish-evidence"] {
-        let f = Fixture::new();
-        succeeds(&f.run(name, "authorize"));
-        assert!(f.calls().is_empty());
+        let fixture = Fixture::new();
+        succeeds(&fixture.run(name, "authorize"));
+        assert!(fixture.calls().is_empty());
     }
 }
 
@@ -18,9 +18,9 @@ fn every_live_publisher_requires_reviewers_and_only_release_tag_deployments() {
     let environment = "release environment must require reviewers and custom tag policies";
     let policies = "release environment must allow only the v* tag policy";
     for name in ["publish-binaries", "publish-crate", "publish-evidence"] {
-        let mut f = Fixture::new();
-        f.trusted();
-        succeeds(&f.run(name, "authorize"));
+        let mut fixture = Fixture::new();
+        fixture.trusted();
+        succeeds(&fixture.run(name, "authorize"));
         for (key, value, message) in [
             ("ENVIRONMENT_JSON", "{}", environment),
             ("ENVIRONMENT_JSON", "not-json", environment),
@@ -53,14 +53,14 @@ fn every_live_publisher_requires_reviewers_and_only_release_tag_deployments() {
                 policies,
             ),
         ] {
-            let previous = f.env[key].clone();
-            f.set(key, value);
-            refused(&f.run(name, "authorize"), message);
-            f.set(key, &previous);
+            let previous = fixture.env[key].clone();
+            fixture.set(key, value);
+            refused(&fixture.run(name, "authorize"), message);
+            fixture.set(key, &previous);
         }
-        f.stub("gh", "exit 7");
+        fixture.stub("gh", "exit 7");
         refused(
-            &f.run(name, "authorize"),
+            &fixture.run(name, "authorize"),
             "Cannot verify release environment protection",
         );
     }
@@ -95,14 +95,18 @@ fn live_jobs_enter_release_with_only_the_permissions_they_use() {
 
 #[test]
 fn binary_upload_checks_the_release_revision_and_never_replaces_assets() {
-    let mut f = Fixture::new();
-    f.trusted();
-    fs::create_dir(f.root.join("rust-release")).unwrap();
+    let mut fixture = Fixture::new();
+    fixture.trusted();
+    fs::create_dir(fixture.root.join("rust-release")).unwrap();
     for name in ["payload.tar.gz", "provenance.json", "SHA256SUMS"] {
-        fs::write(f.root.join("rust-release").join(name), "verified earlier").unwrap();
+        fs::write(
+            fixture.root.join("rust-release").join(name),
+            "verified earlier",
+        )
+        .unwrap();
     }
-    succeeds(&f.run("publish-binaries", "publish"));
-    let calls = f.calls();
+    succeeds(&fixture.run("publish-binaries", "publish"));
+    let calls = fixture.calls();
     assert!(calls.contains("environments/release"));
     assert!(calls.contains("/commits/refs%2Ftags%2Fv0.1.0"));
     assert!(calls.contains("release view v0.1.0"));
@@ -156,51 +160,58 @@ fn binary_upload_checks_the_release_revision_and_never_replaces_assets() {
             "Cannot verify release environment tag policies",
         ),
     ] {
-        let previous = f.env[key].clone();
-        f.set(key, &value);
-        fs::write(f.root.join("calls"), "").unwrap();
-        refused(&f.run("publish-binaries", "publish"), message);
-        assert!(!f.calls().contains("release upload"));
-        f.set(key, &previous);
+        let previous = fixture.env[key].clone();
+        fixture.set(key, &value);
+        fs::write(fixture.root.join("calls"), "").unwrap();
+        refused(&fixture.run("publish-binaries", "publish"), message);
+        assert!(!fixture.calls().contains("release upload"));
+        fixture.set(key, &previous);
     }
 }
 
 #[test]
 fn release_upload_refuses_missing_files_and_propagates_network_failure() {
-    let mut f = Fixture::new();
-    f.trusted();
+    let mut fixture = Fixture::new();
+    fixture.trusted();
     refused(
-        &f.run("publish-binaries", "publish"),
+        &fixture.run("publish-binaries", "publish"),
         "Release asset is missing or unsafe",
     );
-    assert!(!f.calls().contains("release upload"));
-    fs::create_dir(f.root.join("rust-release")).unwrap();
+    assert!(!fixture.calls().contains("release upload"));
+    fs::create_dir(fixture.root.join("rust-release")).unwrap();
     for name in ["payload.tar.gz", "provenance.json", "SHA256SUMS"] {
-        fs::write(f.root.join("rust-release").join(name), "verified earlier").unwrap();
+        fs::write(
+            fixture.root.join("rust-release").join(name),
+            "verified earlier",
+        )
+        .unwrap();
     }
-    f.set("DRY_RUN", "true");
-    fs::write(f.root.join("calls"), "").unwrap();
-    succeeds(&f.run("publish-binaries", "publish"));
-    assert!(f.calls().is_empty());
-    f.set("DRY_RUN", "false");
-    f.set("UPLOAD_STATUS", "7");
-    assert_eq!(f.run("publish-binaries", "publish").status.code(), Some(7));
-    assert!(!f.root.join("summary").exists());
+    fixture.set("DRY_RUN", "true");
+    fs::write(fixture.root.join("calls"), "").unwrap();
+    succeeds(&fixture.run("publish-binaries", "publish"));
+    assert!(fixture.calls().is_empty());
+    fixture.set("DRY_RUN", "false");
+    fixture.set("UPLOAD_STATUS", "7");
+    assert_eq!(
+        fixture.run("publish-binaries", "publish").status.code(),
+        Some(7)
+    );
+    assert!(!fixture.root.join("summary").exists());
 }
 
 #[test]
 fn crate_publication_rechecks_approval_before_exposing_the_token_to_cargo() {
-    let mut f = Fixture::new();
-    f.trusted();
-    f.set("TOKEN", "synthetic-token-not-a-secret");
-    f.set("ENVIRONMENT_JSON", "{}");
-    f.stub("cargo", "exit 99");
+    let mut fixture = Fixture::new();
+    fixture.trusted();
+    fixture.set("TOKEN", "synthetic-token-not-a-secret");
+    fixture.set("ENVIRONMENT_JSON", "{}");
+    fixture.stub("cargo", "exit 99");
     refused(
-        &f.run("publish-crate", "publish"),
+        &fixture.run("publish-crate", "publish"),
         "release environment must require reviewers and custom tag policies",
     );
-    assert!(!f.calls().contains("cargo\n"));
-    f.set("DRY_RUN", "true");
-    succeeds(&f.run("publish-crate", "publish"));
-    assert!(!f.calls().contains("cargo\n"));
+    assert!(!fixture.calls().contains("cargo\n"));
+    fixture.set("DRY_RUN", "true");
+    succeeds(&fixture.run("publish-crate", "publish"));
+    assert!(!fixture.calls().contains("cargo\n"));
 }

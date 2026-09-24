@@ -7,13 +7,13 @@ use std::fs;
 #[test]
 fn successful_nextest_cannot_omit_or_empty_its_junit_report() {
     for mode in ["missing", "empty"] {
-        let mut f = Fixture::new();
-        f.set("REPORT_MODE", mode);
-        succeeds(&f.run_body(
+        let mut fixture = Fixture::new();
+        fixture.set("REPORT_MODE", mode);
+        succeeds(&fixture.run_body(
             "cd \"$PROJECT\"; cargo metadata --format-version 1 --offline \
              > \"$RUNNER_TEMP/source-metadata.json\"",
         ));
-        f.stub(
+        fixture.stub(
             "cargo",
             r#"case "$1" in
 metadata) cat "$RUNNER_TEMP/source-metadata.json" ;;
@@ -22,7 +22,7 @@ esac
 exit 0"#,
         );
         refused(
-            &f.run("ci", "quality"),
+            &fixture.run("ci", "quality"),
             "cargo-nextest produced no JUnit report",
         );
     }
@@ -30,17 +30,17 @@ exit 0"#,
 
 #[test]
 fn real_nextest_preserves_junit_for_passed_and_failed_tests() {
-    let mut f = Fixture::new();
+    let mut fixture = Fixture::new();
     fs::write(
-        f.root.join("project/src/lib.rs"),
+        fixture.root.join("project/src/lib.rs"),
         "//! Fixture.\n#[test]\nfn an_expected_variable_must_exist() {\n\
          \x20   assert!(std::env::var_os(\"EXPECTED_RUN\").is_some());\n}\n",
     )
     .unwrap();
-    succeeds(&f.run_body("cd \"$PROJECT\"; cargo generate-lockfile --offline"));
-    f.set("EXPECTED_RUN", "yes");
-    succeeds(&f.run("ci", "quality"));
-    let report = f.root.join("reports/tests.xml");
+    succeeds(&fixture.run_body("cd \"$PROJECT\"; cargo generate-lockfile --offline"));
+    fixture.set("EXPECTED_RUN", "yes");
+    succeeds(&fixture.run("ci", "quality"));
+    let report = fixture.root.join("reports/tests.xml");
     let passed = fs::read_to_string(&report).unwrap();
     assert!(
         passed.contains("<testsuites") && passed.contains("<testcase"),
@@ -48,8 +48,8 @@ fn real_nextest_preserves_junit_for_passed_and_failed_tests() {
     );
     assert!(!passed.contains("<failure"));
     fs::remove_file(&report).unwrap();
-    f.env.remove("EXPECTED_RUN");
-    assert!(!f.run("ci", "quality").status.success());
+    fixture.env.remove("EXPECTED_RUN");
+    assert!(!fixture.run("ci", "quality").status.success());
     let failed = fs::read_to_string(report).unwrap();
     assert!(failed.contains("<failure"), "{failed}");
 }
@@ -57,21 +57,21 @@ fn real_nextest_preserves_junit_for_passed_and_failed_tests() {
 #[test]
 fn a_real_clippy_failure_keeps_json_sarif_and_its_status() {
     for broken_converter in [false, true] {
-        let mut f = Fixture::new();
-        f.set("SARIF_REPORTS", "true");
+        let mut fixture = Fixture::new();
+        fixture.set("SARIF_REPORTS", "true");
         fs::write(
-            f.root.join("project/src/lib.rs"),
+            fixture.root.join("project/src/lib.rs"),
             "//! Fixture.\n/// A deliberate Clippy finding.\n\
              pub fn answer() -> bool {\n    1 == 1\n}\n",
         )
         .unwrap();
-        succeeds(&f.run_body("cd \"$PROJECT\"; cargo generate-lockfile --offline"));
+        succeeds(&fixture.run_body("cd \"$PROJECT\"; cargo generate-lockfile --offline"));
         if broken_converter {
-            f.stub("clippy-sarif", "exit 9");
+            fixture.stub("clippy-sarif", "exit 9");
         }
-        let result = f.run("ci", "quality");
+        let result = fixture.run("ci", "quality");
         assert_eq!(result.status.code(), Some(101));
-        let report = f.root.join("reports/clippy.json");
+        let report = fixture.root.join("reports/clippy.json");
         assert!(
             report.is_file(),
             "Clippy diagnostics must survive its failure"
@@ -88,12 +88,12 @@ fn a_real_clippy_failure_keeps_json_sarif_and_its_status() {
         );
         if !broken_converter {
             let sarif: Value = serde_json::from_str(
-                &fs::read_to_string(f.root.join("reports/clippy.sarif")).unwrap(),
+                &fs::read_to_string(fixture.root.join("reports/clippy.sarif")).unwrap(),
             )
             .unwrap();
             assert!(!sarif["runs"][0]["results"].as_array().unwrap().is_empty());
         }
-        let trace = f.trace();
+        let trace = fixture.trace();
         assert_eq!(
             trace
                 .lines()

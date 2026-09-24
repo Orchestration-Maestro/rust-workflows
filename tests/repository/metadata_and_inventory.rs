@@ -97,7 +97,7 @@ fn required_files_exist(root: &Path) {
 /// Commit hooks come from this repository, not from a remote index.
 fn hooks_are_local(root: &Path) {
     let hooks = root.join(".pre-commit-config.yaml");
-    let validation = crate::harness::tool("prek")
+    let validation = tool("prek")
         .arg("validate-config")
         .arg(&hooks)
         .output()
@@ -364,7 +364,7 @@ fn every_code_token_a_tree_comment_names_lives_in_its_file() {
             continue;
         }
         let tokens: Vec<&str> = comment
-            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .split(|character: char| !character.is_alphanumeric() && character != '_')
             .filter(|token| token.contains('_') && token.len() >= 4)
             .collect();
         if tokens.is_empty() {

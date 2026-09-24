@@ -131,7 +131,7 @@ const INACTIVE: &[(&str, &str, &str, &str, &str, &str)] = &[
 #[test]
 fn the_scorecard_distinguishes_disabled_inapplicable_failed_and_unrun_controls() {
     for &(control, setting, value, outcome, result, expected) in INACTIVE {
-        let mut f = Fixture::new();
+        let mut fixture = Fixture::new();
         for key in [
             "OUT_QUALITY",
             "OUT_COVERAGE",
@@ -145,7 +145,7 @@ fn the_scorecard_distinguishes_disabled_inapplicable_failed_and_unrun_controls()
             "OUT_STAGE",
             "OUT_API",
         ] {
-            f.set(key, "success");
+            fixture.set(key, "success");
         }
         for key in [
             "MUTATION_TEST",
@@ -156,14 +156,14 @@ fn the_scorecard_distinguishes_disabled_inapplicable_failed_and_unrun_controls()
             "API_COMPATIBILITY",
             "API_APPLIED",
         ] {
-            f.set(key, "true");
+            fixture.set(key, "true");
         }
-        f.set("UNSAFE_POLICY", "deny");
-        f.set(setting, value);
-        f.set(outcome, result);
-        succeeds(&f.run("ci", "scorecard"));
+        fixture.set("UNSAFE_POLICY", "deny");
+        fixture.set(setting, value);
+        fixture.set(outcome, result);
+        succeeds(&fixture.run("ci", "scorecard"));
         let card: Value = serde_json::from_str(
-            &fs::read_to_string(f.root.join("reports/scorecard.json")).unwrap(),
+            &fs::read_to_string(fixture.root.join("reports/scorecard.json")).unwrap(),
         )
         .unwrap();
         let row = card["controls"]
@@ -174,7 +174,7 @@ fn the_scorecard_distinguishes_disabled_inapplicable_failed_and_unrun_controls()
             .unwrap();
         assert_eq!(row["state"], expected, "{control}: {card}");
         assert_eq!(row["active"], false, "{control}: {card}");
-        let markdown = fs::read_to_string(f.root.join("reports/scorecard.md")).unwrap();
+        let markdown = fs::read_to_string(fixture.root.join("reports/scorecard.md")).unwrap();
         assert!(
             markdown
                 .lines()
@@ -185,11 +185,11 @@ fn the_scorecard_distinguishes_disabled_inapplicable_failed_and_unrun_controls()
 
 #[test]
 fn mutation_testing_records_no_application_when_the_workspace_has_no_mutants() {
-    let mut f = Fixture::new();
-    f.set("MUTATION_TEST", "true");
-    succeeds(&f.run_body("cd \"$PROJECT\"; cargo generate-lockfile --offline"));
-    succeeds(&f.run("ci", "mutants"));
-    let output = fs::read_to_string(f.root.join("output")).unwrap();
+    let mut fixture = Fixture::new();
+    fixture.set("MUTATION_TEST", "true");
+    succeeds(&fixture.run_body("cd \"$PROJECT\"; cargo generate-lockfile --offline"));
+    succeeds(&fixture.run("ci", "mutants"));
+    let output = fs::read_to_string(fixture.root.join("output")).unwrap();
     assert!(output.ends_with("applied=false\n"), "{output}");
 }
 

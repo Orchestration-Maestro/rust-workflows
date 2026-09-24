@@ -117,9 +117,9 @@ jobs:
       matrix:
         include:
           - example: library
-            package: bounded-arithmetic
+            package: maestro-bounded-arithmetic
           - example: workspace
-            package: workspace-arithmetic
+            package: maestro-workspace-arithmetic
     uses: ./.github/workflows/publish-crate.yml
     permissions:
       contents: read

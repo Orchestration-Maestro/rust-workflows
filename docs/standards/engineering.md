@@ -39,7 +39,8 @@ is its one door, in front of `tests/harness/repository.rs`,
 `tests/harness/fixture.rs`, each naming what it takes from a sibling and none
 naming a test module. A module names what it proves in two words at least and
 a test function in four, never behind a `test_` prefix or a `_works`, `_ok` or
-`_test` suffix; `tests/repository/naming_rules.rs` holds both rules.
+`_test` suffix: NAME-002, held by `rust-gate architecture` in `just check`
+(`badly_named_tests_and_one_word_test_modules_are_refused`).
 
 | ID | Rule | Enforced here by |
 | --- | --- | --- |
@@ -261,7 +262,6 @@ more documentation.
 | C-002 | Retain compliance evidence | Met for what runs: `just check` output, CI receipts and the per-run reports artifact. |
 | C-003 | Controlled, authorized, scoped, expiring exceptions | No exception has been taken. |
 | C-004 | Coordinate rollouts that change content, controls or contexts | Met by the pull request template's contract section. |
-
 
 The baseline was adopted as content, not as a tracked dependency: it has no
 published release to pin, so the requirements about consuming, versioning and

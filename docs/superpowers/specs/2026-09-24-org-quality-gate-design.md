@@ -172,7 +172,7 @@ The compiler pin itself is a generated file (section 7), so it cannot drift.
 | --- | --- | --- |
 | TST-001 | `std::thread::sleep`, `tokio::time::sleep` or `async_std::task::sleep` in test code: a test waits on a fake clock or a synchronisation primitive, never on time. **Exception**, for a test that genuinely exercises wall-clock behaviour | `rust-gate architecture`, test code only |
 | TST-002 | `#[ignore]` without a reason, `#[should_panic]` without `expected` | Clippy `ignore_without_reason`, `should_panic_without_expect` |
-| TST-003 | More than one integration-test crate root per package without `required-features`: one `main.rs` in the package's tests directory and its modules, one binary to link | Manifests and the tests directory |
+| TST-003 | More than one integration-test crate root per package without `required-features`: one crate in a subdirectory of the tests directory, `it/main.rs` with its modules beside it, one binary to link; Cargo builds every file directly in the tests directory as a crate of its own | Manifests and the tests directory |
 | TST-004 | A test that is retried: the generated nextest profile sets `retries = 0`, so a flaky test fails the run | Generated `.config/nextest.toml`, rendered from the same source as the profile the gate writes for its own run |
 
 Mutation testing stays as it is: every mutant of the changed lines must be

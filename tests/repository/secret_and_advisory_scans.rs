@@ -2,6 +2,7 @@
 //! source tree, and the `RustSec` advisories when the network is allowed.
 
 use crate::harness::{capture, command_line, root, temp_dir};
+use std::env;
 use std::fs;
 use std::path::Path;
 
@@ -39,7 +40,7 @@ fn advisories_are_clean_when_the_network_is_allowed() {
     // CHECK_NETWORK=1 fetches one advisory database snapshot and audits every
     // lockfile with it; yanked crates need the registry index, so cargo-deny's
     // advisories pass runs here too. Offline, the justfile says NOT RUN.
-    if std::env::var("CHECK_NETWORK").is_ok_and(|value| value == "1") {
+    if env::var("CHECK_NETWORK").is_ok_and(|value| value == "1") {
         let root = root();
         let temp = temp_dir("advisories");
         let db = temp.join("advisory-db");

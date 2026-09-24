@@ -2,11 +2,13 @@
 //! against stand-ins the way a hosted runner would run it.
 
 use super::gate_declarations::gate_bin;
-use super::repository::{root, toolbelt_path, write_executable};
+use super::repository::{root, tool, toolbelt_path, write_executable};
 use super::workflow_yaml::step;
 use std::collections::BTreeMap;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process;
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -18,9 +20,9 @@ pub(crate) struct Fixture {
 impl Fixture {
     pub(crate) fn new() -> Self {
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
-        let path = std::env::temp_dir().join(format!(
+        let path = env::temp_dir().join(format!(
             "rust-workflows-{}-{}",
-            std::process::id(),
+            process::id(),
             COUNTER.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir(&path).unwrap();
@@ -57,7 +59,7 @@ impl Fixture {
             ("GITHUB_BASE_REF", ""),
             ("LICENSE_ALLOWLIST", ""),
             ("ARTIFACT_KEY", "test"),
-            ("COVERAGE", "80"),
+            ("COVERAGE", "90"),
             ("LICENSE_POLICY", "auto"),
             ("MUTATION_TEST", "false"),
             ("API_COMPATIBILITY", "false"),
@@ -120,6 +122,9 @@ impl Fixture {
         let project = fixture.root.join("project");
         fs::remove_dir_all(&project).unwrap();
         copy_tree(&root().join("examples").join(name), &project);
+        // Every organization repository holds the organization's clippy.toml
+        // at its root, the thresholds and test allowances Clippy reads.
+        fs::copy(root().join("clippy.toml"), fixture.root.join("clippy.toml")).unwrap();
         for (key, value) in [
             ("CARGO_BUILD_TARGET", "x86_64-unknown-linux-gnu"),
             ("COVERAGE", "90"),
@@ -134,6 +139,48 @@ impl Fixture {
             &fixture.root.join("target").display().to_string(),
         );
         fixture
+    }
+
+    /// A fixture whose project is a Cargo package on the organization's
+    /// edition and not published, holding `files`: each a path under the
+    /// project and its source. What the source rules read, with only the rule
+    /// under test left to speak.
+    pub(crate) fn with_sources(files: &[(&str, &str)]) -> Self {
+        let fixture = Self::new();
+        let project = fixture.root.join("project");
+        fs::write(
+            project.join("Cargo.toml"),
+            concat!(
+                "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n",
+                "edition = \"2024\"\npublish = false\n",
+            ),
+        )
+        .unwrap();
+        // The organization's lints and thresholds, LNT-001, written the way a
+        // repository gets them: by the gate's own command and its clippy.toml.
+        let written = tool("rust-gate")
+            .args(["lints", "--write"])
+            .env(
+                "PATH",
+                format!("{}:{}", gate_bin().display(), toolbelt_path()),
+            )
+            .current_dir(&project)
+            .output()
+            .unwrap();
+        succeeds(&written);
+        fs::copy(root().join("clippy.toml"), fixture.root.join("clippy.toml")).unwrap();
+        for (path, source) in files {
+            let file = project.join(path);
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(file, source).unwrap();
+        }
+        fixture
+    }
+
+    /// Write the organization's lints into the project's manifest, as a
+    /// repository does after writing a manifest of its own.
+    pub(crate) fn write_lints(&self) {
+        succeeds(&self.run_body("cd project && rust-gate lints --write"));
     }
 
     pub(crate) fn set(&mut self, key: &str, value: &str) {
@@ -161,7 +208,7 @@ impl Fixture {
             "RUSTUP_HOME",
             "CARGO_HOME",
         ] {
-            if let Ok(value) = std::env::var(key) {
+            if let Ok(value) = env::var(key) {
                 command.env(key, value);
             }
         }

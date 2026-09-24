@@ -1,0 +1,56 @@
+name: Hygiene
+# Contract: The checks every repository holds to, for one without Rust: secrets, hygiene, managed files and the commit hooks over every file
+"on":
+  workflow_call:
+permissions:
+  contents: read
+concurrency:
+  group: hygiene-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+defaults:
+  run:
+    shell: bash
+jobs:
+  # The reusable workflow of a repository without Rust: the checks every
+  # repository holds to, whatever its language. The job's name is the check the
+  # hygiene-required ruleset requires, "hygiene / Required hygiene".
+  hygiene:
+    name: Required hygiene
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout consumer revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Build the gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@75807b0f9d6fc3f3389f43d3890342b23943b3cb  # rust-workflows: the commit that ships this gate
+      - name: Name the checkout and the reports directory
+        id: prepare
+        run: rust-gate hygiene prepare
+      - name: Install verified tools
+        id: install
+        run: rust-gate install-tools
+        env:
+          # Each asset pinned by checksum, the rows ci.yml installs.
+          TOOLS: |
+            jaq 01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu 5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454
+            gitleaks gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb gitleaks
+            prek j178/prek/releases/download/v0.5.3/prek-x86_64-unknown-linux-musl.tar.gz d4eae1f31c0817d0a9bfa532d4bb66df60a8b01f121def002021915e826c3d1f prek-x86_64-unknown-linux-musl/prek
+      - name: Redacted source secret scan
+        id: secrets
+        env:
+          SARIF_REPORTS: "false"
+        run: rust-gate secrets
+      - name: Repository hygiene HYG and the width of shell scripts
+        id: hygiene
+        run: rust-gate hygiene
+      - name: Managed files as the organization renders them
+        id: managed-files
+        run: rust-gate managed-files
+      - name: Commit hooks over every file
+        id: hooks
+        run: rust-gate hooks

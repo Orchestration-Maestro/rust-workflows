@@ -3,6 +3,8 @@
 
 use super::outcome::{Failure, Outcome};
 use super::step_declaration::{Kind, declared};
+use std::env;
+use std::env::consts;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
@@ -11,13 +13,13 @@ use std::path::PathBuf;
 /// An input, exactly as the workflow passed it through `env:`.
 pub(crate) fn input(name: &str) -> Result<String, String> {
     declared(Kind::Input, name)?;
-    std::env::var(name).map_err(|_| format!("{name} is not set"))
+    env::var(name).map_err(|_| format!("{name} is not set"))
 }
 
 /// An input a workflow may leave unset, read as empty then.
 pub(crate) fn optional(name: &str) -> Result<String, String> {
     declared(Kind::Input, name)?;
-    Ok(std::env::var(name).unwrap_or_default())
+    Ok(env::var(name).unwrap_or_default())
 }
 
 /// An input that names a path.
@@ -67,7 +69,7 @@ pub(crate) fn output(name: &str, value: &str) -> Outcome {
 
 /// Only native Linux x64 is supported: the runner this gate is built for.
 pub(crate) fn native_linux() -> Outcome {
-    native(std::env::consts::OS, std::env::consts::ARCH)
+    native(consts::OS, consts::ARCH)
 }
 
 /// Whether `os` and `arch` name the one platform the gate runs on.

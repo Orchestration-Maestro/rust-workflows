@@ -2,10 +2,12 @@
 //! commands run to completion, private temporary directories, the stand-in
 //! executables tests run, and every Rust file of these tests.
 
+use std::env;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process;
 use std::process::{Command, Stdio};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -23,7 +25,7 @@ pub(crate) fn root() -> PathBuf {
 /// editor's test runner, still finds the pinned binaries instead of failing on
 /// a missing `jaq`.
 pub(crate) fn toolbelt_path() -> String {
-    let inherited = std::env::var("PATH").unwrap_or_default();
+    let inherited = env::var("PATH").unwrap_or_default();
     let bin = root().join(".tools/bin");
     if bin.is_dir() {
         format!("{}:{inherited}", bin.display())
@@ -65,9 +67,9 @@ pub(crate) fn capture(command: &mut Command) -> String {
 /// A private temporary directory for one test.
 pub(crate) fn temp_dir(purpose: &str) -> PathBuf {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
-    let path = std::env::temp_dir().join(format!(
+    let path = env::temp_dir().join(format!(
         "rust-workflows-{purpose}-{}-{}",
-        std::process::id(),
+        process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
     ));
     fs::create_dir(&path).unwrap();
@@ -103,8 +105,13 @@ pub(crate) fn write_executable(path: &Path, contents: &str) {
 /// Every Rust file of the contract tests, the harness included, so a scan of
 /// what the tests define sees all of it.
 pub(crate) fn test_sources() -> Vec<PathBuf> {
+    rust_files(&root().join("tests"))
+}
+
+/// Every Rust file under `directory`, build output left out, sorted.
+pub(crate) fn rust_files(directory: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
-    let mut queue = vec![root().join("tests")];
+    let mut queue = vec![directory.to_path_buf()];
     while let Some(directory) = queue.pop() {
         for entry in fs::read_dir(&directory).unwrap() {
             let path = entry.unwrap().path();

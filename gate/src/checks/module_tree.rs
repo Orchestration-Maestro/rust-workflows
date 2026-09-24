@@ -3,9 +3,11 @@
 //! declarations reach from its root, with the items, paths and re-exports of
 //! each.
 
+use super::manifests::LIBRARY_KINDS;
 use super::rust_code::{Item, blanked, items, without_tests};
 use super::rust_paths::{NamedPath, paths, use_leaves};
 use crate::runner::{Cmd, Failure};
+use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Cargo's targets, one line each: their kinds and their root file.
@@ -25,6 +27,8 @@ pub(crate) struct Module {
     pub(crate) path: Vec<String>,
     /// The file holding it.
     pub(crate) file: PathBuf,
+    /// The file as written.
+    pub(crate) source: String,
     /// Its code with comments and literals blanked, test items included.
     pub(crate) code: String,
     /// Its top-level items.
@@ -66,6 +70,7 @@ impl Module {
         Self {
             path,
             file,
+            source: source.to_owned(),
             code,
             items,
             paths,
@@ -87,6 +92,13 @@ impl Module {
 }
 
 impl Tree {
+    /// Whether the target is a library: its root is a crate's public door.
+    pub(crate) fn is_library(&self) -> bool {
+        self.kinds
+            .iter()
+            .any(|kind| LIBRARY_KINDS.contains(&kind.as_str()))
+    }
+
     /// The index of the module at `path`.
     pub(crate) fn find(&self, path: &[String]) -> Option<usize> {
         self.modules.iter().position(|module| module.path == path)
@@ -126,13 +138,9 @@ impl Tree {
     }
 }
 
-/// Every target of the Cargo project at `project` and its module tree.
-pub(crate) fn module_trees(project: &Path, temp: &Path) -> Result<Vec<Tree>, Failure> {
-    let metadata = temp.join("module-trees.json");
-    Cmd::new("cargo metadata --no-deps --format-version 1 --offline --manifest-path")
-        .arg(project.join("Cargo.toml"))
-        .stdout_to(&metadata)?;
-    let listing = Cmd::new("jaq -r").arg(TARGETS).arg(&metadata).capture()?;
+/// Every target the Cargo metadata at `metadata` lists, and its module tree.
+pub(crate) fn module_trees(metadata: &Path) -> Result<Vec<Tree>, Failure> {
+    let listing = Cmd::new("jaq -r").arg(TARGETS).arg(metadata).capture()?;
     listing.lines().map(target_tree).collect()
 }
 
@@ -153,8 +161,8 @@ fn walk(root: &Path) -> Result<Vec<Module>, Failure> {
     let mut modules = Vec::new();
     let mut pending = vec![(Vec::new(), root.to_path_buf())];
     while let Some((path, file)) = pending.pop() {
-        let source = std::fs::read_to_string(&file)
-            .map_err(|error| format!("{}: {error}", file.display()))?;
+        let source =
+            fs::read_to_string(&file).map_err(|error| format!("{}: {error}", file.display()))?;
         let module = Module::read(path, file, &source);
         let directory = children_directory(&module);
         for child in module.children() {
@@ -221,7 +229,10 @@ pub(crate) fn sample(kinds: &[&str], files: &[(&str, &str)]) -> Tree {
 #[cfg(test)]
 mod tests {
     use super::{Module, sample, target_tree, walk};
+    use std::env;
+    use std::fs;
     use std::path::PathBuf;
+    use std::process;
 
     /// Owned segments.
     fn owned(path: &[&str]) -> Vec<String> {
@@ -281,10 +292,10 @@ mod tests {
 
     #[test]
     fn a_walk_follows_declarations_into_both_file_layouts() {
-        let root = std::env::temp_dir().join(format!("module-tree-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
+        let root = env::temp_dir().join(format!("module-tree-{}", process::id()));
+        fs::remove_dir_all(&root).ok();
         for directory in ["a", "b"] {
-            std::fs::create_dir_all(root.join(directory)).unwrap();
+            fs::create_dir_all(root.join(directory)).unwrap();
         }
         for (file, source) in [
             (
@@ -296,7 +307,7 @@ mod tests {
             ("b/mod.rs", ""),
             ("tests.rs", ""),
         ] {
-            std::fs::write(root.join(file), source).unwrap();
+            fs::write(root.join(file), source).unwrap();
         }
         let modules = walk(&root.join("lib.rs")).unwrap();
         let paths: Vec<String> = modules
@@ -304,7 +315,7 @@ mod tests {
             .map(|module| module.path.join("::"))
             .collect();
         assert_eq!(paths, ["", "a", "a::c", "b"]);
-        std::fs::remove_dir_all(&root).unwrap();
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

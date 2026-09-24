@@ -2,9 +2,10 @@
 //! diagram's control count, is what `just docs` writes from its source, so a
 //! reader never has to keep one in step with the other by hand.
 
-use crate::harness::{root, succeeds, temp_dir, tool, write_executable};
+use crate::harness::{query, root, succeeds, temp_dir, tool, workflow, write_executable};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::process::Output;
 
 /// Every file `just docs` rewrites, besides the steps document.
@@ -130,12 +131,12 @@ fn a_commit_or_a_pull_request_regenerates_the_documents() {
     // Nobody keeps a table in step by hand: the commit hook runs just docs,
     // and on a pull request from this repository the bot commits whatever it
     // rewrote, through the recipe that makes GitHub sign the commit.
-    let hooks = crate::harness::query(
+    let hooks = query(
         &root().join(".pre-commit-config.yaml"),
         r#".repos[].hooks[] | select(.id == "generated-documents") | .entry"#,
     );
     assert_eq!(hooks.trim(), "just docs");
-    let sync = crate::harness::workflow("docs-sync");
+    let sync = workflow("docs-sync");
     assert!(sync["on"].get("pull_request").is_some());
     let job = &sync["jobs"]["sync"];
     assert!(
@@ -180,7 +181,7 @@ fn the_bot_commits_exactly_the_changed_files_through_the_api() {
     let dir = temp_dir("commit-as-bot");
     fs::copy(root().join("justfile"), dir.join("justfile")).unwrap();
     let git = |args: &[&str]| {
-        let output = std::process::Command::new("git")
+        let output = Command::new("git")
             .args([
                 "-c",
                 "user.name=t",

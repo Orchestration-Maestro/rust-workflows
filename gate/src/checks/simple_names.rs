@@ -7,10 +7,10 @@ pub(crate) fn simple(value: &str, first: &str, rest: &str) -> bool {
     value
         .chars()
         .next()
-        .is_some_and(|c| c.is_ascii_alphanumeric() || first.contains(c))
+        .is_some_and(|character| character.is_ascii_alphanumeric() || first.contains(character))
         && value
             .chars()
-            .all(|c| c.is_ascii_alphanumeric() || rest.contains(c))
+            .all(|character| character.is_ascii_alphanumeric() || rest.contains(character))
 }
 
 /// A lowercase hexadecimal string of exactly `length` digits: a commit SHA at
@@ -19,7 +19,7 @@ pub(crate) fn is_hex(value: &str, length: usize) -> bool {
     value.len() == length
         && value
             .bytes()
-            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 #[cfg(test)]

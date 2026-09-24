@@ -6,6 +6,7 @@ use crate::checks::checkout_paths::{committed_file, project_directory, rust_sour
 use crate::checks::rust_versions::is_nightly;
 use crate::checks::simple_names::simple;
 use crate::runner::{Cmd, Job, Outcome, Step, export, flag, input, native_linux, tee_line};
+use std::fs;
 
 /// What each step declares: its inputs, its tools and its reports.
 pub(crate) const STEPS: &[Step] = &[
@@ -79,7 +80,7 @@ fn toolchain() -> Outcome {
     let job = Job::current()?;
     native_linux()?;
     let reports = &job.reports;
-    std::fs::create_dir_all(reports)
+    fs::create_dir_all(reports)
         .map_err(|error| format!("cannot create {}: {error}", reports.display()))?;
     let toolchain = input("RUSTUP_TOOLCHAIN")?;
     // Miri is not published for every nightly, so a missing component here
@@ -128,10 +129,10 @@ fn reach() -> Outcome {
     let project = &job.project;
     let mut blocks = 0;
     for file in rust_sources(project)? {
-        let source = std::fs::read_to_string(&file).unwrap_or_default();
+        let source = fs::read_to_string(&file).unwrap_or_default();
         blocks += whole_word_occurrences(&source, "unsafe");
     }
-    let executed = std::fs::read_to_string(job.earlier("miri.txt")).map_or(0, |log| {
+    let executed = fs::read_to_string(job.earlier("miri.txt")).map_or(0, |log| {
         log.lines()
             .filter(|line| {
                 line.strip_prefix("test ")
@@ -157,17 +158,17 @@ fn reach() -> Outcome {
 /// Occurrences of `word` in `text` as a whole word: `unsafely` is not
 /// `unsafe`.
 fn whole_word_occurrences(text: &str, word: &str) -> usize {
-    let is_word = |c: char| c.is_alphanumeric() || c == '_';
+    let is_word = |character: char| character.is_alphanumeric() || character == '_';
     text.match_indices(word)
         .filter(|(index, _)| {
             let before = text[..*index]
                 .chars()
                 .next_back()
-                .is_none_or(|c| !is_word(c));
+                .is_none_or(|character| !is_word(character));
             let after = text[index + word.len()..]
                 .chars()
                 .next()
-                .is_none_or(|c| !is_word(c));
+                .is_none_or(|character| !is_word(character));
             before && after
         })
         .count()

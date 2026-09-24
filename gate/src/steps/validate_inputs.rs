@@ -8,6 +8,7 @@ use crate::checks::inputs::{
 };
 use crate::checks::rust_versions::{channel_value, is_exact_stable, parse};
 use crate::runner::{Cmd, Failure, Outcome, Step, export, flag, input, optional, output};
+use std::fs;
 use std::path::Path;
 
 /// What this step declares: its inputs, its tools and its reports.
@@ -93,7 +94,7 @@ fn run() -> Outcome {
 fn selected_toolchain(project: &Path) -> Result<String, Failure> {
     // One quoted key is all this reads, and the pin check below refuses
     // anything the read got wrong, so no TOML parser is involved.
-    let toolchain_file = std::fs::read_to_string(project.join("rust-toolchain.toml"))
+    let toolchain_file = fs::read_to_string(project.join("rust-toolchain.toml"))
         .map_err(|error| format!("rust-toolchain.toml: {error}"))?;
     let pinned = toolchain_file
         .lines()

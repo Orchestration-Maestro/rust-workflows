@@ -5,16 +5,16 @@ use crate::harness::{Fixture, refused, succeeds, workflow};
 use serde_json::json;
 use std::fs;
 
-fn outputs(f: &Fixture) -> String {
-    fs::read_to_string(f.root.join("output")).unwrap_or_default()
+fn outputs(fixture: &Fixture) -> String {
+    fs::read_to_string(fixture.root.join("output")).unwrap_or_default()
 }
 
 #[test]
 fn named_platforms_become_a_matrix_of_pinned_runners() {
-    let mut f = Fixture::new();
-    f.set("PLATFORMS", "macos windows linux-arm");
-    succeeds(&f.run("ci", "validate"));
-    let written = outputs(&f);
+    let mut fixture = Fixture::new();
+    fixture.set("PLATFORMS", "macos windows linux-arm");
+    succeeds(&fixture.run("ci", "validate"));
+    let written = outputs(&fixture);
     assert!(
         written
             .lines()
@@ -46,22 +46,22 @@ fn named_platforms_become_a_matrix_of_pinned_runners() {
 
 #[test]
 fn requested_platforms_must_pass_for_the_required_status() {
-    let mut f = Fixture::new();
-    f.set("RESULT", "success");
-    f.set("RUNNERS", r#"["macos-15"]"#);
+    let mut fixture = Fixture::new();
+    fixture.set("RESULT", "success");
+    fixture.set("RUNNERS", r#"["macos-15"]"#);
     for status in ["failure", "cancelled", "skipped", ""] {
-        f.set("PORTABILITY", status);
+        fixture.set("PORTABILITY", status);
         refused(
-            &f.run("ci", "required"),
+            &fixture.run("ci", "required"),
             "Portability checks failed or were skipped",
         );
     }
-    f.set("PORTABILITY", "success");
-    succeeds(&f.run("ci", "required"));
+    fixture.set("PORTABILITY", "success");
+    succeeds(&fixture.run("ci", "required"));
     // No platform named: the skipped job is what was asked for.
-    f.set("RUNNERS", "");
-    f.set("PORTABILITY", "skipped");
-    succeeds(&f.run("ci", "required"));
+    fixture.set("RUNNERS", "");
+    fixture.set("PORTABILITY", "skipped");
+    succeeds(&fixture.run("ci", "required"));
 }
 
 #[test]

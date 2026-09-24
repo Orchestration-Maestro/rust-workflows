@@ -11,8 +11,9 @@ mod workflow_yaml;
 pub(crate) use fixture::{Fixture, checksums, refused, succeeds};
 pub(crate) use gate_declarations::{Described, describe_text, described, described_step};
 pub(crate) use repository::{
-    capture, command_line, root, temp_dir, test_sources, tool, toolbelt_path, write_executable,
+    capture, command_line, root, rust_files, temp_dir, test_sources, tool, toolbelt_path,
+    write_executable,
 };
 pub(crate) use workflow_yaml::{
-    GATE_STEPS, action, helper_action, query, step, tool_rows, workflow,
+    GATE_STEPS, action, helper_action, query, step, tool_rows, workflow, workflow_steps,
 };

@@ -1,8 +1,10 @@
 //! The evidence receipt: produced only when every upstream result succeeded.
 
 use crate::harness::{query, root, toolbelt_path};
+use std::env;
 use std::fs;
 use std::path::Path;
+use std::process;
 use std::process::Command;
 
 /// Every combination of upstream results the evidence step can be handed.
@@ -73,7 +75,7 @@ fn evidence_step_contract(path: &Path, workflow: &str, job: &str) -> String {
 /// One run of the evidence body: a receipt exists exactly when every result
 /// succeeded, and it names the revision, the run and the scope.
 fn evidence_outcome(script: &str, case: &str, results: &str) {
-    let temp = std::env::temp_dir().join(format!("ci-evidence-{}-{case}", std::process::id()));
+    let temp = env::temp_dir().join(format!("ci-evidence-{}-{case}", process::id()));
     fs::create_dir(&temp).unwrap();
     let summary = temp.join("summary.md");
     let mut command = Command::new("bash");

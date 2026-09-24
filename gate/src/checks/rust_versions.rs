@@ -5,7 +5,7 @@
 pub(crate) fn parse(value: &str, patch_optional: bool) -> Option<(u64, u64, u64)> {
     let parts: Vec<&str> = value.split('.').collect();
     let number = |part: &str| -> Option<u64> {
-        (!part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
+        (!part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
             .then(|| part.parse().ok())
             .flatten()
     };
@@ -28,15 +28,13 @@ pub(crate) fn is_nightly(value: &str) -> bool {
         Some(date) => {
             let digits: Vec<&str> = date
                 .strip_prefix('-')
-                .map(|d| d.split('-').collect())
+                .map(|rest| rest.split('-').collect())
                 .unwrap_or_default();
-            digits.len() == 3
-                && digits[0].len() == 4
-                && digits[1].len() == 2
-                && digits[2].len() == 2
+            matches!(digits.as_slice(), [year, month, day]
+                if year.len() == 4 && month.len() == 2 && day.len() == 2)
                 && digits
                     .iter()
-                    .all(|part| part.bytes().all(|b| b.is_ascii_digit()))
+                    .all(|part| part.bytes().all(|byte| byte.is_ascii_digit()))
         }
         None => false,
     }
@@ -46,8 +44,14 @@ pub(crate) fn is_nightly(value: &str) -> bool {
 pub(crate) fn channel_value(line: &str) -> Option<String> {
     let rest = line.trim_start().strip_prefix("channel")?.trim_start();
     let rest = rest.strip_prefix('=')?.trim_start();
-    let quote = rest.chars().next().filter(|c| *c == '"' || *c == '\'')?;
-    let value: String = rest[1..].chars().take_while(|c| *c != quote).collect();
+    let quote = rest
+        .chars()
+        .next()
+        .filter(|character| *character == '"' || *character == '\'')?;
+    let value: String = rest[1..]
+        .chars()
+        .take_while(|character| *character != quote)
+        .collect();
     rest[1..].contains(quote).then_some(value)
 }
 

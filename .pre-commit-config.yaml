@@ -8,8 +8,16 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: end-of-file-fixer
+      - id: check-json
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
+      - id: mixed-line-ending
+        args: [--fix=no]
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
   - repo: local
     hooks:
       - id: rustfmt
@@ -23,13 +31,13 @@ repos:
         entry: just --unstable --fmt --check
         files: '(^|/)justfile$'
         pass_filenames: false
-      - id: yaml-format
+      - id: yamlfmt
         name: YAML formatting
         language: system
         entry: yamlfmt -no_global_conf -lint
         types: [yaml]
         pass_filenames: false
-      - id: toml-format
+      - id: taplo
         name: TOML formatting
         language: system
         entry: taplo fmt --check --diff
@@ -38,6 +46,35 @@ repos:
         name: Spelling in code and prose
         language: system
         entry: typos --force-exclude
+      - id: gitleaks
+        name: Secrets in the staged change
+        language: system
+        entry: gitleaks git --pre-commit --staged --redact --no-banner
+        pass_filenames: false
+      - id: shellcheck
+        name: Shell lint
+        language: system
+        entry: shellcheck
+        types: [shell]
+      - id: shfmt
+        name: Shell formatting
+        language: system
+        entry: shfmt -d
+        types: [shell]
+      - id: rumdl
+        name: Markdown structure
+        language: system
+        entry: rumdl check --no-cache
+        types: [markdown]
+      - id: lychee
+        name: Markdown links, offline
+        language: system
+        entry: lychee --offline --no-progress
+        types: [markdown]
+      - id: editorconfig-checker
+        name: Every file against .editorconfig
+        language: system
+        entry: editorconfig-checker -disable-indent-size
       - id: actionlint
         name: GitHub workflow lint
         language: system

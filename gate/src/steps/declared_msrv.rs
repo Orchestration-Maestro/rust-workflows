@@ -7,6 +7,8 @@
 
 use crate::checks::rust_versions::parse;
 use crate::runner::{Cmd, Job, Outcome, Step, input};
+use std::fs;
+use std::path::Path;
 
 /// What this step declares: its inputs, its tools and its reports.
 pub(crate) const STEPS: &[Step] = &[Step {
@@ -52,7 +54,7 @@ fn run() -> Outcome {
         }
     }
     let report = job.report("msrv.tsv")?;
-    std::fs::write(&report, &table)
+    fs::write(&report, &table)
         .map_err(|error| format!("cannot write {}: {error}", report.display()))?;
     compiles_at_its_floor(&table, &job.project)
 }
@@ -63,7 +65,7 @@ fn run() -> Outcome {
 /// Cargo's own reason rather than the consumer's code. A member declaring less
 /// is carried by the floor and is not checked on its own, which the run says
 /// rather than leaves to be assumed.
-fn compiles_at_its_floor(table: &str, project: &std::path::Path) -> Outcome {
+fn compiles_at_its_floor(table: &str, project: &Path) -> Outcome {
     let declared: Vec<_> = table
         .lines()
         .filter_map(|line| line.split_once('\t'))

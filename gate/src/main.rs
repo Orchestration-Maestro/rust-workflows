@@ -7,12 +7,15 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::missing_docs_in_private_items)]
 
+use std::env;
+use std::process;
+
 mod checks;
 mod runner;
 mod steps;
 
 fn main() {
-    let mut arguments = std::env::args().skip(1);
+    let mut arguments = env::args().skip(1);
     let command = arguments.next().unwrap_or_default();
     if command == "describe" {
         print!("{}", steps::describe());
@@ -23,6 +26,6 @@ fn main() {
         if let Some(message) = failure.message {
             eprintln!("{message}");
         }
-        std::process::exit(failure.code);
+        process::exit(failure.code);
     }
 }

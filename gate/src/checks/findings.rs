@@ -4,7 +4,8 @@
 //! one reported as a finding itself.
 
 use super::quality_config::Exception;
-use std::fmt;
+use crate::runner::{Failure, Outcome, summary, write};
+use std::fmt::{self, Write as _};
 use std::path::Path;
 
 /// One rule broken at one place.
@@ -54,6 +55,47 @@ impl fmt::Display for Finding {
             )
         }
     }
+}
+
+/// Write every finding, every excused one with its reason, then every report
+/// line, to `report` and to the summary under `title`, and fail when a
+/// finding is left.
+pub(crate) fn publish_findings(
+    report: &Path,
+    title: &str,
+    kept: &[Finding],
+    excused: &[(Finding, &str)],
+    notes: &[String],
+) -> Outcome {
+    let mut text = String::new();
+    for finding in kept {
+        let _ = writeln!(text, "{finding}");
+    }
+    for (finding, reason) in excused {
+        let _ = writeln!(text, "EXCUSED {finding} (because {reason})");
+    }
+    for note in notes {
+        let _ = writeln!(text, "{note}");
+    }
+    write(report, text.as_bytes(), false)?;
+    if kept.is_empty() {
+        println!("{title}: no finding, {} excused", excused.len());
+        for note in notes {
+            println!("{note}");
+        }
+        return summary(&format!(
+            "### {title}\n\nNo finding; {} excused.\n",
+            excused.len()
+        ));
+    }
+    eprint!("{text}");
+    summary(&format!("### {title}\n\n```text\n{text}```\n"))?;
+    let plural = if kept.len() == 1 { "" } else { "s" };
+    Err(Failure::from(format!(
+        "{}: {} finding{plural}; each names its rule, its file and what to do",
+        title.to_lowercase(),
+        kept.len()
+    )))
 }
 
 /// `file` relative to `workspace`, the way a finding names it.

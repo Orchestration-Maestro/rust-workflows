@@ -78,7 +78,7 @@ fn markdown_files(root: &Path) -> Vec<PathBuf> {
             }
             if path.is_dir() {
                 queue.push(path);
-            } else if path.extension().is_some_and(|e| e == "md") {
+            } else if path.extension().is_some_and(|extension| extension == "md") {
                 files.push(path);
             }
         }
@@ -142,7 +142,7 @@ fn every_input_output_and_secret_is_documented() {
         .iter()
         .map(|doc| fs::read_to_string(root.join(doc)).unwrap())
         .collect();
-    let mut files: Vec<std::path::PathBuf> = fs::read_dir(root.join(".github/workflows"))
+    let mut files: Vec<PathBuf> = fs::read_dir(root.join(".github/workflows"))
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .collect();
@@ -235,10 +235,10 @@ fn every_test_the_standards_cite_exists() {
             let looks_like_a_test = index % 2 == 1
                 && span.len() >= 12
                 && span.contains('_')
-                && span.starts_with(|c: char| c.is_ascii_lowercase())
-                && span
-                    .chars()
-                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+                && span.starts_with(|character: char| character.is_ascii_lowercase())
+                && span.chars().all(|character| {
+                    character.is_ascii_lowercase() || character.is_ascii_digit() || character == '_'
+                });
             if !looks_like_a_test || vocabulary.contains(span) {
                 continue;
             }

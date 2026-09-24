@@ -12,17 +12,17 @@ const VERIFY: &str = "rust-gate verify-payload";
 
 #[test]
 fn artifact_integrity_revision_target_and_binary_selection_are_checked() {
-    let mut f = Fixture::new();
-    let release = f.root.join("rust-release");
+    let mut fixture = Fixture::new();
+    let release = fixture.root.join("rust-release");
     fs::create_dir(&release).unwrap();
     fs::write(release.join("payload.tar.gz"), "not an executable").unwrap();
-    f.set("REVISION", &"a".repeat(40));
-    f.set("REQUIRE_BINARIES", "true");
+    fixture.set("REVISION", &"a".repeat(40));
+    fixture.set("REQUIRE_BINARIES", "true");
     let original = json!({"revision": "a".repeat(40), "target": "x86_64-unknown-linux-gnu",
                           "binaries": ["fixture"]});
     fs::write(release.join("provenance.json"), original.to_string()).unwrap();
     checksums(&release);
-    succeeds(&f.run_body(VERIFY));
+    succeeds(&fixture.run_body(VERIFY));
     for (key, value) in [
         ("revision", json!("b".repeat(40))),
         ("target", json!("wrong")),
@@ -33,23 +33,23 @@ fn artifact_integrity_revision_target_and_binary_selection_are_checked() {
         fs::write(release.join("provenance.json"), provenance.to_string()).unwrap();
         checksums(&release);
         refused(
-            &f.run_body(VERIFY),
+            &fixture.run_body(VERIFY),
             "Unexpected release revision, target or binary selection",
         );
     }
     fs::write(release.join("provenance.json"), original.to_string()).unwrap();
     checksums(&release);
-    succeeds(&f.run_body(VERIFY));
+    succeeds(&fixture.run_body(VERIFY));
 }
 
 #[test]
 fn a_checksum_manifest_names_each_release_file_once_and_is_never_a_link() {
-    let mut f = Fixture::new();
-    let release = f.root.join("rust-release");
+    let mut fixture = Fixture::new();
+    let release = fixture.root.join("rust-release");
     fs::create_dir(&release).unwrap();
     fs::write(release.join("payload.tar.gz"), "payload").unwrap();
     fs::write(release.join("provenance.json"), "{}").unwrap();
-    f.set("REVISION", &"a".repeat(40));
+    fixture.set("REVISION", &"a".repeat(40));
     let digest = "a".repeat(64);
     let selector = "Invalid release checksum selector";
     for (manifest, message) in [
@@ -65,22 +65,28 @@ fn a_checksum_manifest_names_each_release_file_once_and_is_never_a_link() {
         ),
     ] {
         fs::write(release.join("SHA256SUMS"), manifest).unwrap();
-        refused(&f.run_body(VERIFY), message);
+        refused(&fixture.run_body(VERIFY), message);
     }
     fs::remove_file(release.join("SHA256SUMS")).unwrap();
-    refused(&f.run_body(VERIFY), "Missing required release checksums");
+    refused(
+        &fixture.run_body(VERIFY),
+        "Missing required release checksums",
+    );
     symlink("/etc/hostname", release.join("SHA256SUMS")).unwrap();
-    refused(&f.run_body(VERIFY), "Checksum file must not be a symlink");
+    refused(
+        &fixture.run_body(VERIFY),
+        "Checksum file must not be a symlink",
+    );
     fs::remove_file(release.join("SHA256SUMS")).unwrap();
     checksums(&release);
-    f.set("REVISION", "main");
+    fixture.set("REVISION", "main");
     refused(
-        &f.run_body(VERIFY),
+        &fixture.run_body(VERIFY),
         "revision must be an immutable commit SHA",
     );
-    f.set("REVISION", &"b".repeat(40));
+    fixture.set("REVISION", &"b".repeat(40));
     refused(
-        &f.run_body(VERIFY),
+        &fixture.run_body(VERIFY),
         "Release revision does not match source",
     );
 }

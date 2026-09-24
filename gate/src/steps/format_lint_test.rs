@@ -12,7 +12,9 @@
 
 use crate::checks::checkout_paths::canonical;
 use crate::checks::inputs::{UnsafePolicy, clippy_level, unsafe_policy};
+use crate::checks::nextest_profile::nextest_profile;
 use crate::runner::{Cmd, Job, Outcome, Step, flag, non_empty, path};
+use std::fs;
 use std::path::Path;
 
 /// What this step declares: its inputs, its tools and its reports.
@@ -57,11 +59,11 @@ const MEMBER_PATHS: &str =
 fn run_the_tests(job: &Job) -> Outcome {
     let report = job.report("tests.xml")?;
     let profile = job.temp.join("nextest.toml");
-    let body = format!(
-        "[profile.gate]\njunit = {{ path = '{}' }}\n",
-        report.display()
+    let body = nextest_profile(
+        "gate",
+        &format!("junit = {{ path = '{}' }}\n", report.display()),
     );
-    std::fs::write(&profile, body)
+    fs::write(&profile, body)
         .map_err(|error| format!("cannot write {}: {error}", profile.display()))?;
     Cmd::new("cargo nextest run --workspace --locked --profile gate --config-file")
         .arg(&profile)
@@ -85,7 +87,8 @@ fn run() -> Outcome {
         .arg(&metadata)
         .capture()?;
     for line in members.lines() {
-        let inside = canonical(Path::new(line)).is_ok_and(|p| p.starts_with(&root) && p != root);
+        let inside = canonical(Path::new(line))
+            .is_ok_and(|resolved| resolved.starts_with(&root) && resolved != root);
         if !inside {
             return Err("Workspace manifests and sources must remain inside checkout".into());
         }

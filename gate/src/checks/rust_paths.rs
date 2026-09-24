@@ -140,8 +140,8 @@ fn split_top_level(group: &str) -> Vec<&str> {
     let mut parts = Vec::new();
     let mut depth = 0usize;
     let mut start = 0;
-    for (index, c) in group.char_indices() {
-        match c {
+    for (index, character) in group.char_indices() {
+        match character {
             '{' => depth += 1,
             '}' => depth = depth.saturating_sub(1),
             ',' if depth == 0 => {

@@ -2,9 +2,10 @@
 //! tool, each workflow installs exactly what it locked, and `just update-tools`
 //! moves a pin everywhere at once.
 
-use crate::harness::{root, succeeds, tool, workflow, write_executable};
+use crate::harness::{root, succeeds, temp_dir, tool, workflow, write_executable};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 
 /// Every `rust-gate install-tools` row across the workflows: name, asset,
 /// digest, and the archive member when there is one.
@@ -93,7 +94,7 @@ fn next_major(version: &str) -> String {
 /// network: mise names the latest releases, curl returns fixed bytes and gh
 /// names the latest Codecov CLI.
 fn sandbox(latest_mutants: &str, codecov: &str) -> PathBuf {
-    let dir = crate::harness::temp_dir("tool-updates");
+    let dir = temp_dir("tool-updates");
     for file in ["justfile", "mise.toml", "mise.lock"] {
         fs::copy(root().join(file), dir.join(file)).unwrap();
     }
@@ -186,8 +187,8 @@ fn update_tools_moves_a_pin_everywhere_it_is_installed() {
     let digest = tool("sha256sum")
         .current_dir(&dir)
         .arg("/dev/stdin")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
         .spawn()
         .and_then(|mut child| {
             use std::io::Write;

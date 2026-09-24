@@ -7,8 +7,8 @@
 /// # Examples
 ///
 /// ```
-/// assert_eq!(workspace_arithmetic::checked_sum(20, 22), Some(42));
-/// assert_eq!(workspace_arithmetic::checked_sum(u32::MAX, 1), None);
+/// assert_eq!(maestro_workspace_arithmetic::checked_sum(20, 22), Some(42));
+/// assert_eq!(maestro_workspace_arithmetic::checked_sum(u32::MAX, 1), None);
 /// ```
 #[must_use]
 pub const fn checked_sum(left: u32, right: u32) -> Option<u32> {
@@ -20,7 +20,7 @@ mod tests {
     use super::checked_sum;
 
     #[test]
-    fn normal_and_overflow() {
+    fn checked_sum_adds_and_refuses_overflow() {
         assert_eq!(checked_sum(20, 22), Some(42));
         assert_eq!(checked_sum(u32::MAX, 1), None);
         assert_eq!(checked_sum(0, 0), Some(0));

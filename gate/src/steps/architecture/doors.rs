@@ -3,19 +3,14 @@
 //! name, walking past it to the module defining the name is refused.
 
 use crate::checks::findings::{Finding, relative};
-use crate::checks::module_tree::Tree;
+use crate::checks::module_tree::{Module, Tree};
 use crate::checks::rust_code::Item;
+use std::iter;
 use std::path::Path;
-
-/// The kinds of target whose root is the crate's public door.
-const LIBRARY_KINDS: &[&str] = &["lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro"];
 
 /// ARC-002: every item of a door that does more than declare.
 pub(super) fn contents(tree: &Tree, workspace: &Path) -> Vec<Finding> {
-    let library = tree
-        .kinds
-        .iter()
-        .any(|kind| LIBRARY_KINDS.contains(&kind.as_str()));
+    let library = tree.is_library();
     let mut found = Vec::new();
     for module in &tree.modules {
         let root_door = module.path.is_empty() && library && module.children().next().is_some();
@@ -57,31 +52,36 @@ pub(super) fn bypasses(tree: &Tree, workspace: &Path) -> Vec<Finding> {
             let Some(target) = tree.absolute(&door.path, &export.segments) else {
                 continue;
             };
-            let Some(name) = target.last().filter(|_| target.len() > door.path.len() + 1) else {
-                continue;
-            };
-            let outside = tree
-                .modules
-                .iter()
-                .filter(|module| !module.path.starts_with(&door.path));
-            for module in outside {
-                for path in &module.paths {
-                    let past = tree
-                        .absolute(&module.path, &path.segments)
-                        .is_some_and(|absolute| absolute.starts_with(&target));
-                    if past {
-                        found.push(Finding::new(
-                            "ARC-003",
-                            relative(workspace, &module.file),
-                            path.line,
-                            format!(
-                                "`{}` walks past the door of {}; name `{name}` through it",
-                                path.segments.join("::"),
-                                display(&door.path)
-                            ),
-                        ));
-                    }
-                }
+            if target.len() > door.path.len() + 1 {
+                found.extend(walked_past(tree, door, &target, workspace));
+            }
+        }
+    }
+    found
+}
+
+/// ARC-003 for one name `door` re-exports from `target`: every path from
+/// outside the door that reaches it past the door.
+fn walked_past(tree: &Tree, door: &Module, target: &[String], workspace: &Path) -> Vec<Finding> {
+    let name = target.last().map(String::as_str).unwrap_or_default();
+    let mut found = Vec::new();
+    let outside = tree
+        .modules
+        .iter()
+        .filter(|module| !module.path.starts_with(&door.path));
+    for module in outside {
+        for path in &module.paths {
+            let past = tree
+                .absolute(&module.path, &path.segments)
+                .is_some_and(|absolute| absolute.starts_with(target));
+            if past {
+                let message = format!(
+                    "`{}` walks past the door of {}; name `{name}` through it",
+                    path.segments.join("::"),
+                    display(&door.path)
+                );
+                let file = relative(workspace, &module.file);
+                found.push(Finding::new("ARC-003", file, path.line, message));
             }
         }
     }
@@ -90,7 +90,7 @@ pub(super) fn bypasses(tree: &Tree, workspace: &Path) -> Vec<Finding> {
 
 /// A module path as a reader writes it: `crate::runner`.
 fn display(path: &[String]) -> String {
-    std::iter::once("crate")
+    iter::once("crate")
         .chain(path.iter().map(String::as_str))
         .collect::<Vec<_>>()
         .join("::")
@@ -99,11 +99,12 @@ fn display(path: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{bypasses, contents};
+    use crate::checks::findings::Finding;
     use crate::checks::module_tree::sample;
     use std::path::Path;
 
     /// Every finding of `rule` as its report line.
-    fn lines(found: &[crate::checks::findings::Finding]) -> Vec<String> {
+    fn lines(found: &[Finding]) -> Vec<String> {
         found.iter().map(ToString::to_string).collect()
     }
 

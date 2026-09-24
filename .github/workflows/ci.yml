@@ -1,5 +1,5 @@
 name: Rust CI
-# Contract: Locked Rust checks, 80% line coverage, security scans, SBOMs and release artifacts
+# Contract: Locked Rust checks, 90% line coverage, security scans, SBOMs and release artifacts
 'on':
   workflow_call:
     inputs:
@@ -17,9 +17,9 @@ name: Rust CI
         default: ''
       coverage-threshold:
         description: >-
-          Finite minimum line percentage, inclusive range 0 to 100
+          Finite minimum line percentage, from the organization's floor of 90 to 100
         type: number
-        default: 80
+        default: 90
       artifact-key:
         description: >-
           Invocation identity, 1 to 40 alphanumeric/underscore/hyphen
@@ -54,11 +54,10 @@ name: Rust CI
         default: default
       dependency-audit:
         description: >-
-          Require a recorded cargo-vet audit for every dependency; opt-in
-          because it commits the team to reviewing third-party source on each
-          bump
+          Require a recorded cargo-vet audit for every dependency, the
+          organization's and five public audit sets imported (VET-001)
         type: boolean
-        default: false
+        default: true
       unsafe-policy:
         description: >-
           Refuses an `unsafe` block in any workspace member; `allow` leaves the
@@ -186,6 +185,12 @@ jobs:
           # multiplied by the compiler matrix. Each asset is pinned by checksum.
           TOOLS: |
             jaq 01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu 5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454
+            # prek runs the repository's commit hooks over every file; each hook
+            # brings its own tool at the version the gate renders.
+            prek j178/prek/releases/download/v0.5.3/prek-x86_64-unknown-linux-musl.tar.gz d4eae1f31c0817d0a9bfa532d4bb66df60a8b01f121def002021915e826c3d1f prek-x86_64-unknown-linux-musl/prek
+            # gungraun's runner counts the declared benchmarks' instructions
+            # (PRF-001); it must match the gungraun the benchmarks link.
+            gungraun-runner gungraun/gungraun/releases/download/v0.19.4/gungraun-runner-v0.19.4-x86_64-unknown-linux-gnu.tar.gz f88194dac725ef0599b2812396518e9bd74aadaf75f5baf78df91ddb9eec67d3 gungraun-runner-v0.19.4-x86_64-unknown-linux-gnu/gungraun-runner
             gitleaks gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb gitleaks
             cargo-llvm-cov taiki-e/cargo-llvm-cov/releases/download/v0.9.1/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz b3f68e625481fed9b16444174f3fa5ebcdbde4a1878803a35eabe2dcefcdc41a cargo-llvm-cov
             cargo-audit rustsec/rustsec/releases/download/cargo-audit%2Fv0.22.2/cargo-audit-x86_64-unknown-linux-gnu-v0.22.2.tgz ab28a1bdb54db4d5d8ad5981cf1f959410370b3d28250dbd35f6a44248620e39 cargo-audit-x86_64-unknown-linux-gnu-v0.22.2/cargo-audit
@@ -203,7 +208,7 @@ jobs:
             # a committed deny.toml on top.
             cargo-deny EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz 9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f cargo-deny-0.20.2-x86_64-unknown-linux-musl/cargo-deny
             # similarity-rs lists the pairs of functions whose syntax trees match,
-            # information the duplication step reports and never enforces.
+            # what the duplication step reports, and refuses from three alike.
             similarity-rs mizchi/similarity/releases/download/v0.5.0/similarity-v0.5.0-x86_64-unknown-linux-gnu.tar.gz 2afda6201b6afb1ee36c1ce51b95a538ec99310c79f661905536d917470a406a similarity-v0.5.0-x86_64-unknown-linux-gnu/similarity-rs
             # cargo-hack builds each declared feature on its own. Whether a workspace
             # has features is a property of its manifests, not of an input, so this
@@ -243,19 +248,37 @@ jobs:
       - name: Install the toolchain
         id: tools
         run: rust-gate tools
-      - name: Module structure rules ARC-001 to ARC-007
+      - name: Source rules ARC, SIZE, NAME, DOC, LIB, TST, WSP and LNT
         id: architecture
         # Always on from v2.0.0. Until then only on request: this repository's
         # own CI still runs the previously pinned gate, which lacks the step.
         if: ${{ inputs.quality-preview }}
         run: rust-gate architecture
+      - name: Repository hygiene HYG and the width of shell scripts
+        id: hygiene
+        if: ${{ inputs.quality-preview }}
+        run: rust-gate hygiene
+      - name: Managed files as the organization renders them
+        id: managed-files
+        if: ${{ inputs.quality-preview }}
+        run: rust-gate managed-files
+      - name: Commit hooks over every file
+        id: hooks
+        if: ${{ inputs.quality-preview }}
+        run: rust-gate hooks
+      - name: Pull request rules PRL
+        id: pull-request
+        if: ${{ inputs.quality-preview }}
+        env:
+          PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
+        run: rust-gate pull-request
       - name: Formatting, Clippy and tests
         id: quality
         run: rust-gate quality
       - name: Function and file sizes, never blocking
         id: complexity
         run: rust-gate complexity
-      - name: Duplicated functions, never blocking
+      - name: Duplicated functions, pairs reported and three alike refused
         id: duplication
         run: rust-gate duplication
       - name: Line coverage gate
@@ -263,6 +286,12 @@ jobs:
         env:
           COVERAGE: ${{ inputs.coverage-threshold }}
         run: rust-gate coverage
+      - name: Coverage of the lines a pull request adds
+        id: changed-coverage
+        if: ${{ inputs.quality-preview }}
+        env:
+          PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
+        run: rust-gate changed-coverage
       - name: Dependency vulnerability audit
         id: audit
         run: rust-gate audit
@@ -274,6 +303,10 @@ jobs:
       - name: Mutation testing
         id: mutants
         run: rust-gate mutants
+      - name: Instruction counts of the declared benchmarks against the base
+        id: performance
+        if: ${{ inputs.quality-preview }}
+        run: rust-gate performance
       - name: Public API compatibility
         id: api
         env:

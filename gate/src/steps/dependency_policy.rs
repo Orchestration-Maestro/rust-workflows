@@ -93,7 +93,7 @@ fn is_spdx_list(value: &str) -> bool {
         !id.is_empty()
             && id
                 .chars()
-                .all(|c| c.is_ascii_alphanumeric() || ".+ -".contains(c))
+                .all(|character| character.is_ascii_alphanumeric() || ".+ -".contains(character))
     })
 }
 

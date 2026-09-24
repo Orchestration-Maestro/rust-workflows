@@ -11,22 +11,24 @@ type Member<'a> = (&'a str, &'a str, bool);
 /// The stand-ins: git answers whether the checkout kept the base parent and
 /// which manifests the base branch has, cargo describes the workspace and
 /// plays cargo-semver-checks.
-fn prepare(f: &mut Fixture, parent: &str, members: &[Member], semver: &str) {
-    f.set("API_COMPATIBILITY", "true");
-    f.set("GITHUB_BASE_REF", "main");
-    f.set("PULL_REQUEST_TITLE", "feat: add a checked product");
+fn prepare(fixture: &mut Fixture, parent: &str, members: &[Member<'_>], semver: &str) {
+    fixture.set("API_COMPATIBILITY", "true");
+    fixture.set("GITHUB_BASE_REF", "main");
+    fixture.set("PULL_REQUEST_TITLE", "feat: add a checked product");
     let in_base: Vec<String> = members
         .iter()
         .filter(|member| member.2)
         .map(|member| format!("HEAD^1:{}/Cargo.toml", member.0))
         .collect();
-    f.stub(
+    fixture.stub(
         "git",
         &format!(
             r#"case "$1 $2" in
   "rev-parse --show-toplevel") pwd ;;
   "rev-parse --verify") {parent} ;;
-  "cat-file -e") [[ " {} " == *" $3 "* ]] ;;
+  "show HEAD^1:"*) [[ " {} " == *" $2 "* ]] || exit 128
+    member="${{2#HEAD^1:}}"
+    printf '[package]\nname = "%s"\n' "${{BASE_NAME:-${{member%/Cargo.toml}}}}" ;;
   *) exit 1 ;;
 esac"#,
             in_base.join(" ")
@@ -39,7 +41,7 @@ esac"#,
             format!(r#"{{"name":"{name}",{manifest},"targets":[{{"kind":["{kind}"]}}]}}"#)
         })
         .collect();
-    f.stub(
+    fixture.stub(
         "cargo",
         &format!(
             r#"case "$1" in
@@ -51,12 +53,12 @@ esac"#,
     );
 }
 
-fn report(f: &Fixture) -> String {
-    fs::read_to_string(f.root.join("reports/api-compatibility.txt")).unwrap()
+fn report(fixture: &Fixture) -> String {
+    fs::read_to_string(fixture.root.join("reports/api-compatibility.txt")).unwrap()
 }
 
-fn applied(f: &Fixture) -> String {
-    fs::read_to_string(f.root.join("output")).unwrap_or_default()
+fn applied(fixture: &Fixture) -> String {
+    fs::read_to_string(fixture.root.join("output")).unwrap_or_default()
 }
 
 const CHECK: &str = "semver-checks --baseline-rev HEAD^1 --release-type minor --package fixture";
@@ -91,7 +93,7 @@ fn an_undeclared_break_fails_the_pull_request() {
 #[test]
 fn a_declared_break_and_what_has_no_api_are_not_checked() {
     // Each case is reported as not applicable, never as a pass.
-    let cases: [(&str, &str, &[Member], &str, &str); 6] = [
+    let cases: [(&str, &str, &[Member<'_>], &str, &str); 7] = [
         (
             "PULL_REQUEST_TITLE",
             "feat(api)!: drop checked_sum",
@@ -135,15 +137,28 @@ fn a_declared_break_and_what_has_no_api_are_not_checked() {
             "exit 0",
             "new in this pull request: fresh",
         ),
+        // A library the pull request renames has no baseline under its new
+        // name: the base manifest at its path names another package.
+        (
+            "BASE_NAME",
+            "old-fixture",
+            &[("fixture", "lib", true)],
+            "exit 0",
+            "new in this pull request: fixture",
+        ),
     ];
     for (key, value, members, parent, said) in cases {
-        let mut f = Fixture::new();
-        prepare(&mut f, parent, members, "exit 100");
-        f.set(key, value);
-        succeeds(&f.run("ci", "api"));
-        assert!(!f.calls().contains("semver-checks"), "{key}={value}");
-        assert!(report(&f).contains(said), "{key}={value}: {}", report(&f));
-        assert!(applied(&f).contains("applied=false"), "{key}={value}");
+        let mut fixture = Fixture::new();
+        prepare(&mut fixture, parent, members, "exit 100");
+        fixture.set(key, value);
+        succeeds(&fixture.run("ci", "api"));
+        assert!(!fixture.calls().contains("semver-checks"), "{key}={value}");
+        assert!(
+            report(&fixture).contains(said),
+            "{key}={value}: {}",
+            report(&fixture)
+        );
+        assert!(applied(&fixture).contains("applied=false"), "{key}={value}");
     }
 }
 
@@ -151,9 +166,9 @@ fn a_declared_break_and_what_has_no_api_are_not_checked() {
 fn only_the_libraries_the_base_branch_has_are_compared() {
     // A workspace that gains a member compares the members it already had,
     // and the report names the new one.
-    let mut f = Fixture::new();
+    let mut fixture = Fixture::new();
     prepare(
-        &mut f,
+        &mut fixture,
         "exit 0",
         &[
             ("core", "lib", true),
@@ -162,23 +177,28 @@ fn only_the_libraries_the_base_branch_has_are_compared() {
         ],
         "exit 0",
     );
-    succeeds(&f.run("ci", "api"));
-    let calls = f.calls();
+    succeeds(&fixture.run("ci", "api"));
+    let calls = fixture.calls();
     assert!(
         calls.contains("semver-checks --baseline-rev HEAD^1 --release-type minor --package core"),
         "{calls}"
     );
     assert!(!calls.contains("--package fresh") && !calls.contains("--package app"));
-    assert!(report(&f).contains("new in this pull request: fresh"));
-    assert!(applied(&f).contains("applied=true"));
+    assert!(report(&fixture).contains("new in this pull request: fresh"));
+    assert!(applied(&fixture).contains("applied=true"));
 }
 
 #[test]
 fn a_pull_request_checkout_must_keep_the_base_parent() {
-    let mut f = Fixture::new();
-    prepare(&mut f, "exit 1", &[("fixture", "lib", true)], "exit 0");
+    let mut fixture = Fixture::new();
+    prepare(
+        &mut fixture,
+        "exit 1",
+        &[("fixture", "lib", true)],
+        "exit 0",
+    );
     refused(
-        &f.run("ci", "api"),
+        &fixture.run("ci", "api"),
         "pull request checkout must include the base parent",
     );
 }

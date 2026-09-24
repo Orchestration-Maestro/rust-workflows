@@ -6,6 +6,7 @@ use crate::checks::release_boundary::{
 };
 use crate::checks::simple_names::is_hex;
 use crate::runner::{Cmd, Outcome, Step, flag, input, non_empty};
+use std::fs;
 use std::path::Path;
 
 /// What each step declares: its inputs, its tools and its reports.
@@ -66,15 +67,15 @@ fn validate() -> Outcome {
     if revision != input("GITHUB_SHA")? {
         return Err("Evidence revision does not match this source".into());
     }
-    if std::fs::symlink_metadata("evidence").is_ok_and(|m| m.file_type().is_symlink()) {
+    if fs::symlink_metadata("evidence").is_ok_and(|metadata| metadata.file_type().is_symlink()) {
         return Err("Evidence must not contain symlinks".into());
     }
     non_empty(Path::new("evidence/scorecard.json"))
         .map_err(|_| "Reports are missing the run scorecard")?;
-    let root = std::fs::canonicalize("evidence").map_err(|error| format!("evidence: {error}"))?;
+    let root = fs::canonicalize("evidence").map_err(|error| format!("evidence: {error}"))?;
     let mut pending = vec![root.clone()];
     while let Some(directory) = pending.pop() {
-        let entries = std::fs::read_dir(&directory)
+        let entries = fs::read_dir(&directory)
             .map_err(|error| format!("{}: {error}", directory.display()))?;
         for entry in entries {
             let entry = entry.map_err(|error| format!("evidence: {error}"))?;
@@ -88,8 +89,8 @@ fn validate() -> Outcome {
             if !kind.is_file() && !kind.is_dir() {
                 return Err("Evidence entries must be regular files or directories".into());
             }
-            let real = std::fs::canonicalize(&file)
-                .map_err(|error| format!("{}: {error}", file.display()))?;
+            let real =
+                fs::canonicalize(&file).map_err(|error| format!("{}: {error}", file.display()))?;
             inside_evidence(&real, &root)?;
             if kind.is_dir() {
                 pending.push(real);

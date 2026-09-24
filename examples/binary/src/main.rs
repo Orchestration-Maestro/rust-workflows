@@ -8,7 +8,7 @@
 use anyhow::Context;
 
 fn main() -> anyhow::Result<()> {
-    let total = bounded_sum::checked_sum(20, 22).context("the sum overflows u32")?;
+    let total = maestro_bounded_sum::checked_sum(20, 22).context("the sum overflows u32")?;
     println!("{total}");
     Ok(())
 }

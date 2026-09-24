@@ -72,7 +72,7 @@ Codecov needs its GitHub App installed on the organization; the upload logs in
 through OIDC, so there is no Codecov token to store.
 
 That is the whole adoption. Every run enforces formatting, Clippy, tests,
-rustdoc, 80% line coverage, advisories, a secret scan, the declared MSRV,
+rustdoc, 90% line coverage, advisories, a secret scan, the declared MSRV,
 dependency sources and versions, a reproducible hardened release build and both
 SBOM formats. Five more gates are on by default and each is one input to switch
 off: mutation testing, the unused-dependency check, the `unsafe` ban, SARIF
@@ -141,9 +141,10 @@ workflows.
 
 | Workflow | Contract |
 | --- | --- |
-| [`ci.yml`](.github/workflows/ci.yml) | Locked Rust checks, 80% line coverage, security scans, SBOMs and release artifacts |
+| [`ci.yml`](.github/workflows/ci.yml) | Locked Rust checks, 90% line coverage, security scans, SBOMs and release artifacts |
 | [`attest-binaries.yml`](.github/workflows/attest-binaries.yml) | Opt-in signed build provenance for a re-verified payload; isolated so its scopes bind only its callers |
 | [`fuzz.yml`](.github/workflows/fuzz.yml) | Opt-in bounded fuzz regression: replays the committed corpus, then explores for a fixed budget |
+| [`hygiene.yml`](.github/workflows/hygiene.yml) | The checks every repository holds to, for one without Rust: secrets, hygiene, managed files and the commit hooks over every file |
 | [`publish-binaries.yml`](.github/workflows/publish-binaries.yml) | Same-revision CI, artifact verification, dry-run by default; existing GitHub Release when explicitly enabled |
 | [`publish-crate.yml`](.github/workflows/publish-crate.yml) | Same-revision CI and selected-package verification; explicit public crates.io publication only |
 | [`publish-evidence.yml`](.github/workflows/publish-evidence.yml) | Dry-run-first archive of release reports; live assets only on protected-tag GitHub Releases |
@@ -162,8 +163,8 @@ skip is visible as `attested=false`; require `attested == 'true'`, not just a gr
 job. Set `on-unavailable: fail` when provenance is required. This runtime policy
 cannot bypass GitHub's permission validation before a job starts.
 
-The coverage floor is the `coverage-threshold` input, `80` by default and valid
-from 0 through 100. Every other knob is listed under [gates](#-gates).
+The coverage floor is the `coverage-threshold` input, `90` by default and valid
+from 90, the organization's floor (COV-001), through 100. Every other knob is listed under [gates](#-gates).
 
 ## 🦀 Rust versions
 
@@ -238,7 +239,7 @@ A golden workflow enforces the standard: no input switches these off.
 | --- | --- | --- | --- |
 | Formatting, Clippy, tests | `cargo fmt --check`; Clippy with every warning denied, plus `todo!()` and `dbg!()`; unit, integration and doc tests | SST-001 | `example_gate_replays_ci_step_bodies_against_every_fixture`, `a_failing_consumer_command_fails_the_step_with_its_own_status` |
 | Strict rustdoc | A public item without documentation, or a broken intra-doc link | North Star, Maintainability | `strict_rustdoc_fails_the_run_when_cargo_doc_does`, `example_gate_replays_ci_step_bodies_against_every_fixture` |
-| Line coverage | Below `coverage-threshold`, `80` by default | North Star, Quality | `line_coverage_below_the_threshold_fails_the_run`, `example_gate_replays_ci_step_bodies_against_every_fixture` |
+| Line coverage | Below `coverage-threshold`, `90` by default and never lower (COV-001) | North Star, Quality, COV-001 | `line_coverage_below_the_threshold_fails_the_run`, `ci_validates_toolchain_threshold_and_artifact_identity`, `example_gate_replays_ci_step_bodies_against_every_fixture` |
 | Advisories | A RustSec vulnerability, or a yanked, unsound or unmaintained crate | SST-002 | `scanners_propagate_findings_execution_errors_and_missing_tools` |
 | Secret scan | A secret anywhere in the source revision; the report is redacted | SEC-001, SST-003 | `scanners_propagate_findings_execution_errors_and_missing_tools` |
 | Declared MSRV | A workspace member without `rust-version`, one the selected compiler cannot satisfy, or a workspace that does not compile with the oldest compiler its declarations allow | North Star, Quality | `the_declared_msrv_must_be_real_and_reachable`, `the_declared_msrv_is_the_compiler_the_workspace_is_checked_with` |
@@ -263,6 +264,7 @@ Each is one input to switch off, documented in [docs/ci.md](docs/ci.md).
 | SARIF reports | `sarif-reports: false` | A Clippy or secret-scan SARIF report that is missing or empty; `upload-sarif.yml` shows the findings in code scanning | SST-003 | `sarif_reports_are_written_only_when_asked_and_never_empty`, `sarif_reports_are_on_by_default_and_upload_in_their_own_workflow` |
 | Public API compatibility | `api-compatibility: false` | A pull request that breaks a library's public API without `!` after the type in its title; not applicable to a push, a project without a library or Rust older than 1.93 | North Star, Quality | `an_undeclared_break_fails_the_pull_request`, `a_declared_break_and_what_has_no_api_are_not_checked` |
 | Dependency policy | `license-policy: off` | Violations of your `deny.toml`, or the default source/version policy; licence checks apply only with a consumer policy or `LICENSE_ALLOWLIST`. `off` skips the whole gate | SCH-010 | `the_organization_allowlist_adds_licences_and_a_committed_policy_wins`, `the_dependency_policy_holds_by_default_and_licences_only_with_a_list` |
+| Recorded dependency audits | `dependency-audit: false` | A dependency neither audited nor exempted, or a ledger without one of the six imports VET-001 requires | SCH-007, VET-001 | `unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does` |
 
 <!-- end generated -->
 
@@ -272,10 +274,14 @@ Each is one input to switch off, documented in [docs/ci.md](docs/ci.md).
 
 | Gate | How | Standard | Proof |
 | --- | --- | --- | --- |
-| Recorded dependency audits | `dependency-audit: true`, cargo-vet against your committed audits | SCH-007 | `unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does` |
 | Wider Clippy | `clippy-level: pedantic` or `nursery` | SST-001 | `clippy_denies_leftover_scaffolding_at_every_level` |
 | Platform portability | `platforms: macos windows linux-arm`; `cargo test` on each pinned runner, held by the required status | North Star, Quality | `named_platforms_become_a_matrix_of_pinned_runners`, `requested_platforms_must_pass_for_the_required_status` |
-| Module structure | `quality-preview: true`, until v2.0.0 runs it always | ARC-001 to ARC-007 | `an_import_cycle_between_two_files_is_refused_by_name`, `a_door_holding_a_function_is_refused_and_a_listing_door_passes`, `a_path_past_a_door_re_export_is_refused`, `declared_layers_refuse_an_import_within_or_against_the_order`, `layers_declared_for_a_root_no_target_has_are_refused`, `a_seam_serving_one_outside_caller_is_refused_unless_excused`, `a_binary_root_beyond_declarations_and_a_short_main_is_refused`, `path_attributes_and_rust_includes_are_refused_while_include_str_passes`, `the_quality_file_refuses_unknown_tables_and_unreasoned_exceptions` |
+| Source rules | `quality-preview: true`, until v2.0.0 runs it always | ARC, SIZE, NAME, DOC, LIB, TST, WSP and LNT | `an_import_cycle_between_two_files_is_refused_by_name`, `a_door_holding_a_function_is_refused_and_a_listing_door_passes`, `a_path_past_a_door_re_export_is_refused`, `declared_layers_refuse_an_import_within_or_against_the_order`, `layers_declared_for_a_root_no_target_has_are_refused`, `a_seam_serving_one_outside_caller_is_refused_unless_excused`, `a_binary_root_beyond_declarations_and_a_short_main_is_refused`, `path_attributes_and_rust_includes_are_refused_while_include_str_passes`, `the_quality_file_refuses_unknown_tables_and_unreasoned_exceptions`, `oversized_files_and_lines_are_refused_and_three_hundred_is_reported`, `package_names_follow_the_form_and_publishable_ones_the_prefix`, `badly_named_tests_and_one_word_test_modules_are_refused`, `a_file_without_a_module_comment_is_refused`, `printing_from_a_library_is_refused_and_from_a_binary_allowed`, `a_library_depending_on_anyhow_is_refused_but_a_binary_is_not`, `sleeping_in_a_test_is_refused_unless_excused`, `more_than_one_plain_integration_test_crate_is_refused`, `workspace_members_inherit_their_settings_and_dependencies`, `edition_resolver_and_lockfile_are_held`, `tightened_limits_apply_and_loosened_ones_are_refused`, `a_manifest_without_the_organization_lints_is_refused_until_written`, `a_clippy_toml_looser_than_the_organization_s_is_refused`, `clippy_knows_every_organization_lint_and_applies_it` |
+| Repository hygiene | `quality-preview: true`, until v2.0.0 runs it always | HYG-001 to HYG-005, SIZE-003 | `unlinked_markers_in_comments_are_refused_and_linked_ones_pass`, `snapshots_large_files_modes_and_links_are_refused`, `a_readme_a_licence_and_a_changelog_are_required`, `wide_shell_lines_and_justfiles_are_refused` |
+| Managed files | `quality-preview: true`, until v2.0.0 runs it always | The generated files of every repository, TST-004, DEP-001 | `init_writes_every_managed_file_and_the_check_finds_them_equal`, `a_managed_file_changed_by_hand_is_refused_and_sync_writes_it_back`, `the_managed_files_step_refuses_a_difference_in_ci` |
+| Commit hooks | `quality-preview: true`, until v2.0.0 runs it always | The universal set, UNI | `the_hooks_step_runs_prek_over_every_file_and_skips_what_ci_runs_itself`, `a_step_runs_locally_the_way_a_commit_hook_runs_it`, `every_rendered_hook_runs_a_pinned_version_and_this_repository_runs_them_all`, `the_rendered_hooks_run_in_a_fresh_clone_with_only_prek_and_rustup` |
+| Pull request rules | `quality-preview: true`, until v2.0.0 runs it always | COV-002, PRL-001, PRL-002 | `new_lines_that_never_run_are_refused_past_the_allowance`, `a_feature_without_a_test_is_refused_and_a_large_change_reported` |
+| Performance budget | `[performance] benches` in maestro-quality.toml, with `quality-preview: true` until v2.0.0 | PRF-001 | `a_benchmark_past_its_budget_is_refused_unless_excused`, `nothing_is_measured_without_a_bench_a_base_or_the_pinned_gungraun` |
 | Semantic-version compatibility | `semver-check: true` on `publish-crate.yml`; off for a first publication, which has no baseline | North Star, Quality | `semver_check_fails_the_publication_when_cargo_semver_checks_does` |
 | Signed build provenance | `attest-binaries.yml`, see below | SCH-001, SCH-002 | `attestation_signs_only_bytes_it_verified_itself`, `provenance_attestation_is_isolated_and_reverifies_the_payload` |
 | Undefined-behaviour audit | `unsafe-audit.yml`, Miri on nightly, see below | SST-006 | `the_undefined_behaviour_audit_refuses_to_pass_without_running_anything` |
@@ -526,6 +532,7 @@ extracting it. Rust itself comes from the approved platform channel, never from
 | `cargo-nextest` | The tests, one process each, with their results as `JUnit` | Rust |
 | `clippy-sarif` | Clippy findings as SARIF, for code scanning | Rust |
 | `similarity-rs` | Functions whose syntax trees match, reported without failing the run | Rust |
+| `gungraun-runner` | Instruction counts of the declared benchmarks under Valgrind, base against head | Rust |
 
 <!-- end generated -->
 
@@ -559,6 +566,10 @@ extracting it. Rust itself comes from the approved platform channel, never from
 | `taplo` | TOML formatting | Rust |
 | `jaq` | The JSON the steps read and the YAML the tests read | Rust |
 | `typos` | Spelling in code and prose; `typos.toml` names the words this repository means | Rust |
+| `shfmt` | Shell formatting, the width and indentation .editorconfig sets | Go |
+| `rumdl` | Markdown structure: headings, lists, fences and blank lines | Rust |
+| `lychee` | Every link in the Markdown, offline: files and anchors that exist | Rust |
+| `editorconfig-checker` | Every file against .editorconfig: charset, endings, indentation | Go |
 
 <!-- end generated -->
 

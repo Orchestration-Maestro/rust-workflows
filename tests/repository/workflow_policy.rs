@@ -4,7 +4,9 @@
 use crate::harness::{Fixture, root, step, succeeds, tool, workflow};
 use serde_json::Value;
 use std::fs;
+use std::iter;
 use std::os::unix::fs::symlink;
+use std::path::Path;
 
 #[test]
 fn public_workflow_files_exist() {
@@ -61,11 +63,16 @@ fn permissions_timeouts_and_shell_policy_hold_in_every_workflow() {
             if job.get("steps").is_some() {
                 assert!(job.get("timeout-minutes").is_some());
             }
-            for item in std::iter::once(job).chain(job["steps"].as_array().into_iter().flatten()) {
-                assert!(item.get("continue-on-error").is_none());
-                if let Some(command) = item["run"].as_str() {
-                    body_follows_the_shell_policy(command);
-                }
+            let items: Vec<&Value> = iter::once(job)
+                .chain(job["steps"].as_array().into_iter().flatten())
+                .collect();
+            assert!(
+                items
+                    .iter()
+                    .all(|item| item.get("continue-on-error").is_none())
+            );
+            for command in items.iter().filter_map(|item| item["run"].as_str()) {
+                body_follows_the_shell_policy(command);
             }
         }
     }
@@ -192,12 +199,12 @@ fn the_path_guard_is_identical_in_every_workflow_that_takes_a_directory() {
         assert_eq!(step(workflow, "validate").trim(), command);
         let mut seen = Vec::new();
         for (directory, refusal) in cases {
-            let mut f = Fixture::new();
+            let mut fixture = Fixture::new();
             if directory == "project/out" {
-                symlink("/", f.root.join("project/out")).unwrap();
+                symlink("/", fixture.root.join("project/out")).unwrap();
             }
-            f.set("DIRECTORY", directory);
-            let output = f.run(workflow, "validate");
+            fixture.set("DIRECTORY", directory);
+            let output = fixture.run(workflow, "validate");
             assert!(!output.status.success(), "{workflow} accepted {directory}");
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
             assert!(
@@ -273,16 +280,31 @@ fn the_consumer_matrix_calls_every_local_workflow_and_fixture() {
         succeeds(&result);
         assert_eq!(String::from_utf8(result.stdout).unwrap().trim(), "1.98.1");
     }
-    for member in ["binary", "library", "workspace/core", "workspace/app"] {
+    // The workspace fixture's members inherit their settings and their shared
+    // dependencies from its root, the way WSP-001 requires, so a value a member
+    // marks `workspace = true` is read there.
+    let toml = |path: &Path| -> Value {
         let output = tool("jaq")
             .args(["--from", "toml", "."])
-            .arg(root().join("examples").join(member).join("Cargo.toml"))
+            .arg(path)
             .output()
             .unwrap();
         succeeds(&output);
-        let manifest: Value = serde_json::from_slice(&output.stdout).unwrap();
-        assert_eq!(manifest["package"]["edition"], "2024");
-        assert_eq!(manifest["package"]["rust-version"], "1.85");
+        serde_json::from_slice(&output.stdout).unwrap()
+    };
+    let workspace = toml(&root().join("examples/workspace/Cargo.toml"))["workspace"].clone();
+    let resolved = |value: &Value, shared: &Value| -> Value {
+        if value["workspace"] == true {
+            shared.clone()
+        } else {
+            value.clone()
+        }
+    };
+    for member in ["binary", "library", "workspace/core", "workspace/app"] {
+        let manifest = toml(&root().join("examples").join(member).join("Cargo.toml"));
+        let setting = |key: &str| resolved(&manifest["package"][key], &workspace["package"][key]);
+        assert_eq!(setting("edition"), "2024");
+        assert_eq!(setting("rust-version"), "1.85");
         // Fixtures depend on each other by path. The one exception is the
         // binary fixture's single crates.io dependency, there so the dependency
         // policy, the SBOMs and the embedded dependency list are checked against
@@ -291,8 +313,9 @@ fn the_consumer_matrix_calls_every_local_workflow_and_fixture() {
         for (name, dependency) in manifest["dependencies"]
             .as_object()
             .into_iter()
-            .flat_map(|d| d.iter())
+            .flat_map(|entries| entries.iter())
         {
+            let dependency = resolved(dependency, &workspace["dependencies"][name]);
             assert!(
                 dependency.get("path").is_some() || (member == "binary" && name == "anyhow"),
                 "{member}: unexpected registry dependency {name}"
@@ -354,8 +377,8 @@ fn dependabot_updates_merge_through_the_bot_unless_one_is_major() {
         (&["minor", "major"][..], false),
         (&[][..], false),
     ] {
-        let mut f = Fixture::new();
-        f.set("PR_URL", pull_request);
+        let mut fixture = Fixture::new();
+        fixture.set("PR_URL", pull_request);
         let trailer = types
             .iter()
             .map(|kind| {
@@ -363,7 +386,7 @@ fn dependabot_updates_merge_through_the_bot_unless_one_is_major() {
             })
             .collect::<Vec<_>>()
             .concat();
-        f.stub(
+        fixture.stub(
             "gh",
             &format!(
                 "if [[ $1 == pr && $2 == view ]]; then cat <<'BODY'\n\
@@ -371,9 +394,10 @@ fn dependabot_updates_merge_through_the_bot_unless_one_is_major() {
                  Signed-off-by: dependabot[bot]\nBODY\nfi"
             ),
         );
-        succeeds(&f.run("dependabot-auto-merge", "merge"));
+        succeeds(&fixture.run("dependabot-auto-merge", "merge"));
         assert_eq!(
-            f.calls()
+            fixture
+                .calls()
                 .contains(&format!("pr merge --auto --squash {pull_request}")),
             merges,
             "{types:?}"

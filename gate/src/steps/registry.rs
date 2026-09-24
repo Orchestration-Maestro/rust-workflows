@@ -7,19 +7,26 @@ use std::fmt::Write as _;
 
 /// Every step of every workflow, in the order the workflows run them:
 /// `ci.yml` first, then the commands several workflows share, then the other
-/// workflows.
+/// workflows; the commands a developer or a hook runs locally sit beside the
+/// steps they share code with, and `describe` gathers each workflow's.
 const REGISTRY: &[&[Step]] = &[
     super::validate_inputs::STEPS,
     super::configure_cargo_registry::STEPS,
     super::install_toolchain::STEPS,
     super::architecture::STEPS,
+    super::hygiene::STEPS,
+    super::managed_files::STEPS,
+    super::commit_hooks::STEPS,
     super::format_lint_test::STEPS,
     super::report_sizes::STEPS,
     super::report_duplicates::STEPS,
     super::line_coverage::STEPS,
+    super::changed_coverage::STEPS,
+    super::pull_request_rules::STEPS,
     super::vulnerability_audit::STEPS,
     super::dependency_policy::STEPS,
     super::mutation_testing::STEPS,
+    super::performance::STEPS,
     super::api_compatibility::STEPS,
     super::secret_scan::STEPS,
     super::declared_msrv::STEPS,
@@ -39,6 +46,9 @@ const REGISTRY: &[&[Step]] = &[
     super::attest_binaries::STEPS,
     super::fuzz_regression::STEPS,
     super::unsafe_audit::STEPS,
+    super::hygiene_workflow::STEPS,
+    super::write_lints::STEPS,
+    super::local_runs::STEPS,
 ];
 
 /// Every registered step, in registry order.
@@ -46,19 +56,22 @@ fn steps() -> impl Iterator<Item = &'static Step> {
     REGISTRY.iter().flat_map(|steps| steps.iter())
 }
 
-/// Run the step `command` names: `ci.yml` steps and the shared commands are
-/// one word, the other workflows name themselves first. The step is entered
-/// before it runs, so the runner refuses what it did not declare.
+/// Run the step `command` names: `ci.yml` steps, the shared commands and
+/// the local commands are one word, a local command's flag the second, and
+/// the other workflows name themselves first. The step is entered before it
+/// runs, so the runner refuses what it did not declare.
 pub(crate) fn run(command: &str, step: &str) -> Outcome {
     let (workflow, id) = if step.is_empty() {
-        ("", command)
+        ("", command.to_owned())
+    } else if step.starts_with("--") {
+        ("local", format!("{command} {step}"))
     } else {
-        (command, step)
+        (command, step.to_owned())
     };
     let found = steps().find(|candidate| {
         candidate.id == id
             && (candidate.workflow == workflow
-                || workflow.is_empty() && matches!(candidate.workflow, "ci" | "shared"))
+                || workflow.is_empty() && matches!(candidate.workflow, "ci" | "shared" | "local"))
     });
     let Some(found) = found else {
         return Err(Failure::from(format!(
@@ -80,25 +93,29 @@ pub(crate) fn describe() -> String {
          the step did not declare is refused. The runner's own files and the job's \
          directories are read by every step and not listed.\n",
     );
-    let mut workflow = "";
+    let mut workflows: Vec<&str> = Vec::new();
     for step in steps() {
-        if step.workflow != workflow {
-            workflow = step.workflow;
-            let _ = write!(
+        if !workflows.contains(&step.workflow) {
+            workflows.push(step.workflow);
+        }
+    }
+    for workflow in workflows {
+        let _ = write!(
+            text,
+            "\n## {workflow}\n\n| Step | What it does | Inputs | Tools | Reports |\n\
+             | --- | --- | --- | --- | --- |\n"
+        );
+        for step in steps().filter(|step| step.workflow == workflow) {
+            let _ = writeln!(
                 text,
-                "\n## {workflow}\n\n| Step | What it does | Inputs | Tools | Reports |\n\
-                 | --- | --- | --- | --- | --- |\n"
+                "| `{}` | {} | {} | {} | {} |",
+                step.id,
+                step.summary,
+                cell(step.inputs),
+                cell(step.tools),
+                cell(step.reports)
             );
         }
-        let _ = writeln!(
-            text,
-            "| `{}` | {} | {} | {} | {} |",
-            step.id,
-            step.summary,
-            cell(step.inputs),
-            cell(step.tools),
-            cell(step.reports)
-        );
     }
     text
 }

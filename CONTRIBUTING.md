@@ -77,7 +77,7 @@ hygiene: every toolbelt link points at the locked build, every line of Bash
 left (the Just recipes, `bootstrap.sh`, the gate action's build step) passes
 ShellCheck, and Gitleaks scans the tree. It then runs real redacted source
 scanning and each fixture's formatting, Clippy, unit/integration/doc/release tests,
-80% line-coverage gate, release build, packaging, SBOM validation and the actual
+90% line-coverage gate, release build, packaging, SBOM validation and the actual
 workflow artifact-staging and selected-package verification commands.
 
 `CHECK_NETWORK=1` also fetches one isolated RustSec database snapshot and
@@ -116,9 +116,10 @@ names the cycle it finds (`an_import_cycle_between_two_files_is_refused_by_name`
 
 Five more tests hold the crate and its proof to the same bar. The binary never
 panics: Clippy's `unwrap_used`, `expect_used`, `panic`, `unreachable`, `todo`,
-`unimplemented` and `dbg_macro` lints are denied in its manifest, and
-`the_binary_refuses_every_way_to_panic` keeps them there; a refusal is a
-message and an exit status, never a stack trace. Every step it declares is
+`unimplemented` and `dbg_macro` lints are denied in its manifest, among the
+organization's lints `rust-gate architecture` keeps there
+(`a_manifest_without_the_organization_lints_is_refused_until_written`); a
+refusal is a message and an exit status, never a stack trace. Every step it declares is
 run by a contract test (`a_contract_test_runs_every_registered_step`), and every refusal it
 composes is asserted by a test, in its own words
 (`a_test_asserts_every_refusal_the_gate_can_print`); a message that relays an
@@ -131,10 +132,9 @@ an import cycle (`an_import_cycle_between_two_files_is_refused_by_name`).
 The tests are laid out by what they prove: `tests/ci/`, `tests/publishers/`,
 `tests/nightly/`, `tests/gate/` and `tests/repository/`, with the harness they
 share under `tests/harness/`. A module names what it proves in two words at
-least (`every_test_module_names_what_it_proves_in_two_words_at_least`), a test
-function in four (`every_test_function_names_what_it_proves_in_four_words_at_least`),
-and never behind a `test_` prefix or a `_works`, `_ok` or `_test` suffix
-(`no_test_function_is_named_by_a_test_prefix_or_a_works_ok_or_test_suffix`).
+least, a test function in four, and never behind a `test_` prefix or a
+`_works`, `_ok` or `_test` suffix: NAME-002, which `rust-gate architecture`
+holds in `just check` (`badly_named_tests_and_one_word_test_modules_are_refused`).
 A step declares its inputs, tools and reports in its `STEPS` constant and the
 gate refuses anything else at run time; `just docs` regenerates
 [docs/steps.md](docs/steps.md) from those declarations, and `just check`

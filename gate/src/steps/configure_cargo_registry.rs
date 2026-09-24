@@ -3,6 +3,7 @@
 
 use crate::checks::private_directories::private_directory;
 use crate::runner::{Outcome, Step, export, input};
+use std::fs::OpenOptions;
 use std::io::Write;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -26,7 +27,7 @@ pub(crate) const STEPS: &[Step] = &[Step {
 fn run() -> Outcome {
     let home = private_directory(&input("RUNNER_TEMP")?, "cargo-home")?;
     let config = "[registries.crates-io]\nprotocol = \"sparse\"\n";
-    let mut options = std::fs::OpenOptions::new();
+    let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
     options.mode(0o600);

@@ -3,13 +3,14 @@
 
 use crate::harness::{Fixture, refused, succeeds, tool_rows, workflow};
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fs;
 
 /// The stand-ins a download needs: curl leaves the file behind, sha256sum
 /// answers as told, tar does nothing, install creates the target.
-fn prepare(f: &Fixture, checksum_holds: bool) {
+fn prepare(fixture: &Fixture, checksum_holds: bool) {
     // curl must leave the file behind, or verification has nothing to read.
-    f.stub(
+    fixture.stub(
         "curl",
         r#"out=""
 while [[ $# -gt 0 ]]; do
@@ -18,7 +19,7 @@ while [[ $# -gt 0 ]]; do
 done
 printf 'downloaded' > "$out""#,
     );
-    f.stub(
+    fixture.stub(
         "sha256sum",
         if checksum_holds {
             "cat > /dev/null; exit 0"
@@ -26,8 +27,8 @@ printf 'downloaded' > "$out""#,
             "cat > /dev/null; exit 1"
         },
     );
-    f.stub("tar", "");
-    f.stub(
+    fixture.stub("tar", "");
+    fixture.stub(
         "install",
         r#"dst=${@: -1}
 mkdir -p "$(dirname "$dst")"
@@ -37,8 +38,9 @@ chmod +x "$dst""#,
 }
 
 /// How many release assets the fixture fetched.
-fn downloads(f: &Fixture) -> usize {
-    f.calls()
+fn downloads(fixture: &Fixture) -> usize {
+    fixture
+        .calls()
         .lines()
         .filter(|line| line.contains("releases/download/"))
         .count()
@@ -103,12 +105,12 @@ fn a_dropped_connection_is_retried_before_a_download_fails() {
     // A connection GitHub's release storage reset once failed a whole run
     // (curl exit 35). curl retries only timeouts and server errors unless it
     // is told to retry every error.
-    let mut f = Fixture::new();
-    prepare(&f, true);
-    f.set("TOOLS", TABLE);
-    succeeds(&f.run("ci", "install"));
-    assert_eq!(downloads(&f), 2);
-    for call in f
+    let mut fixture = Fixture::new();
+    prepare(&fixture, true);
+    fixture.set("TOOLS", TABLE);
+    succeeds(&fixture.run("ci", "install"));
+    assert_eq!(downloads(&fixture), 2);
+    for call in fixture
         .calls()
         .lines()
         .filter(|line| line.contains("releases/download/"))
@@ -119,12 +121,12 @@ fn a_dropped_connection_is_retried_before_a_download_fails() {
 
 #[test]
 fn every_download_comes_directly_from_github_releases() {
-    let mut f = Fixture::new();
-    prepare(&f, true);
-    f.set("TOOLS", TABLE);
-    succeeds(&f.run("ci", "install"));
-    assert_eq!(downloads(&f), 2);
-    for url in f
+    let mut fixture = Fixture::new();
+    prepare(&fixture, true);
+    fixture.set("TOOLS", TABLE);
+    succeeds(&fixture.run("ci", "install"));
+    assert_eq!(downloads(&fixture), 2);
+    for url in fixture
         .calls()
         .lines()
         .filter(|line| line.contains("releases/download/"))
@@ -164,11 +166,11 @@ fn a_tool_line_names_an_immutable_release_asset_with_its_own_digest() {
         ),
         (String::new(), "tools lists nothing to install"),
     ] {
-        let mut f = Fixture::new();
-        prepare(&f, true);
-        f.set("TOOLS", &line);
-        refused(&f.run("ci", "install"), message);
-        assert_eq!(downloads(&f), 0, "fetched before refusing {line:?}");
+        let mut fixture = Fixture::new();
+        prepare(&fixture, true);
+        fixture.set("TOOLS", &line);
+        refused(&fixture.run("ci", "install"), message);
+        assert_eq!(downloads(&fixture), 0, "fetched before refusing {line:?}");
     }
 }
 
@@ -228,7 +230,7 @@ fn ci_installs_its_toolbelt_once_and_each_optional_tool_behind_its_gate() {
     .map(|(tool, condition)| (tool.to_owned(), condition.to_owned()))
     .collect();
     assert_eq!(gated, expected);
-    let unique: std::collections::BTreeSet<_> = digests.iter().collect();
+    let unique: BTreeSet<_> = digests.iter().collect();
     assert_eq!(
         digests.len(),
         unique.len(),

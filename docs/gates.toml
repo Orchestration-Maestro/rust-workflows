@@ -26,10 +26,11 @@ proofs = [
 [[gate]]
 name = "Line coverage"
 kind = "always"
-fails = "Below `coverage-threshold`, `80` by default"
-standard = "North Star, Quality"
+fails = "Below `coverage-threshold`, `90` by default and never lower (COV-001)"
+standard = "North Star, Quality, COV-001"
 proofs = [
   "line_coverage_below_the_threshold_fails_the_run",
+  "ci_validates_toolchain_threshold_and_artifact_identity",
   "example_gate_replays_ci_step_bodies_against_every_fixture",
 ]
 
@@ -159,9 +160,10 @@ proofs = [
 
 [[gate]]
 name = "Recorded dependency audits"
-kind = "opt-in"
-switch = "`dependency-audit: true`, cargo-vet against your committed audits"
-standard = "SCH-007"
+kind = "default"
+switch = "`dependency-audit: false`"
+fails = "A dependency neither audited nor exempted, or a ledger without one of the six imports VET-001 requires"
+standard = "SCH-007, VET-001"
 proofs = [
   "unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does",
 ]
@@ -184,10 +186,10 @@ proofs = [
 ]
 
 [[gate]]
-name = "Module structure"
+name = "Source rules"
 kind = "opt-in"
 switch = "`quality-preview: true`, until v2.0.0 runs it always"
-standard = "ARC-001 to ARC-007"
+standard = "ARC, SIZE, NAME, DOC, LIB, TST, WSP and LNT"
 proofs = [
   "an_import_cycle_between_two_files_is_refused_by_name",
   "a_door_holding_a_function_is_refused_and_a_listing_door_passes",
@@ -198,6 +200,75 @@ proofs = [
   "a_binary_root_beyond_declarations_and_a_short_main_is_refused",
   "path_attributes_and_rust_includes_are_refused_while_include_str_passes",
   "the_quality_file_refuses_unknown_tables_and_unreasoned_exceptions",
+  "oversized_files_and_lines_are_refused_and_three_hundred_is_reported",
+  "package_names_follow_the_form_and_publishable_ones_the_prefix",
+  "badly_named_tests_and_one_word_test_modules_are_refused",
+  "a_file_without_a_module_comment_is_refused",
+  "printing_from_a_library_is_refused_and_from_a_binary_allowed",
+  "a_library_depending_on_anyhow_is_refused_but_a_binary_is_not",
+  "sleeping_in_a_test_is_refused_unless_excused",
+  "more_than_one_plain_integration_test_crate_is_refused",
+  "workspace_members_inherit_their_settings_and_dependencies",
+  "edition_resolver_and_lockfile_are_held",
+  "tightened_limits_apply_and_loosened_ones_are_refused",
+  "a_manifest_without_the_organization_lints_is_refused_until_written",
+  "a_clippy_toml_looser_than_the_organization_s_is_refused",
+  "clippy_knows_every_organization_lint_and_applies_it",
+]
+
+[[gate]]
+name = "Repository hygiene"
+kind = "opt-in"
+switch = "`quality-preview: true`, until v2.0.0 runs it always"
+standard = "HYG-001 to HYG-005, SIZE-003"
+proofs = [
+  "unlinked_markers_in_comments_are_refused_and_linked_ones_pass",
+  "snapshots_large_files_modes_and_links_are_refused",
+  "a_readme_a_licence_and_a_changelog_are_required",
+  "wide_shell_lines_and_justfiles_are_refused",
+]
+
+[[gate]]
+name = "Managed files"
+kind = "opt-in"
+switch = "`quality-preview: true`, until v2.0.0 runs it always"
+standard = "The generated files of every repository, TST-004, DEP-001"
+proofs = [
+  "init_writes_every_managed_file_and_the_check_finds_them_equal",
+  "a_managed_file_changed_by_hand_is_refused_and_sync_writes_it_back",
+  "the_managed_files_step_refuses_a_difference_in_ci",
+]
+
+[[gate]]
+name = "Commit hooks"
+kind = "opt-in"
+switch = "`quality-preview: true`, until v2.0.0 runs it always"
+standard = "The universal set, UNI"
+proofs = [
+  "the_hooks_step_runs_prek_over_every_file_and_skips_what_ci_runs_itself",
+  "a_step_runs_locally_the_way_a_commit_hook_runs_it",
+  "every_rendered_hook_runs_a_pinned_version_and_this_repository_runs_them_all",
+  "the_rendered_hooks_run_in_a_fresh_clone_with_only_prek_and_rustup",
+]
+
+[[gate]]
+name = "Pull request rules"
+kind = "opt-in"
+switch = "`quality-preview: true`, until v2.0.0 runs it always"
+standard = "COV-002, PRL-001, PRL-002"
+proofs = [
+  "new_lines_that_never_run_are_refused_past_the_allowance",
+  "a_feature_without_a_test_is_refused_and_a_large_change_reported",
+]
+
+[[gate]]
+name = "Performance budget"
+kind = "opt-in"
+switch = "`[performance] benches` in maestro-quality.toml, with `quality-preview: true` until v2.0.0"
+standard = "PRF-001"
+proofs = [
+  "a_benchmark_past_its_budget_is_refused_unless_excused",
+  "nothing_is_measured_without_a_bench_a_base_or_the_pinned_gungraun",
 ]
 
 [[gate]]

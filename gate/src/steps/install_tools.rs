@@ -7,6 +7,7 @@
 use crate::checks::private_directories::private_directory;
 use crate::checks::simple_names::{is_hex, simple};
 use crate::runner::{Cmd, Outcome, Step, add_to_path, input, native_linux, path};
+use std::fs;
 
 /// What this step declares: its inputs, its tools and its reports.
 pub(crate) const STEPS: &[Step] = &[Step {
@@ -28,7 +29,7 @@ const RELEASES: &str = "https://github.com";
 fn run() -> Outcome {
     native_linux()?;
     let bin = path("RUNNER_TEMP")?.join("rust-tools/bin");
-    std::fs::create_dir_all(&bin)
+    fs::create_dir_all(&bin)
         .map_err(|error| format!("cannot create {}: {error}", bin.display()))?;
     let downloads = private_directory(&input("RUNNER_TEMP")?, "tool-downloads")?;
     let mut installed = 0;
@@ -55,11 +56,10 @@ fn run() -> Outcome {
         }
         // Everything after the digest is the member, so a fifth word is
         // refused rather than silently dropped.
-        let member = if words.len() > 3 {
-            words[3..].join(" ")
-        } else {
-            name.to_string()
-        };
+        let member = words
+            .get(3..)
+            .filter(|rest| !rest.is_empty())
+            .map_or_else(|| name.to_string(), |rest| rest.join(" "));
         if !is_member(&member) {
             return Err(format!("Invalid archive member for {name}").into());
         }
@@ -96,7 +96,7 @@ fn run() -> Outcome {
                 .arg(&member)
                 .run()?;
         } else {
-            std::fs::copy(&archive, downloads.join(&member))
+            fs::copy(&archive, downloads.join(&member))
                 .map_err(|error| format!("cannot copy {name}: {error}"))?;
         }
         Cmd::new("install -m755")
@@ -108,7 +108,7 @@ fn run() -> Outcome {
     if installed == 0 {
         return Err("tools lists nothing to install".into());
     }
-    std::fs::remove_dir_all(&downloads)
+    fs::remove_dir_all(&downloads)
         .map_err(|error| format!("cannot remove {}: {error}", downloads.display()))?;
     add_to_path(&bin)
 }
@@ -119,17 +119,14 @@ fn is_release_asset(value: &str) -> bool {
     let parts: Vec<&str> = value.split('/').collect();
     let label = |part: &str, extra: &str| {
         !part.is_empty()
-            && part
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || "._-".contains(c) || extra.contains(c))
+            && part.chars().all(|character| {
+                character.is_ascii_alphanumeric()
+                    || "._-".contains(character)
+                    || extra.contains(character)
+            })
     };
-    parts.len() == 6
-        && label(parts[0], "")
-        && label(parts[1], "")
-        && parts[2] == "releases"
-        && parts[3] == "download"
-        && label(parts[4], "%")
-        && label(parts[5], "")
+    matches!(parts.as_slice(), [owner, repository, "releases", "download", tag, file]
+        if label(owner, "") && label(repository, "") && label(tag, "%") && label(file, ""))
         && !value.contains("..")
 }
 
@@ -140,7 +137,7 @@ fn is_member(value: &str) -> bool {
             !part.is_empty()
                 && part
                     .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || "._-".contains(c))
+                    .all(|character| character.is_ascii_alphanumeric() || "._-".contains(character))
         })
         && !value.starts_with('/')
 }

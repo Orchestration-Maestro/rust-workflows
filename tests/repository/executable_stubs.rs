@@ -31,6 +31,13 @@ fn write_and_run(dir: &Path, writer: usize) -> usize {
         .count()
 }
 
+/// Start processes until `stop` is set, as the test process does all the time.
+fn start_processes(stop: &AtomicBool) {
+    while !stop.load(Ordering::Relaxed) {
+        Command::new("true").output().unwrap();
+    }
+}
+
 #[test]
 fn a_stand_in_runs_while_other_threads_start_processes() {
     // What the test process does all the time: some threads start processes
@@ -41,11 +48,7 @@ fn a_stand_in_runs_while_other_threads_start_processes() {
     let stop = AtomicBool::new(false);
     let refused: usize = thread::scope(|scope| {
         for _ in 0..4 {
-            scope.spawn(|| {
-                while !stop.load(Ordering::Relaxed) {
-                    Command::new("true").output().unwrap();
-                }
-            });
+            scope.spawn(|| start_processes(&stop));
         }
         let writers: Vec<_> = (0..4)
             .map(|writer| {

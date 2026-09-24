@@ -3,6 +3,7 @@
 
 use super::repository::{root, tool};
 use serde_json::Value;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -23,6 +24,41 @@ pub(crate) fn yaml(path: PathBuf) -> Value {
 
 pub(crate) fn workflow(name: &str) -> Value {
     yaml(root().join(format!(".github/workflows/{name}.yml")))
+}
+
+/// Every job of every workflow, sorted by workflow: the workflow's file
+/// stem, the job's id and the job.
+fn workflow_jobs() -> Vec<(String, String, Value)> {
+    let mut names: Vec<String> = fs::read_dir(root().join(".github/workflows"))
+        .unwrap()
+        .map(|entry| {
+            let path = entry.unwrap().path();
+            path.file_stem().unwrap().to_string_lossy().into_owned()
+        })
+        .collect();
+    names.sort();
+    let mut jobs = Vec::new();
+    for name in names {
+        let data = workflow(&name);
+        for (id, job) in data["jobs"].as_object().into_iter().flatten() {
+            jobs.push((name.clone(), id.clone(), job.clone()));
+        }
+    }
+    jobs
+}
+
+/// Every step of every workflow, in job order: the workflow's file stem, the
+/// job's id and the step.
+pub(crate) fn workflow_steps() -> Vec<(String, String, Value)> {
+    workflow_jobs()
+        .into_iter()
+        .flat_map(|(name, id, job)| {
+            let steps = job["steps"].as_array().cloned().unwrap_or_default();
+            steps
+                .into_iter()
+                .map(move |step| (name.clone(), id.clone(), step))
+        })
+        .collect()
 }
 
 /// An action shipped in this repository, under `.github/actions/`.
