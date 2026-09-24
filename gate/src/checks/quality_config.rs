@@ -34,7 +34,6 @@ const CI_INPUTS: &[&str] = &[
     "unused-dependencies",
     "platforms",
     "api-compatibility",
-    "quality-preview",
 ];
 
 /// Each `[typos] words` entry, one per line.
@@ -325,6 +324,9 @@ mod tests {
             parse_ci_input("artifact-key\tstring\ta: \"b\"").unwrap().1,
             "\"a: \\\"b\\\"\""
         );
+        // v2.0.0 runs every rule on every call; the switch that held them
+        // back is gone.
+        assert!(parse_ci_input("quality-preview\tboolean\ttrue").is_err());
         let unknown = parse_ci_input("colour\tstring\tred").unwrap_err();
         assert!(unknown.message.unwrap_or_default().starts_with(
             "maestro-quality.toml: [ci] sets `colour`, which ci.yml does not take; it takes \

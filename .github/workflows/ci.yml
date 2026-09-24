@@ -83,13 +83,6 @@ name: Rust CI
           compatibility](#public-api-compatibility)
         type: boolean
         default: true
-      quality-preview:
-        description: >-
-          Run the organization quality steps that ship with v2.0.0 before that
-          release, the module structure rules first; v2.0.0 removes this input
-          and runs them always
-        type: boolean
-        default: false
     outputs:
       artifact-id:
         description: >-
@@ -142,7 +135,7 @@ jobs:
           # push or tag.
           fetch-depth: 2
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@75807b0f9d6fc3f3389f43d3890342b23943b3cb  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@12f8b536457153e7e1285ccee2d77eb3c804b3a6  # rust-workflows: the commit that ships this gate
       - name: Validate consumer inputs
         id: validate
         env:
@@ -250,21 +243,15 @@ jobs:
         run: rust-gate tools
       - name: Source rules ARC, SIZE, NAME, DOC, LIB, TST, WSP and LNT
         id: architecture
-        # Always on from v2.0.0. Until then only on request: this repository's
-        # own CI still runs the previously pinned gate, which lacks the step.
-        if: ${{ inputs.quality-preview }}
         run: rust-gate architecture
       - name: Repository hygiene HYG and the width of shell scripts
         id: hygiene
-        if: ${{ inputs.quality-preview }}
         run: rust-gate hygiene
       - name: Managed files as the organization renders them
         id: managed-files
-        if: ${{ inputs.quality-preview }}
         run: rust-gate managed-files
       - name: Commit hooks over every file
         id: hooks
-        if: ${{ inputs.quality-preview }}
         env:
           # mise asks GitHub's API for each hook's release; an anonymous
           # runner shares its rate limit with every other job on its address.
@@ -272,7 +259,6 @@ jobs:
         run: rust-gate hooks
       - name: Pull request rules PRL
         id: pull-request
-        if: ${{ inputs.quality-preview }}
         env:
           PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
         run: rust-gate pull-request
@@ -292,7 +278,6 @@ jobs:
         run: rust-gate coverage
       - name: Coverage of the lines a pull request adds
         id: changed-coverage
-        if: ${{ inputs.quality-preview }}
         env:
           PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
         run: rust-gate changed-coverage
@@ -309,7 +294,6 @@ jobs:
         run: rust-gate mutants
       - name: Instruction counts of the declared benchmarks against the base
         id: performance
-        if: ${{ inputs.quality-preview }}
         run: rust-gate performance
       - name: Public API compatibility
         id: api
@@ -435,7 +419,7 @@ jobs:
       revision: ${{ needs.checks.outputs.revision }}
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@75807b0f9d6fc3f3389f43d3890342b23943b3cb  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@12f8b536457153e7e1285ccee2d77eb3c804b3a6  # rust-workflows: the commit that ships this gate
       - name: Require every check
         id: required
         env:
