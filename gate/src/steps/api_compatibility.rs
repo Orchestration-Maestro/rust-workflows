@@ -30,6 +30,9 @@ const LIBRARIES: &str = concat!(
     r#"any(. == "lib" or . == "rlib" or . == "proc-macro")) | "\(.name) \(.manifest_path)""#
 );
 
+/// The package a manifest names, or nothing for a workspace root.
+const BASE_NAME: &str = ".package.name // \"\"";
+
 /// The oldest compiler cargo-semver-checks 0.50 runs on.
 const OLDEST_RUST: (u64, u64, u64) = (1, 93, 0);
 
@@ -97,8 +100,8 @@ fn run() -> Outcome {
 }
 
 /// The libraries the base branch already has, which can be compared, and
-/// the ones this pull request adds, which have no baseline: a manifest at the
-/// same path in the base commit decides.
+/// the ones this pull request adds or renames, which have no baseline: the
+/// base commit's manifest at the same path, naming the same package, decides.
 fn split_by_base(job: &Job, libraries: &str) -> Result<(Vec<String>, Vec<String>), Failure> {
     let top = Cmd::new("git rev-parse --show-toplevel")
         .cwd(&job.project)
@@ -110,11 +113,19 @@ fn split_by_base(job: &Job, libraries: &str) -> Result<(Vec<String>, Vec<String>
             continue;
         };
         let relative = manifest.strip_prefix(&top).unwrap_or(manifest);
-        let in_base = Cmd::new("git cat-file -e")
+        let base_manifest = Cmd::new("git show")
             .arg(format!("HEAD^1:{relative}"))
             .cwd(&job.project)
             .capture()
-            .is_ok();
+            .ok();
+        let base_name = base_manifest.and_then(|text| {
+            Cmd::new("jaq --from toml -r")
+                .arg(BASE_NAME)
+                .stdin_bytes(text.as_bytes())
+                .capture()
+                .ok()
+        });
+        let in_base = base_name.is_some_and(|base| base.trim() == name);
         if in_base {
             compared.push(name.to_owned());
         } else {

@@ -26,7 +26,9 @@ fn prepare(fixture: &mut Fixture, parent: &str, members: &[Member<'_>], semver: 
             r#"case "$1 $2" in
   "rev-parse --show-toplevel") pwd ;;
   "rev-parse --verify") {parent} ;;
-  "cat-file -e") [[ " {} " == *" $3 "* ]] ;;
+  "show HEAD^1:"*) [[ " {} " == *" $2 "* ]] || exit 128
+    member="${{2#HEAD^1:}}"
+    printf '[package]\nname = "%s"\n' "${{BASE_NAME:-${{member%/Cargo.toml}}}}" ;;
   *) exit 1 ;;
 esac"#,
             in_base.join(" ")
@@ -91,7 +93,7 @@ fn an_undeclared_break_fails_the_pull_request() {
 #[test]
 fn a_declared_break_and_what_has_no_api_are_not_checked() {
     // Each case is reported as not applicable, never as a pass.
-    let cases: [(&str, &str, &[Member<'_>], &str, &str); 6] = [
+    let cases: [(&str, &str, &[Member<'_>], &str, &str); 7] = [
         (
             "PULL_REQUEST_TITLE",
             "feat(api)!: drop checked_sum",
@@ -134,6 +136,15 @@ fn a_declared_break_and_what_has_no_api_are_not_checked() {
             &[("fresh", "lib", false)],
             "exit 0",
             "new in this pull request: fresh",
+        ),
+        // A library the pull request renames has no baseline under its new
+        // name: the base manifest at its path names another package.
+        (
+            "BASE_NAME",
+            "old-fixture",
+            &[("fixture", "lib", true)],
+            "exit 0",
+            "new in this pull request: fixture",
         ),
     ];
     for (key, value, members, parent, said) in cases {
