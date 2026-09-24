@@ -47,10 +47,31 @@ fn every_install_row_is_the_asset_mise_locked() {
     // Two records of one download drift apart; the lock is the one a tool
     // update rewrites, so every workflow row must say what it says. A lock
     // that keeps another hash function than SHA-256 still pins the URL.
+    // mise installs the rest, so scripts/bootstrap.sh pins mise itself.
     let rows = install_rows(&root());
     assert!(rows.len() > 20, "only {} install rows", rows.len());
+    let bootstrap = fs::read_to_string(root().join("scripts/bootstrap.sh")).unwrap();
+    let pinned = |key: &str| {
+        bootstrap
+            .lines()
+            .find_map(|line| line.strip_prefix(&format!("readonly {key}=")))
+            .unwrap()
+            .to_owned()
+    };
     for (name, asset, digest, _) in rows {
         let url = format!("https://github.com/{}", asset.replace("%2F", "/"));
+        if name == "mise" {
+            let version = pinned("MISE_VERSION");
+            assert_eq!(
+                url,
+                format!(
+                    "https://github.com/jdx/mise/releases/download/{version}/\
+                     mise-{version}-linux-x64.tar.gz"
+                )
+            );
+            assert_eq!(digest, pinned("MISE_SHA256"));
+            continue;
+        }
         assert_eq!(locked(&root(), &name, "url"), url, "{name}");
         let checksum = locked(&root(), &name, "checksum");
         if let Some(sha256) = checksum.strip_prefix("sha256:") {
