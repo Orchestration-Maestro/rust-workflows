@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.0.0...v2.0.1) (2026-09-24)
+
+
+### Bug Fixes
+
+* give the hooks step the mise bootstrap.sh pins ([#38](https://github.com/Orchestration-Maestro/rust-workflows/issues/38)) ([a88ec51](https://github.com/Orchestration-Maestro/rust-workflows/commit/a88ec510980675b6b9f315765d45911bcb2d70d0))
+* skip dependabot auto-merge on runs a person started ([#36](https://github.com/Orchestration-Maestro/rust-workflows/issues/36)) ([57245f6](https://github.com/Orchestration-Maestro/rust-workflows/commit/57245f6e497fd724120fdf1be7f483e037bd21bb))
+
 ## [2.0.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v1.2.1...v2.0.0) (2026-09-24)
 
 
