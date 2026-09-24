@@ -64,8 +64,11 @@ Both keep what a person wrote:
   KPI rows. A rule the organization holds everywhere gets its default; any
   other new rule arrives as "Not mapped yet".
 
-The rendering is byte-identical to the scripts' on every organization
-repository; that parity is the port's acceptance test (section 6).
+Below each page's intro, the rendering is byte-identical to the scripts' on
+every organization repository; that parity is the port's acceptance test
+(section 6). The intro differs by design: it names `rust-gate rules` rather than
+the script, the version of the rules it follows, and links to that version.
+The default for C-001 names the command the same way.
 
 ### 4.2 The golden rules travel inside the binary
 
@@ -141,8 +144,9 @@ its release.
   explanation survives a run; a rule added to the embedded copy appears as
   "Not mapped yet"; `--check` exits 1 on a stale file and 0 on a current one.
 - **Parity:** in phases 1 and 2, the output for each organization repository
-  equals the Python script's output, byte for byte. The fixtures are captured
-  once from the scripts and kept as test data.
+  equals the Python script's output below each page's intro, byte for byte,
+  but for the C-001 default. The plan runs the comparison on fresh clones
+  before the pull request; the contract tests' fixtures cover each behaviour.
 - **Hooks:** the rendered `.pre-commit-config.yaml` holds both hooks, and the
   live hooks test runs them.
 - **Network:** with `CHECK_NETWORK=1`, the embedded copy equals the `.github`
