@@ -74,6 +74,8 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── northstar.md                        # The motto, four axes, the KPI table and the test behind each bar
 │   │   └── security.md                         # Security requirements and how they are enforced
 │   ├── superpowers/                            # Designs written and approved before a change is built
+│   │   ├── plans/                              # One implementation plan per approved design, task by task
+│   │   │   └── 2026-09-24-org-quality-gate-1-architecture.md  # Plan 1 of 8: the module structure rules, and this repository held to them
 │   │   └── specs/                              # One approved design per change, named by date and topic
 │   │       └── 2026-09-24-org-quality-gate-design.md  # The quality gate every organization repository inherits, and how
 │   ├── README.md                               # Complete workflow contracts and usage examples

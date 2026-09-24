@@ -1,7 +1,7 @@
 # Organization quality gate: one standard every repository inherits
 
 - Date: 2026-09-24
-- Status: design approved in conversation, awaiting review of this written spec
+- Status: approved by the owner on 2026-09-24
 - Owner: rust-workflows (engine), `.github` (organization automation)
 - Release: rust-workflows v2.0.0, a breaking change for every consumer
 
@@ -67,7 +67,7 @@ maestro-core's `ci.yml` also calls rust-workflows at a placeholder commit,
 | Where the rules live | Everything in `rust-gate` (approach A) |
 | Scope of phase 1 | Every rule family in this document, including cargo-vet and the performance gate |
 | Coverage | 90 % of all lines; 95 % of changed lines for `feat` and `fix`, 90 % for other types |
-| Exceptions | Only for the six rules where a deliberate choice is legitimate (ARC-005, DUP-001, HYG-003, TST-001, DEP-001, PRF-001), each with a reason; a stale exception fails. The conversation started from two rules; the other four were added while writing this spec and need confirmation in its review |
+| Exceptions | Only for the six rules where a deliberate choice is legitimate (ARC-005, DUP-001, HYG-003, TST-001, DEP-001, PRF-001), each with a reason; a stale exception fails. The conversation started from two rules; the owner confirmed the other four in the review of this spec |
 | Distribution | Generated, byte-checked files; automatic sync pull requests on every release |
 
 ## 5. Rule catalogue
@@ -96,10 +96,10 @@ inside a string or a comment is never read as an import. Inline
 | --- | --- | --- |
 | ARC-001 | An import cycle between files of one crate, directly or through others | Graph of `crate::`, `super::` and declared-child paths; the message names every file of the cycle |
 | ARC-002 | A door holding more than doors hold: any `mod.rs`, and `lib.rs` when its crate has other modules, may contain only `mod`, `use`, `pub use` and `pub(...) use` declarations, attributes and doc comments | Top-level items of the door file |
-| ARC-003 | A path through a door it does not own: from outside module `m`, `crate::m::Name` is allowed only when `Name` is declared or re-exported by `m`'s door; `crate::m::child::Name` is refused. The same holds through `super::` | Resolved path against each door's offer |
+| ARC-003 | A path that walks past a door: when a `mod.rs` re-exports a name, a path from outside that directory to the module defining the name is refused, `crate::m::child::Name` where the door offers `crate::m::Name`. A door that offers a child module itself, `pub(crate) mod child;`, lets the path continue at that child | Resolved path against each door's re-exports |
 | ARC-004 | An import against the declared layer order, when `maestro-quality.toml` declares layers for the crate. A module may import only from layers to its right; every top-level module of that crate must belong to exactly one layer | `[[crate]] layers` |
-| ARC-005 | A seam serving one caller: an item a `mod.rs` door offers that exactly one module outside the door's subtree uses must be narrowed or moved next to its caller. The library's own root, the public API, is excluded. **Exception** | Door offers against importers; rustc `unreachable_pub` enforces the visibility half (section 5.10) |
-| ARC-006 | A thick binary root: `main.rs` and every `src/bin/*.rs` may hold only `mod` and `use` declarations, attributes, doc comments and `fn main`, whose body is at most 25 lines | Top-level items and `main`'s span |
+| ARC-005 | A seam serving one caller: an item a `mod.rs` door offers past its parent, that exactly one module outside the directory uses and no module inside shares besides the one defining it, must move next to its caller. Three cases cannot move and are not counted: an offer no wider than `pub(super)`, a use by the crate root, which composes the crate, and an item shared inside the directory. A library's root, its public API, is not a `mod.rs`. **Exception** | Door offers against importers; rustc `unreachable_pub` enforces the visibility half (section 5.10) |
+| ARC-006 | A thick binary root: the root of every binary target may hold only `mod` and `use` declarations, attributes, doc comments and a `fn main` spanning at most 25 lines, signature and closing brace included | Top-level items and `main`'s span |
 | ARC-007 | A module tree that differs from the file tree: `#[path = ...]` attributes and `include!` of Rust source. `include_str!` and `include_bytes!` stay allowed | Attribute and macro scan |
 
 ARC-007 is what makes the other six exact: with it, the directory layout is the
@@ -273,10 +273,9 @@ One command, three places, and the same bytes in each.
    uses. Linux x64 only, the platform the gate's tool rows cover.
 
 rust-workflows runs the same command on itself in `just check` and in
-`ci-internal.yml`. `tests/gate/acyclic_imports.rs`, the generic parts of
-`tests/gate/layer_boundaries.rs`, `tests/repository/size_limits.rs` and
-`tests/repository/naming_rules.rs` are deleted, and their rules become the
-fixtures of the command. The rust-workflows-specific tests about its own
+`ci-internal.yml`. Its internal tests for import cycles, the generic parts of
+its layer boundaries, its size limits and its test names are deleted, and
+their rules become the fixtures of the command. The rust-workflows-specific tests about its own
 workflows and step registry stay. Its layers, `steps`, `checks` and `runner`,
 are declared in its own `maestro-quality.toml`.
 
@@ -302,9 +301,9 @@ may say lives in one optional file:
 [limits]              # tighten only; a looser value is refused
 file-lines = 400
 
-[[crate]]             # ARC-004
-name = "rust-gate"
-layers = ["steps", "checks", "runner"]
+[[crate]]             # ARC-004: the target whose root is this file
+root = "gate/src/main.rs"
+layers = ["steps", "checks", "runner"]   # a layer may name several modules
 
 [typos]               # words this repository means, merged into typos.toml
 words = ["jaq", "zizmor"]
