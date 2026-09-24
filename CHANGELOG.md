@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.0.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v1.2.1...v2.0.0) (2026-09-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* the quality-preview input is removed; a caller passing it fails to start.
+* finish the organization quality gate behind quality-preview ([#32](https://github.com/Orchestration-Maestro/rust-workflows/issues/32))
+
+### Features
+
+* finish the organization quality gate behind quality-preview ([#32](https://github.com/Orchestration-Maestro/rust-workflows/issues/32)) ([deb5670](https://github.com/Orchestration-Maestro/rust-workflows/commit/deb56707c850e204c96f6a9af093769cdda9e1e5))
+* refuse module structure faults with rust-gate architecture ([#30](https://github.com/Orchestration-Maestro/rust-workflows/issues/30)) ([cb65e7c](https://github.com/Orchestration-Maestro/rust-workflows/commit/cb65e7c228b5c6b5c1b58d26e271a1fee0567c7e))
+* run every organization rule on every call ([#33](https://github.com/Orchestration-Maestro/rust-workflows/issues/33)) ([207cadb](https://github.com/Orchestration-Maestro/rust-workflows/commit/207cadbb6ee4b129cc8cc7b3e33e5af7bca424af))
+* score every rule family and leave the home's hooks to just check ([#35](https://github.com/Orchestration-Maestro/rust-workflows/issues/35)) ([12f8b53](https://github.com/Orchestration-Maestro/rust-workflows/commit/12f8b536457153e7e1285ccee2d77eb3c804b3a6))
+
+
+### Bug Fixes
+
+* ship the gate's build inputs and authenticate hook installs ([#34](https://github.com/Orchestration-Maestro/rust-workflows/issues/34)) ([cc14131](https://github.com/Orchestration-Maestro/rust-workflows/commit/cc141317193572396c11bb1a130d88634a590314))
+
 ## [1.2.1](https://github.com/Orchestration-Maestro/rust-workflows/compare/v1.2.0...v1.2.1) (2026-09-23)
 
 
