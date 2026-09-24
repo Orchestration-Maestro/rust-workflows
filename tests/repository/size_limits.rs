@@ -1,37 +1,10 @@
 //! The size limits the repository holds its own code to beyond what
-//! `rust-gate architecture` holds (SIZE-002 and SIZE-003 on every Rust file):
-//! functions through Clippy's thresholds, and the width of shell scripts and
-//! the justfile, which no module tree reaches.
+//! `rust-gate architecture` and `rust-gate hygiene` hold in `just check`
+//! (SIZE-002 and SIZE-003): functions through Clippy's thresholds, and a binary
+//! that never panics.
 
 use crate::harness::root;
 use std::fs;
-use std::path::{Path, PathBuf};
-
-/// Every source file the limits apply to.
-fn source_files(root: &Path, extensions: &[&str], names: &[&str]) -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    let mut queue = vec![root.to_path_buf()];
-    while let Some(directory) = queue.pop() {
-        for entry in fs::read_dir(&directory).unwrap() {
-            let path = entry.unwrap().path();
-            let name = path.file_name().unwrap().to_string_lossy().to_string();
-            if matches!(name.as_str(), ".git" | ".tools" | "target") {
-                continue;
-            }
-            if path.is_dir() {
-                queue.push(path);
-            } else if extensions
-                .iter()
-                .any(|e| path.extension().is_some_and(|x| x == *e))
-                || names.contains(&name.as_str())
-            {
-                files.push(path);
-            }
-        }
-    }
-    files.sort();
-    files
-}
 
 #[test]
 fn every_crate_holds_the_complexity_limits() {
@@ -84,38 +57,6 @@ fn every_crate_holds_the_complexity_limits() {
         justfile.contains("cargo clippy --manifest-path \"$manifest/Cargo.toml\"")
             && justfile.contains("-- -D warnings"),
         "the justfile must run Clippy with -D warnings on every crate"
-    );
-}
-
-#[test]
-fn no_code_line_exceeds_one_hundred_columns() {
-    // The width the editor configuration declares for Rust and shell, held
-    // here because rustfmt wraps code but not a string literal, and nothing
-    // wraps a justfile. Workflow YAML is not scanned: a pinned action and a
-    // release asset with its digest are single tokens longer than any limit.
-    let root = root();
-    let mut over = Vec::new();
-    let mut scanned = 0;
-    for path in source_files(&root, &["rs", "sh"], &["justfile"]) {
-        scanned += 1;
-        for (number, line) in fs::read_to_string(&path).unwrap().lines().enumerate() {
-            if line.chars().count() > 100 {
-                over.push(format!(
-                    "{}:{}",
-                    path.strip_prefix(&root).unwrap().display(),
-                    number + 1
-                ));
-            }
-        }
-    }
-    assert!(
-        scanned > 30,
-        "only {scanned} files scanned; the walk drifted"
-    );
-    assert!(
-        over.is_empty(),
-        "lines over 100 columns:\n  {}",
-        over.join("\n  ")
     );
 }
 

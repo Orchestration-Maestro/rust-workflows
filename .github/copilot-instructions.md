@@ -158,6 +158,12 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   │   ├── sizes.rs                    # SIZE-002 and SIZE-003: lines of code per file and columns per line
 │   │   │   │   ├── sources.rs                  # DOC-001, LIB-001 and TST-001: module comments, library prints, waits in tests
 │   │   │   │   └── step.rs                     # The step: module trees, the rules, the exceptions and the report
+│   │   │   ├── hygiene/                        # rust-gate hygiene: the step and one module per group of rules over tracked files
+│   │   │   │   ├── comments.rs                 # HYG-001: work left for later names its issue
+│   │   │   │   ├── files.rs                    # HYG-002 to HYG-005: snapshots, large files, modes, case, symlinks, required files
+│   │   │   │   ├── mod.rs                      # The step's door: its modules and its declaration
+│   │   │   │   ├── step.rs                     # The step: tracked files, the rules, the exceptions and the report
+│   │   │   │   └── widths.rs                   # SIZE-003 for shell scripts and justfiles
 │   │   │   ├── quality_scorecard/              # rust-gate scorecard: the step and the value it renders
 │   │   │   │   ├── mod.rs                      # The step's door: its two modules and its declaration
 │   │   │   │   ├── scorecard.rs                # A run's scorecard as a value: its controls, and the JSON, Markdown and badge of them
@@ -182,7 +188,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── recorded_audits.rs              # rust-gate vet: cargo-vet against the committed ledger
 │   │   │   ├── registry.rs                     # Every step's declaration in workflow order, and the two doors main.rs calls
 │   │   │   ├── release_build.rs                # rust-gate build: release tests, auditable build, packages, per-member SBOMs
-│   │   │   ├── report_duplicates.rs            # rust-gate duplication: functions whose syntax trees look alike, reported and never enforced
+│   │   │   ├── report_duplicates.rs            # rust-gate duplication: pairs of alike functions reported, three alike refused (DUP-001)
 │   │   │   ├── report_sizes.rs                 # rust-gate complexity: function and file sizes, reported and never enforced
 │   │   │   ├── require_every_check.rs          # rust-gate required: the one status a branch protection can require
 │   │   │   ├── secret_scan.rs                  # rust-gate secrets: Gitleaks over the current revision, findings redacted
@@ -203,7 +209,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── api_compatibility.rs                # ci.yml: an undeclared API break fails a pull request; what has no API is not applicable
 │   │   ├── architecture_rules.rs               # ci.yml: ARC-001 to ARC-007, each refused by name, and the exceptions maestro-quality.toml takes
 │   │   ├── complexity_report.rs                # ci.yml: function and file sizes, reported and never held against the run
-│   │   ├── duplication_report.rs               # ci.yml: duplicated functions, reported and never held against the run
+│   │   ├── duplication_report.rs               # ci.yml: pairs reported, three functions of one shape refused unless excused
 │   │   ├── feature_combinations.rs             # ci.yml: real per-feature and combined compilation, plus replay coverage
 │   │   ├── input_validation.rs                 # unsafe-audit.yml and fuzz.yml: every malformed input refused before a toolchain is touched
 │   │   ├── install_tools.rs                    # rust-gate install-tools: what it refuses, honours, and ci.yml installs
@@ -213,6 +219,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── quality_reports.rs                  # ci.yml: diagnostics survive failing tools without changing their verdict
 │   │   ├── release_payload.rs                  # ci.yml: release build, payload, bills of materials, and the example gate
 │   │   ├── release_payload_refusals.rs         # The release payload's refusals: lockfile drift, unhardened or irreproducible binaries, malformed staging
+│   │   ├── repository_hygiene.rs               # ci.yml: HYG-001 to HYG-005 and shell width, each refused by name
 │   │   ├── scorecard_and_required_status.rs    # ci.yml: the scorecard, the required status and mutation testing
 │   │   ├── scorecard_states.rs                 # ci.yml: selection, applicability and execution reported separately
 │   │   ├── source_rules.rs                     # ci.yml: SIZE, NAME, DOC, LIB, TST and WSP, each refused by name, and the limits a repository tightens
@@ -255,7 +262,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── north_star.rs                       # Promised controls run, every gate names its proof, no lint silenced
 │   │   ├── pinned_tool_usage.rs                # Every job installs every pinned tool it invokes before a step reads it
 │   │   ├── secret_and_advisory_scans.rs        # Gitleaks over the tree; RustSec audits under CHECK_NETWORK=1
-│   │   ├── size_limits.rs                      # Clippy thresholds, a binary that never panics, shell and justfile width
+│   │   ├── size_limits.rs                      # Clippy thresholds, and a binary that never panics
 │   │   ├── tool_updates.rs                     # Every install row is what mise locked; update-tools moves a pin everywhere at once
 │   │   ├── toolbelt_and_shellcheck.rs          # Toolbelt links to the locked builds; ShellCheck over every Bash line left
 │   │   ├── version_pins.rs                     # Tool versions, the toolchain pin and the speed target, one copy each

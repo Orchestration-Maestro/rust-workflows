@@ -68,6 +68,12 @@ check:
         cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- architecture
       rm -rf "$scratch"
     done
+    # And the hygiene every tracked file holds to, once for the whole checkout.
+    scratch=$(mktemp -d)
+    PROJECT="$PWD" REPORTS="$scratch" RUNNER_TEMP="$scratch" \
+      GITHUB_WORKSPACE="$PWD" GITHUB_STEP_SUMMARY="$scratch/summary.md" \
+      cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- hygiene
+    rm -rf "$scratch"
     RUSTDOCFLAGS='-D warnings -D missing_docs' cargo doc --manifest-path gate/Cargo.toml \
       --no-deps --locked --offline --document-private-items
     cargo test --manifest-path tests/Cargo.toml --locked

@@ -2,12 +2,11 @@
 //! manifest, the source rules run over them, the exceptions
 //! `maestro-quality.toml` takes, and one report line per finding.
 
-use crate::checks::findings::{Finding, excuse, relative};
+use crate::checks::findings::{Finding, excuse, publish_findings, relative};
 use crate::checks::manifests::{cargo_packages, read_cargo_metadata, workspace_of};
 use crate::checks::module_tree::module_trees;
 use crate::checks::quality_config::{self, QualityConfig};
-use crate::runner::{Failure, Job, Outcome, Step, input, summary, write};
-use std::fmt::Write as _;
+use crate::runner::{Failure, Job, Outcome, Step, input};
 use std::path::Path;
 
 /// What this step declares: its inputs, its tools and its reports.
@@ -37,7 +36,8 @@ fn run() -> Outcome {
     let scope = scope(&workspace, &job.project);
     let (found, notes) = findings(&job, &workspace, &config, &scope)?;
     let (kept, excused) = excuse(found, &config.exceptions, RULES, &scope);
-    report(&job, &kept, &excused, &notes)
+    let report = job.report("architecture.txt")?;
+    publish_findings(&report, "Source rules", &kept, &excused, &notes)
 }
 
 /// Every finding of every rule over every target and package of the
@@ -90,40 +90,6 @@ fn scope(workspace: &Path, project: &Path) -> String {
     } else {
         format!("{directory}/")
     }
-}
-
-/// Write every finding, every excused one with its reason, then every
-/// report line, to the report and the summary, and fail when a finding is
-/// left.
-fn report(job: &Job, kept: &[Finding], excused: &[(Finding, &str)], notes: &[String]) -> Outcome {
-    let mut text = String::new();
-    for finding in kept {
-        let _ = writeln!(text, "{finding}");
-    }
-    for (finding, reason) in excused {
-        let _ = writeln!(text, "EXCUSED {finding} (because {reason})");
-    }
-    for note in notes {
-        let _ = writeln!(text, "{note}");
-    }
-    write(&job.report("architecture.txt")?, text.as_bytes(), false)?;
-    if kept.is_empty() {
-        println!("Source rules: no finding, {} excused", excused.len());
-        for note in notes {
-            println!("{note}");
-        }
-        return summary(&format!(
-            "### Source rules\n\nNo finding; {} excused.\n",
-            excused.len()
-        ));
-    }
-    eprint!("{text}");
-    summary(&format!("### Source rules\n\n```text\n{text}```\n"))?;
-    let plural = if kept.len() == 1 { "" } else { "s" };
-    Err(Failure::from(format!(
-        "source rules: {} finding{plural}; each names its rule, its file and what to do",
-        kept.len()
-    )))
 }
 
 #[cfg(test)]

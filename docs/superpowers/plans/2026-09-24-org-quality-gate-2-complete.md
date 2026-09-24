@@ -180,3 +180,16 @@ Rulings taken while executing, newest last.
    retired naming test never asked of the examples, and the repository test
    that reads the example manifests resolves the values a member inherits from
    the workspace root.
+5. Phase B keeps the rules the gate reads itself, HYG-001 to HYG-005, SIZE-003
+   for shell scripts and justfiles, and DUP-001. DOC-002 (lychee), DOC-003
+   (rumdl), shellcheck, shfmt and editorconfig-checker move to phase C's hook
+   set, which CI runs through prek exactly as a commit does: pinning them a
+   second time in the `hygiene` step would give each tool two installers and
+   two versions to keep in step, the drift this gate exists to remove.
+6. The HYG refusals read as `docs/ci.md` lists them; a DUP-001 exception names
+   the group's first function, by file and name, since a group has no single
+   file.
+7. When similarity-rs itself fails, `duplication` still reports `NOT MEASURED`
+   and passes, as before this plan: failing the run on a tool outage would make
+   every consumer's CI depend on one tool's uptime. Cost if wrong: a broken
+   similarity-rs lets a third copy through until the report is read.

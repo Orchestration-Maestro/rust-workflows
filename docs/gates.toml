@@ -212,6 +212,18 @@ proofs = [
 ]
 
 [[gate]]
+name = "Repository hygiene"
+kind = "opt-in"
+switch = "`quality-preview: true`, until v2.0.0 runs it always"
+standard = "HYG-001 to HYG-005, SIZE-003"
+proofs = [
+  "unlinked_markers_in_comments_are_refused_and_linked_ones_pass",
+  "snapshots_large_files_modes_and_links_are_refused",
+  "a_readme_a_licence_and_a_changelog_are_required",
+  "wide_shell_lines_and_justfiles_are_refused",
+]
+
+[[gate]]
 name = "Semantic-version compatibility"
 kind = "opt-in"
 switch = "`semver-check: true` on `publish-crate.yml`; off for a first publication, which has no baseline"

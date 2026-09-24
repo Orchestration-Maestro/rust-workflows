@@ -13,6 +13,7 @@ mod dependency_policy;
 mod feature_combinations;
 mod format_lint_test;
 mod fuzz_regression;
+mod hygiene;
 mod install_toolchain;
 mod install_tools;
 mod line_coverage;

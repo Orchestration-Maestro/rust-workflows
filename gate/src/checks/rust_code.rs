@@ -68,6 +68,27 @@ pub(crate) fn blanked(source: &str) -> String {
     String::from_utf8(out).unwrap_or_default()
 }
 
+/// Every comment of a Rust source, line and block, with the line it starts
+/// on.
+pub(crate) fn comments(source: &str) -> Vec<(usize, &str)> {
+    let bytes = source.as_bytes();
+    let mut found = Vec::new();
+    let mut index = 0;
+    while index < bytes.len() {
+        match literal_end(bytes, index) {
+            Some(end) => {
+                let text = source.get(index..end).unwrap_or_default();
+                if text.starts_with("//") || text.starts_with("/*") {
+                    found.push((line_at(source, index), text));
+                }
+                index = end;
+            }
+            None => index += 1,
+        }
+    }
+    found
+}
+
 /// Turn every byte but a line break into a space.
 pub(crate) fn blank(bytes: &mut [u8]) {
     for byte in bytes.iter_mut().filter(|byte| **byte != b'\n') {
@@ -378,6 +399,12 @@ mod tests {
             code.split_whitespace().collect::<Vec<_>>(),
             ["a", "b", "c", "d", "e", "f"]
         );
+    }
+
+    #[test]
+    fn comments_are_listed_with_their_line_and_strings_are_not() {
+        let source = "let a = \"// not one\";\n// one\nlet b = 1; /* two\n */\n";
+        assert_eq!(super::comments(source), [(2, "// one"), (3, "/* two\n */")]);
     }
 
     #[test]

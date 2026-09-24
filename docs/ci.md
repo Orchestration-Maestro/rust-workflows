@@ -134,9 +134,31 @@ selects `clippy-level: pedantic`, which makes function length blocking.
 
 The `duplication` step lists the pairs of functions whose syntax trees match
 at 90 % or more, among functions of eight lines or more, through
-similarity-rs. It never fails the run: the listing lands in `duplication.txt`
-and its count in the step summary. A pair is a candidate to merge, or a shape
-two functions share on purpose; the report leaves that call to the consumer.
+similarity-rs; the listing lands in `duplication.txt` and its count in the
+step summary. A pair is reported and never fails the run. Three functions or
+more that the pairs join into one shape fail it, DUP-001, the rule of three:
+the third copy is the signal to extract what they share. A shape shared on
+purpose takes a DUP-001 exception in `maestro-quality.toml`, named by the
+first function's file and name. When similarity-rs itself fails, the report
+says so and the step does not guess.
+
+### Repository hygiene
+
+Preview until v2.0.0, with `quality-preview: true` like the source rules:
+`rust-gate hygiene` reads every file git tracks in the checkout, whatever its
+language, and refuses:
+
+| Rule | Refuses |
+| --- | --- |
+| HYG-001 | A `TODO`, `FIXME`, `HACK` or `XXX` in a Rust, shell, TOML, YAML or justfile comment without `#123` or an issue URL |
+| HYG-002 | A pending snapshot committed, `*.snap.new` or `*.pending-snap` |
+| HYG-003 | A file over 500 KB, unless an exception records the asset |
+| HYG-004 | An executable without a shebang, a shebang without the executable bit, two paths differing only by case, a symlink whose target is missing or lies outside the repository |
+| HYG-005 | A missing `README.md` or `LICENSE`, or a missing `CHANGELOG.md` beside a release-please configuration |
+| SIZE-003 | A shell script or justfile line over 100 columns |
+
+The findings, and the ones an exception excuses with its reason, are in
+`hygiene.txt`.
 
 ### Source rules
 
@@ -439,7 +461,8 @@ earlier failure. The scorecard identifies controls that never ran.
 | `clippy.json` | Diagnostics from the enforcing Clippy invocation, preserved even on failure | always |
 | `tests.xml` | nextest JUnit, including failed tests when nextest produces it | always |
 | `complexity.txt`, `complexity.json` | Functions over the size thresholds and files over 300 lines of code; informational, never fails the run | always |
-| `duplication.txt` | Pairs of functions at or above 90 % similarity, eight lines or more; informational, never fails the run | always |
+| `duplication.txt` | DUP-001 findings, then the pairs of functions at or above 90 % similarity, eight lines or more | always |
+| `hygiene.txt` | Every hygiene finding with its rule, file and line, then each finding an exception excuses, with its reason | `quality-preview: true` until v2.0.0 |
 | `architecture.txt` | Every source-rule finding with its rule, file and line, each finding an exception excuses with its reason, then the files over 300 lines | `quality-preview: true` until v2.0.0 |
 | `coverage.lcov` | Line coverage in LCOV format | always |
 | `audit.json` | RustSec advisory results | always |

@@ -203,7 +203,7 @@ jobs:
             # a committed deny.toml on top.
             cargo-deny EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz 9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f cargo-deny-0.20.2-x86_64-unknown-linux-musl/cargo-deny
             # similarity-rs lists the pairs of functions whose syntax trees match,
-            # information the duplication step reports and never enforces.
+            # what the duplication step reports, and refuses from three alike.
             similarity-rs mizchi/similarity/releases/download/v0.5.0/similarity-v0.5.0-x86_64-unknown-linux-gnu.tar.gz 2afda6201b6afb1ee36c1ce51b95a538ec99310c79f661905536d917470a406a similarity-v0.5.0-x86_64-unknown-linux-gnu/similarity-rs
             # cargo-hack builds each declared feature on its own. Whether a workspace
             # has features is a property of its manifests, not of an input, so this
@@ -249,13 +249,17 @@ jobs:
         # own CI still runs the previously pinned gate, which lacks the step.
         if: ${{ inputs.quality-preview }}
         run: rust-gate architecture
+      - name: Repository hygiene HYG and the width of shell scripts
+        id: hygiene
+        if: ${{ inputs.quality-preview }}
+        run: rust-gate hygiene
       - name: Formatting, Clippy and tests
         id: quality
         run: rust-gate quality
       - name: Function and file sizes, never blocking
         id: complexity
         run: rust-gate complexity
-      - name: Duplicated functions, never blocking
+      - name: Duplicated functions, pairs reported and three alike refused
         id: duplication
         run: rust-gate duplication
       - name: Line coverage gate

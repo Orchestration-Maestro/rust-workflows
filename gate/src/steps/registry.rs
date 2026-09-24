@@ -13,6 +13,7 @@ const REGISTRY: &[&[Step]] = &[
     super::configure_cargo_registry::STEPS,
     super::install_toolchain::STEPS,
     super::architecture::STEPS,
+    super::hygiene::STEPS,
     super::format_lint_test::STEPS,
     super::report_sizes::STEPS,
     super::report_duplicates::STEPS,
