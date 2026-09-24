@@ -183,6 +183,27 @@ inputs its caller passes, `[ci] platforms = "macos windows"`. The files every
 repository holds as they are here are rust-workflows' own, read in when the
 gate is built.
 
+### Commit hooks
+
+Every repository's `.pre-commit-config.yaml` is a managed file, so the hooks a
+commit runs are the organization's: prek's own checks (merge markers, YAML,
+TOML and JSON syntax, final newlines, trailing whitespace, line endings, files
+over 500 KB, case conflicts, shebangs), then typos, gitleaks over the staged
+change, yamlfmt, taplo, actionlint, zizmor, shellcheck, shfmt, rumdl, lychee
+offline and editorconfig-checker, each installed by prek through mise at the
+version rust-workflows' `mise.toml` pins; the commit message rules; and
+`rust-gate hygiene --local`, the gate built by Cargo from the release the
+caller pins. A Rust repository adds `cargo fmt`, `rust-gate architecture
+--local` and, before a push, Clippy with the organization's lints. A developer
+needs prek and rustup and nothing else.
+
+Preview until v2.0.0, with `quality-preview: true`: the `hooks` step runs the
+same hooks over every file through the pinned prek, skipping the formatter,
+Clippy and the gate's rules, which CI runs as steps of their own; the output is
+`hooks.txt`. A repository without Rust calls `hygiene.yml` instead of `ci.yml`:
+the secret scan, `hygiene`, `managed-files` and `hooks`, under the check
+`hygiene / Required hygiene`.
+
 ### Source rules
 
 Preview until v2.0.0: the step runs only with `quality-preview: true`, and
@@ -501,6 +522,7 @@ earlier failure. The scorecard identifies controls that never ran.
 | `duplication.txt` | DUP-001 findings, then the pairs of functions at or above 90 % similarity, eight lines or more | always |
 | `hygiene.txt` | Every hygiene finding with its rule, file and line, then each finding an exception excuses, with its reason | `quality-preview: true` until v2.0.0 |
 | `managed-files.txt` | Every managed file whose bytes differ from the gate's rendering, one per line | `quality-preview: true` until v2.0.0 |
+| `hooks.txt` | What the commit hooks printed over every file | `quality-preview: true` until v2.0.0 |
 | `architecture.txt` | Every source-rule finding with its rule, file and line, each finding an exception excuses with its reason, then the files over 300 lines | `quality-preview: true` until v2.0.0 |
 | `coverage.lcov` | Line coverage in LCOV format | always |
 | `audit.json` | RustSec advisory results | always |

@@ -263,7 +263,6 @@ more documentation.
 | C-003 | Controlled, authorized, scoped, expiring exceptions | No exception has been taken. |
 | C-004 | Coordinate rollouts that change content, controls or contexts | Met by the pull request template's contract section. |
 
-
 The baseline was adopted as content, not as a tracked dependency: it has no
 published release to pin, so the requirements about consuming, versioning and
 drift-checking one describe a relationship that does not exist. They are left out

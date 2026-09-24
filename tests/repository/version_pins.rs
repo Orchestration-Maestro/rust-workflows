@@ -1,7 +1,9 @@
 //! The pins the local gate shares with CI: tool versions, the toolchain, and
 //! the speed target.
 
-use crate::harness::{described, described_step, root, tool_rows, workflow};
+use crate::harness::{
+    Fixture, described, described_step, query, root, succeeds, tool_rows, workflow,
+};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -71,6 +73,63 @@ fn the_local_gate_and_ci_install_the_same_tool_versions() {
         described_step(&steps, "rust-gate publish-evidence upload")
             .is_some_and(|upload| upload.tools == ["gh", "jaq"])
     );
+}
+
+#[test]
+fn every_rendered_hook_runs_a_pinned_version_and_this_repository_runs_them_all() {
+    // The hooks a repository gets are rendered by the gate; the tools they
+    // install are the ones this repository pins, at the same version, and this
+    // repository runs every one of them on its own pinned toolbelt.
+    let fixture = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
+    succeeds(&fixture.run_body(&format!(
+        "cd project && RUST_WORKFLOWS_PIN='{} v2.0.0' rust-gate init",
+        "a".repeat(40)
+    )));
+    let rendered = fixture.root.join("project/.pre-commit-config.yaml");
+    let pinned = pinned_tools(&root());
+    let specs = query(
+        &rendered,
+        ".repos[].hooks[].additional_dependencies // [] | .[]",
+    );
+    let mut compared = 0;
+    for spec in specs.lines() {
+        let spec = spec.trim_start_matches("cli:");
+        let (Some((name, version)), false) = (
+            spec.rsplit_once(['@', ':']),
+            spec.contains("rust-workflows"),
+        ) else {
+            continue;
+        };
+        let name = name.rsplit(['/', ':']).next().unwrap_or(name);
+        let name = if name == "sh" { "shfmt" } else { name };
+        assert_eq!(
+            pinned.get(name).map(String::as_str),
+            Some(version),
+            "the hooks install {name} {version}; mise.toml pins another"
+        );
+        compared += 1;
+    }
+    assert!(compared > 10, "only {compared} hook tools compared");
+    let ids = |path: &Path| -> Vec<String> {
+        query(path, ".repos[].hooks[].id")
+            .lines()
+            .map(str::to_owned)
+            .collect()
+    };
+    let here = ids(&root().join(".pre-commit-config.yaml"));
+    for id in ids(&rendered) {
+        // The gate's rules and Clippy run in `just check` here, per crate.
+        if matches!(
+            id.as_str(),
+            "rust-gate-architecture" | "rust-gate-hygiene" | "clippy"
+        ) {
+            continue;
+        }
+        assert!(
+            here.contains(&id),
+            "this repository does not run the hook {id}"
+        );
+    }
 }
 
 #[test]

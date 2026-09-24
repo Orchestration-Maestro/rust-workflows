@@ -49,6 +49,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── dependabot-auto-merge.yml           # Queues Dependabot patch and minor updates to merge on the organization's bot token
 │   │   ├── docs-sync.yml                       # On a pull request from this repository, the bot commits the tables just docs regenerated
 │   │   ├── fuzz.yml                            # Bounded fuzz regression on a nightly toolchain
+│   │   ├── hygiene.yml                         # The reusable CI of a repository without Rust: secrets, hygiene, managed files, hooks
 │   │   ├── publish-binaries.yml                # Protected binary release, dry-run by default
 │   │   ├── publish-crate.yml                   # Protected crate publication explicitly to public crates.io
 │   │   ├── publish-evidence.yml                # Verifies release reports, dry-run first, then uploads GitHub Release assets
@@ -173,6 +174,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   │   ├── step.rs                     # The step: tracked files, the rules, the exceptions and the report
 │   │   │   │   └── widths.rs                   # SIZE-003 for shell scripts and justfiles
 │   │   │   ├── managed_files/                  # rust-gate sync, sync --check, init and managed-files: the files every repository holds
+│   │   │   │   ├── hooks.rs                    # The commit hooks rendered: prek's checks, each tool through mise, the gate at the release
 │   │   │   │   ├── mod.rs                      # The steps' door: their modules and their declaration
 │   │   │   │   ├── pin.rs                      # The release a caller pins: a commit and its version
 │   │   │   │   ├── render.rs                   # Every managed file rendered, this repository's own among them
@@ -184,15 +186,18 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── api_compatibility.rs            # rust-gate api: cargo-semver-checks against the base branch unless the title declares a break
 │   │   │   ├── attest_binaries.rs              # rust-gate attest-binaries: validate, extract the SBOM, verify, record the outcome
 │   │   │   ├── binary_hardening.rs             # rust-gate hardening: reproducible, PIE, RELRO, no executable stack, auditable
+│   │   │   ├── commit_hooks.rs                 # rust-gate hooks: the repository's commit hooks over every file, through the pinned prek
 │   │   │   ├── configure_cargo_registry.rs       # rust-gate registry: private job-local Cargo home for direct crates.io
 │   │   │   ├── declared_msrv.rs                # rust-gate msrv: every member declares a rust-version the compiler under test reaches
 │   │   │   ├── dependency_policy.rs            # rust-gate licenses: the consumer's deny.toml, or the generated default policy
 │   │   │   ├── feature_combinations.rs         # rust-gate features: cargo hack builds each declared feature, not only the default set
 │   │   │   ├── format_lint_test.rs             # rust-gate quality: fmt, Clippy, tests, doc tests, strict rustdoc
 │   │   │   ├── fuzz_regression.rs              # rust-gate fuzz: inputs, nightly toolchain with cargo-fuzz, corpus replay and exploration
+│   │   │   ├── hygiene_workflow.rs             # rust-gate hygiene prepare: the checkout and reports directory of hygiene.yml
 │   │   │   ├── install_toolchain.rs            # rust-gate install-tools: what it refuses, honours, and ci.yml installs
 │   │   │   ├── install_tools.rs                # rust-gate install-tools: official release assets, digests verified before extraction
 │   │   │   ├── line_coverage.rs                # rust-gate coverage: LCOV line coverage, failing below the threshold
+│   │   │   ├── local_runs.rs                   # rust-gate architecture --local and hygiene --local: a step as a commit hook runs it
 │   │   │   ├── mod.rs                          # One module per step, the registry among them; run and describe are its doors
 │   │   │   ├── mutation_testing.rs             # rust-gate mutants: cargo-mutants scoped to the change, a diff or the last commit
 │   │   │   ├── publish_binaries.rs             # rust-gate publish-binaries: the publication boundary of the binary publisher
@@ -222,6 +227,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   ├── ci/                                     # ci.yml, one module per gate it runs: what each step accepts, refuses, builds and reports
 │   │   ├── api_compatibility.rs                # ci.yml: an undeclared API break fails a pull request; what has no API is not applicable
 │   │   ├── architecture_rules.rs               # ci.yml: ARC-001 to ARC-007, each refused by name, and the exceptions maestro-quality.toml takes
+│   │   ├── commit_hooks.rs                     # hooks, the local runs a hook makes, and hygiene.yml's first step
 │   │   ├── complexity_report.rs                # ci.yml: function and file sizes, reported and never held against the run
 │   │   ├── duplication_report.rs               # ci.yml: pairs reported, three functions of one shape refused unless excused
 │   │   ├── feature_combinations.rs             # ci.yml: real per-feature and combined compilation, plus replay coverage
@@ -277,6 +283,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
 │   │   ├── north_star.rs                       # Promised controls run, every gate names its proof, no lint silenced
 │   │   ├── pinned_tool_usage.rs                # Every job installs every pinned tool it invokes before a step reads it
+│   │   ├── rendered_hooks_live.rs              # CHECK_NETWORK=1: the rendered hooks in a fresh clone with only prek and rustup
 │   │   ├── secret_and_advisory_scans.rs        # Gitleaks over the tree; RustSec audits under CHECK_NETWORK=1
 │   │   ├── tool_updates.rs                     # Every install row is what mise locked; update-tools moves a pin everywhere at once
 │   │   ├── toolbelt_and_shellcheck.rs          # Toolbelt links to the locked builds; ShellCheck over every Bash line left
@@ -291,7 +298,8 @@ generated SBOM output and local download markers are intentionally excluded.
 ├── .editorconfig                               # UTF-8, LF, final newlines, space indentation
 ├── .gitattributes                              # Text normalization, Rust-aware diff, binary images
 ├── .gitignore                                  # Local tools/caches, Cargo build output, Windows markers
-├── .pre-commit-config.yaml                     # Fast prek hooks: format, lint, basic checks; commit-msg header and column checks
+├── .pre-commit-config.yaml                     # This repository's own hooks: the organization's set on the pinned toolbelt, and its generated tables
+├── .rumdl.toml                                 # Markdown structure: lines wrap where their writer wraps them; rendered by rust-gate sync
 ├── .taplo.toml                                 # TOML formatting: arrays keep the shape they were written in
 ├── .yamlfmt.yml                                # YAML formatting for workflows and metadata
 ├── AGENTS.md                                   # Authoritative workflow objectives and constraints

@@ -52,6 +52,7 @@ All rules run in `rust-gate architecture`, over the trees plan 1 reads plus the 
 **Files:** create `gate/src/checks/manifests.rs`; modify `gate/src/checks/module_tree.rs`, `gate/src/checks/quality_config.rs`, `gate/src/checks/mod.rs`.
 
 **Interfaces:**
+
 - `manifests::read_cargo_metadata(project: &Path, temp: &Path) -> Result<PathBuf, Failure>` runs `cargo metadata` once and returns the file; `module_tree::module_trees(metadata: &Path)` reads that file instead of running cargo itself.
 - `manifests::cargo_packages(metadata: &Path) -> Result<Vec<Package>, Failure>`, `Package { name, publishable, manifest: PathBuf, edition, dependencies: Vec<String> (normal only), library: bool, binary: bool, plain_tests: Vec<String> (test targets without required-features) }`.
 - `manifests::workspace_of(metadata: &Path) -> Result<Workspace, Failure>`, `Workspace { root: PathBuf, members: usize }`.
@@ -226,3 +227,21 @@ Rulings taken while executing, newest last.
     `.rumdl.toml` with the hook set; a non-Rust caller comes with `hygiene.yml`.
 14. `describe` gathers each workflow's steps, so one module declares a
     `ci.yml` step and the local commands that share its code in one `STEPS`.
+15. The hook set is rendered into every repository's `.pre-commit-config.yaml`
+    as local hooks rather than published in a `.pre-commit-hooks.yaml`: prek's
+    `rust` language installs a hook repository only from a root `Cargo.toml`,
+    which rust-workflows has none of, while a local hook takes
+    `cli:<url>:<tag>:rust-gate` from the release tag; one rendering keeps every
+    version in the gate. The tools come through prek's `mise` language at the
+    versions `mise.toml` pins, versions and not digests, since a managed hook
+    environment takes no lockfile; what CI installs itself keeps its digest.
+    `.rumdl.toml` joins the managed files, since Markdown lines wrap where
+    their writer wraps them; editorconfig-checker runs with
+    `-disable-indent-size`, since rustfmt owns the indentation of a continued
+    Rust line.
+16. `rust-gate architecture --local` and `rust-gate hygiene --local` run the
+    step outside Actions, the way a commit hook does: the repository root as
+    workspace and project, a scratch directory for the reports, the report
+    printed when the step refuses. `rust-gate check`, every CI step locally,
+    waits for after v2.0.0: CI runs the whole gate on every pull request, and
+    no rule depends on it.

@@ -81,3 +81,11 @@ cargo-vet = { version = "0.10.0", matching = "x86_64-unknown-linux-gnu" }
 similarity-rs = { version = "0.5.0", matching = "x86_64-unknown-linux-gnu", bin = "similarity-rs" }
 # tool: typos | workflows | Rust | Spelling in code and prose; `typos.toml` names the words this repository means
 typos = { version = "1.50.2", matching = "x86_64-unknown-linux-musl" }
+# tool: shfmt | workflows | Go | Shell formatting, the width and indentation .editorconfig sets
+shfmt = "3.14.1"
+# tool: rumdl | workflows | Rust | Markdown structure: headings, lists, fences and blank lines
+rumdl = "0.2.77"
+# tool: lychee | workflows | Rust | Every link in the Markdown, offline: files and anchors that exist
+lychee = "0.24.2"
+# tool: editorconfig-checker | workflows | Go | Every file against .editorconfig: charset, endings, indentation
+editorconfig-checker = "4.0.2"

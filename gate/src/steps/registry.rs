@@ -16,6 +16,7 @@ const REGISTRY: &[&[Step]] = &[
     super::architecture::STEPS,
     super::hygiene::STEPS,
     super::managed_files::STEPS,
+    super::commit_hooks::STEPS,
     super::format_lint_test::STEPS,
     super::report_sizes::STEPS,
     super::report_duplicates::STEPS,
@@ -42,7 +43,9 @@ const REGISTRY: &[&[Step]] = &[
     super::attest_binaries::STEPS,
     super::fuzz_regression::STEPS,
     super::unsafe_audit::STEPS,
+    super::hygiene_workflow::STEPS,
     super::write_lints::STEPS,
+    super::local_runs::STEPS,
 ];
 
 /// Every registered step, in registry order.

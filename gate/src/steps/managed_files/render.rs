@@ -4,6 +4,7 @@
 //! are written from the gate's data and the repository's
 //! `maestro-quality.toml`.
 
+use super::hooks::commit_hooks;
 use super::pin::Pin;
 use crate::checks::lint_policy::{clippy_config, with_lint_block};
 use crate::checks::nextest_profile::nextest_profile;
@@ -24,6 +25,9 @@ const TAPLO: &str = include_str!("../../../../.taplo.toml");
 
 /// The YAML formatter's settings.
 const YAMLFMT: &str = include_str!("../../../../.yamlfmt.yml");
+
+/// The Markdown structure every repository holds to.
+const RUMDL: &str = include_str!("../../../../.rumdl.toml");
 
 /// The organization's compiler.
 const TOOLCHAIN: &str = include_str!("../../../../rust-toolchain.toml");
@@ -60,22 +64,25 @@ pub(super) fn managed_files(repository: &Repository) -> Result<Vec<(String, Stri
     let mut files: Vec<(&str, String)> = vec![
         (".editorconfig", EDITORCONFIG.to_owned()),
         (".gitattributes", GITATTRIBUTES.to_owned()),
+        (".rumdl.toml", RUMDL.to_owned()),
         (".taplo.toml", TAPLO.to_owned()),
         (".yamlfmt.yml", YAMLFMT.to_owned()),
         ("typos.toml", typos(&repository.config.typos)),
     ];
     if !repository.home {
-        files.push((".github/dependabot.yml", dependabot(repository.rust)));
-    }
-    if repository.rust && !repository.home {
         let pin = repository.pin.as_ref().ok_or(
             "no release to pin: .github/workflows/ci.yml names none; set RUST_WORKFLOWS_PIN to \
              `<commit> v<version>`",
         )?;
-        files.push((
-            ".github/workflows/ci.yml",
-            caller(pin, &repository.config.ci),
-        ));
+        let workflow = if repository.rust {
+            caller(pin, &repository.config.ci)
+        } else {
+            hygiene_caller(pin)
+        };
+        files.push((".github/dependabot.yml", dependabot(repository.rust)));
+        files.push((".github/workflows/ci.yml", workflow));
+        let hooks = commit_hooks(HEADER, repository.rust, &pin.version);
+        files.push((".pre-commit-config.yaml", hooks));
     }
     if repository.rust {
         let profile = nextest_profile("default", "");
@@ -129,6 +136,30 @@ fn dependabot(rust: bool) -> String {
         );
     }
     text
+}
+
+/// The caller of a repository without Rust: the hygiene workflow at `pin`.
+fn hygiene_caller(pin: &Pin) -> String {
+    format!(
+        concat!(
+            "{header}name: CI\n",
+            "\"on\":\n",
+            "  push:\n",
+            "    branches: [main]\n",
+            "  pull_request:\n",
+            "permissions:\n",
+            "  contents: read\n",
+            "jobs:\n",
+            "  # Keep the job id `hygiene`: the hygiene-required ruleset requires the\n",
+            "  # check \"hygiene / Required hygiene\" before any merge to the default branch.\n",
+            "  hygiene:\n",
+            "    uses: {reference}\n",
+            "    permissions:\n",
+            "      contents: read\n",
+        ),
+        header = HEADER,
+        reference = pin.reference("hygiene.yml"),
+    )
 }
 
 /// The caller of the reusable workflows: the gate at `pin` with the inputs
@@ -225,6 +256,8 @@ mod tests {
                 ".gitattributes",
                 ".github/dependabot.yml",
                 ".github/workflows/ci.yml",
+                ".pre-commit-config.yaml",
+                ".rumdl.toml",
                 ".taplo.toml",
                 ".yamlfmt.yml",
                 "Cargo.toml",

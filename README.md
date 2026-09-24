@@ -144,6 +144,7 @@ workflows.
 | [`ci.yml`](.github/workflows/ci.yml) | Locked Rust checks, 80% line coverage, security scans, SBOMs and release artifacts |
 | [`attest-binaries.yml`](.github/workflows/attest-binaries.yml) | Opt-in signed build provenance for a re-verified payload; isolated so its scopes bind only its callers |
 | [`fuzz.yml`](.github/workflows/fuzz.yml) | Opt-in bounded fuzz regression: replays the committed corpus, then explores for a fixed budget |
+| [`hygiene.yml`](.github/workflows/hygiene.yml) | The checks every repository holds to, for one without Rust: secrets, hygiene, managed files and the commit hooks over every file |
 | [`publish-binaries.yml`](.github/workflows/publish-binaries.yml) | Same-revision CI, artifact verification, dry-run by default; existing GitHub Release when explicitly enabled |
 | [`publish-crate.yml`](.github/workflows/publish-crate.yml) | Same-revision CI and selected-package verification; explicit public crates.io publication only |
 | [`publish-evidence.yml`](.github/workflows/publish-evidence.yml) | Dry-run-first archive of release reports; live assets only on protected-tag GitHub Releases |
@@ -278,6 +279,7 @@ Each is one input to switch off, documented in [docs/ci.md](docs/ci.md).
 | Source rules | `quality-preview: true`, until v2.0.0 runs it always | ARC, SIZE, NAME, DOC, LIB, TST, WSP and LNT | `an_import_cycle_between_two_files_is_refused_by_name`, `a_door_holding_a_function_is_refused_and_a_listing_door_passes`, `a_path_past_a_door_re_export_is_refused`, `declared_layers_refuse_an_import_within_or_against_the_order`, `layers_declared_for_a_root_no_target_has_are_refused`, `a_seam_serving_one_outside_caller_is_refused_unless_excused`, `a_binary_root_beyond_declarations_and_a_short_main_is_refused`, `path_attributes_and_rust_includes_are_refused_while_include_str_passes`, `the_quality_file_refuses_unknown_tables_and_unreasoned_exceptions`, `oversized_files_and_lines_are_refused_and_three_hundred_is_reported`, `package_names_follow_the_form_and_publishable_ones_the_prefix`, `badly_named_tests_and_one_word_test_modules_are_refused`, `a_file_without_a_module_comment_is_refused`, `printing_from_a_library_is_refused_and_from_a_binary_allowed`, `a_library_depending_on_anyhow_is_refused_but_a_binary_is_not`, `sleeping_in_a_test_is_refused_unless_excused`, `more_than_one_plain_integration_test_crate_is_refused`, `workspace_members_inherit_their_settings_and_dependencies`, `edition_resolver_and_lockfile_are_held`, `tightened_limits_apply_and_loosened_ones_are_refused`, `a_manifest_without_the_organization_lints_is_refused_until_written`, `a_clippy_toml_looser_than_the_organization_s_is_refused`, `clippy_knows_every_organization_lint_and_applies_it` |
 | Repository hygiene | `quality-preview: true`, until v2.0.0 runs it always | HYG-001 to HYG-005, SIZE-003 | `unlinked_markers_in_comments_are_refused_and_linked_ones_pass`, `snapshots_large_files_modes_and_links_are_refused`, `a_readme_a_licence_and_a_changelog_are_required`, `wide_shell_lines_and_justfiles_are_refused` |
 | Managed files | `quality-preview: true`, until v2.0.0 runs it always | The generated files of every repository, TST-004 | `init_writes_every_managed_file_and_the_check_finds_them_equal`, `a_managed_file_changed_by_hand_is_refused_and_sync_writes_it_back`, `the_managed_files_step_refuses_a_difference_in_ci` |
+| Commit hooks | `quality-preview: true`, until v2.0.0 runs it always | The universal set, UNI | `the_hooks_step_runs_prek_over_every_file_and_skips_what_ci_runs_itself`, `a_step_runs_locally_the_way_a_commit_hook_runs_it`, `every_rendered_hook_runs_a_pinned_version_and_this_repository_runs_them_all`, `the_rendered_hooks_run_in_a_fresh_clone_with_only_prek_and_rustup` |
 | Semantic-version compatibility | `semver-check: true` on `publish-crate.yml`; off for a first publication, which has no baseline | North Star, Quality | `semver_check_fails_the_publication_when_cargo_semver_checks_does` |
 | Signed build provenance | `attest-binaries.yml`, see below | SCH-001, SCH-002 | `attestation_signs_only_bytes_it_verified_itself`, `provenance_attestation_is_isolated_and_reverifies_the_payload` |
 | Undefined-behaviour audit | `unsafe-audit.yml`, Miri on nightly, see below | SST-006 | `the_undefined_behaviour_audit_refuses_to_pass_without_running_anything` |
@@ -561,6 +563,10 @@ extracting it. Rust itself comes from the approved platform channel, never from
 | `taplo` | TOML formatting | Rust |
 | `jaq` | The JSON the steps read and the YAML the tests read | Rust |
 | `typos` | Spelling in code and prose; `typos.toml` names the words this repository means | Rust |
+| `shfmt` | Shell formatting, the width and indentation .editorconfig sets | Go |
+| `rumdl` | Markdown structure: headings, lists, fences and blank lines | Rust |
+| `lychee` | Every link in the Markdown, offline: files and anchors that exist | Rust |
+| `editorconfig-checker` | Every file against .editorconfig: charset, endings, indentation | Go |
 
 <!-- end generated -->
 

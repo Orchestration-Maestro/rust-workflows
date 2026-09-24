@@ -66,6 +66,7 @@ Each later plan is written when the previous one is merged, from the code as it 
 The steps door holds the registry and the scorecard's door holds its step, both of which ARC-002 will refuse. Moving them first is a refactor with a green commit of its own.
 
 **Files:**
+
 - Create: `gate/src/steps/registry.rs`
 - Modify: `gate/src/steps/mod.rs` (whole file)
 - Create: `gate/src/steps/quality_scorecard/step.rs` (moved from its `mod.rs`)
@@ -73,6 +74,7 @@ The steps door holds the registry and the scorecard's door holds its step, both 
 - Modify: tests/gate/step_registry.rs, tests/gate/layer_boundaries.rs, justfile, docs/rust-gate.md, .github/copilot-instructions.md
 
 **Interfaces:**
+
 - Produces: `crate::steps::run(command: &str, step: &str) -> Outcome` and `crate::steps::describe() -> String`, unchanged for `main.rs`; directory steps declare `pub(crate) const STEPS: &[Step]` in `step.rs` and their door re-exports it with `pub(super) use step::STEPS;`. A `pub(in crate::steps)` visibility would read as an import of `crate::steps` to the repository's current layer scanner.
 
 - [ ] **Step 1: Create the registry module**
@@ -249,10 +251,12 @@ git commit -S -m "refactor: keep the gate's doors to declarations"
 ### Task 2: Rust source with comments and literals blanked
 
 **Files:**
+
 - Create: `gate/src/checks/rust_code.rs`
 - Modify: `gate/src/checks/mod.rs` (add `pub(crate) mod rust_code;` after `pub(crate) mod release_boundary;`)
 
 **Interfaces:**
+
 - Produces: `pub(crate) struct Item { line: usize, attributes: String, visibility: String, kind: String, name: String, text: String, span: (usize, usize) }` with `is_test()`, `is_offered()`, `is_module_file()`; `blanked(&str) -> String`, `blank(&mut [u8])`, `items(&str) -> Vec<Item>`, `without_tests(&str) -> String`, `line_at(&str, usize) -> usize`, `is_identifier_byte(u8) -> bool`, all `pub(crate)`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -710,13 +714,14 @@ Expected: 4 passed. Dead-code warnings are expected until Task 6 gives these fun
 ### Task 3: The paths a file names
 
 **Files:**
+
 - Create: `gate/src/checks/rust_paths.rs`
 - Modify: `gate/src/checks/mod.rs` (add `pub(crate) mod rust_paths;` after `pub(crate) mod rust_code;`: its `NamedPath` appears in `Module`'s fields, so a private module would trip `private_interfaces`)
 
 **Interfaces:**
+
 - Consumes: `rust_code::{blank, is_identifier_byte, line_at}`.
 - Produces: `pub(crate) struct NamedPath { line: usize, segments: Vec<String> }` (derives `Debug, PartialEq, Eq`); `paths(code: &str) -> Vec<NamedPath>`; `use_leaves(declaration: &str) -> Vec<Vec<String>>`.
-
 - [ ] **Step 1: Write the failing tests**
 
 Create `gate/src/checks/rust_paths.rs` with:
@@ -1022,13 +1027,14 @@ Expected: 2 passed. Do not commit yet.
 ### Task 4: Module trees
 
 **Files:**
+
 - Create: `gate/src/checks/module_tree.rs`
 - Modify: `gate/src/checks/mod.rs` (add `pub(crate) mod module_tree;` after `pub(crate) mod inputs;`)
 
 **Interfaces:**
+
 - Consumes: `rust_code::{Item, blanked, items, without_tests}`, `rust_paths::{NamedPath, paths, use_leaves}`, `crate::runner::{Cmd, Failure}`.
 - Produces: `pub(crate) struct Tree { kinds: Vec<String>, modules: Vec<Module> }` with `find(&[String]) -> Option<usize>`, `absolute(from: &[String], segments: &[String]) -> Option<Vec<String>>`, `landing(&[String]) -> Option<usize>`; `pub(crate) struct Module { path, file, code, items, paths, exports }` with `read(Vec<String>, PathBuf, &str) -> Module`, `is_mod_rs()`, `children()`; `pub(crate) struct Export { line, segments, offered }`; `trees(project: &Path, temp: &Path) -> Result<Vec<Tree>, Failure>`; under `#[cfg(test)]`, `sample(kinds: &[&str], files: &[(&str, &str)]) -> Tree` for the rules' unit tests.
-
 - [ ] **Step 1: Write the failing tests**
 
 Create `gate/src/checks/module_tree.rs` with:
@@ -1355,13 +1361,14 @@ Expected: 4 passed. Do not commit yet.
 ### Task 5: The quality file and findings
 
 **Files:**
+
 - Create: `gate/src/checks/quality_config.rs`, `gate/src/checks/findings.rs`
 - Modify: `gate/src/checks/mod.rs` (whole file, below)
 
 **Interfaces:**
+
 - Consumes: `crate::runner::{Cmd, Failure}`.
 - Produces: `quality_config::{FILE, Layers { root: String, layers: Vec<Vec<String>> }, Exception { rule, path, item, reason: String }, QualityConfig { layers, exceptions }, read(workspace: &Path) -> Result<QualityConfig, Failure>}`; `findings::{Finding { file: String, line: usize, rule: String, item: String, message: String }, Finding::new(rule: &str, file: String, line: usize, message: String), Finding::about(self, item: &str) -> Finding, relative(workspace: &Path, file: &Path) -> String, excuse(findings: Vec<Finding>, exceptions: &[Exception], rules: &[&str], scope: &str) -> (Vec<Finding>, Vec<(Finding, &str)>)}`. `Finding` derives `Debug, PartialEq, Eq, PartialOrd, Ord` and implements `Display` as `RULE file:line: message`, the `:line` left out when the line is 0.
-
 - [ ] **Step 1: Write the failing tests**
 
 `gate/src/checks/quality_config.rs`:
@@ -1753,15 +1760,16 @@ Expected: every unit test passes, including the 4 new ones. Do not commit yet.
 ### Task 6: The architecture step and ARC-001
 
 **Files:**
+
 - Create: `gate/src/steps/architecture/mod.rs`, `gate/src/steps/architecture/step.rs`, `gate/src/steps/architecture/cycles.rs`
 - Create: tests/ci/architecture_rules.rs
 - Modify: `gate/src/steps/mod.rs` (add `mod architecture;` after `mod api_compatibility;`), `gate/src/steps/registry.rs` (import `architecture`, add `architecture::STEPS,` after `install_toolchain::STEPS,`)
 - Modify: .github/workflows/ci.yml, .github/workflows/publish-crate.yml, .github/workflows/publish-binaries.yml, tests/ci/mod.rs, docs/ci.md, docs/gates.toml, .github/copilot-instructions.md
 
 **Interfaces:**
+
 - Consumes: everything Tasks 2 to 5 produce.
 - Produces: `rust-gate architecture`, reading `PROJECT`, `REPORTS`, `RUNNER_TEMP`, `GITHUB_STEP_SUMMARY` and `GITHUB_WORKSPACE`, writing `architecture.txt`; rule modules expose `pub(super) fn ...(tree: &Tree, workspace: &Path) -> Vec<Finding>`.
-
 - [ ] **Step 1: Write the failing contract tests**
 
 tests/ci/architecture_rules.rs:
@@ -2220,10 +2228,12 @@ git commit -S -m "feat: refuse import cycles with rust-gate architecture"
 ### Task 7: ARC-002 and ARC-003, doors
 
 **Files:**
+
 - Create: `gate/src/steps/architecture/doors.rs`
 - Modify: `gate/src/steps/architecture/mod.rs` (add `mod doors;`), `gate/src/steps/architecture/step.rs` (`use super::{cycles, doors};` and two lines in `findings`), tests/ci/architecture_rules.rs, docs/gates.toml, .github/copilot-instructions.md
 
 **Interfaces:**
+
 - Produces: `doors::contents(tree: &Tree, workspace: &Path) -> Vec<Finding>` (ARC-002) and `doors::bypasses(tree: &Tree, workspace: &Path) -> Vec<Finding>` (ARC-003).
 
 - [ ] **Step 1: Write the failing contract tests**
@@ -2468,13 +2478,14 @@ git commit -S -m "feat: keep doors to declarations and paths through them"
 ### Task 8: ARC-004, declared layers
 
 **Files:**
+
 - Create: `gate/src/steps/architecture/layers.rs`
 - Modify: `gate/src/steps/architecture/mod.rs` (add `mod layers;`), `gate/src/steps/architecture/step.rs`, tests/ci/architecture_rules.rs, docs/gates.toml, .github/copilot-instructions.md
 
 **Interfaces:**
+
 - Consumes: `quality_config::{FILE, Layers, QualityConfig}`.
 - Produces: `layers::findings(tree: &Tree, workspace: &Path, declared: &[Layers]) -> Vec<Finding>` and `layers::unknown_roots(trees: &[Tree], workspace: &Path, declared: &[Layers], scope: &str) -> Vec<Finding>`.
-
 - [ ] **Step 1: Write the failing contract tests**
 
 Append to tests/ci/architecture_rules.rs:
@@ -2796,10 +2807,12 @@ git commit -S -m "feat: hold every target to the layers it declares"
 ### Task 9: ARC-005, seams that serve two
 
 **Files:**
+
 - Create: `gate/src/steps/architecture/seams.rs`
 - Modify: `gate/src/steps/architecture/mod.rs` (add `mod seams;`), `gate/src/steps/architecture/step.rs`, tests/ci/architecture_rules.rs, docs/gates.toml, .github/copilot-instructions.md
 
 **Interfaces:**
+
 - Produces: `seams::findings(tree: &Tree, workspace: &Path) -> Vec<Finding>`, each finding naming its `item` for exceptions.
 
 - [ ] **Step 1: Write the failing contract test**
@@ -3037,10 +3050,12 @@ git commit -S -m "feat: refuse seams that serve a single caller"
 ### Task 10: ARC-006 and ARC-007, roots and paths
 
 **Files:**
+
 - Create: `gate/src/steps/architecture/roots.rs`
 - Modify: `gate/src/steps/architecture/mod.rs` (add `mod roots;`), `gate/src/steps/architecture/step.rs`, tests/ci/architecture_rules.rs, docs/gates.toml, .github/copilot-instructions.md
 
 **Interfaces:**
+
 - Produces: `roots::thin_roots(tree: &Tree, workspace: &Path) -> Vec<Finding>` (ARC-006) and `roots::path_attributes(tree: &Tree, workspace: &Path) -> Vec<Finding>` (ARC-007).
 
 - [ ] **Step 1: Write the failing contract tests**
@@ -3286,11 +3301,11 @@ git commit -S -m "feat: keep binary roots thin and the module tree the file tree
 ### Task 11: rust-workflows holds the rules itself
 
 **Files:**
+
 - Move: tests/harness/native_runtime.rs to tests/native_runtime.rs
 - Modify: tests/native_windows.rs, tests/gate/layer_boundaries.rs, tests/gate/mod.rs, justfile, docs/standards/engineering.md, CONTRIBUTING.md, docs/rust-gate.md, .github/copilot-instructions.md
 - Delete: tests/gate/acyclic_imports.rs
 - Create: maestro-quality.toml
-
 - [ ] **Step 1: Run the rules on this repository and see what they find**
 
 Run:
@@ -3498,6 +3513,7 @@ names the cycle it finds (`an_import_cycle_between_two_files_is_refused_by_name`
 ```
 
    then replace the one remaining `every_crate_has_an_acyclic_import_graph` in the file with `an_import_cycle_between_two_files_is_refused_by_name`.
+
 3. docs/rust-gate.md: replace
 
 ```text
