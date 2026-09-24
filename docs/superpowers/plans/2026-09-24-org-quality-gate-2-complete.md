@@ -288,3 +288,7 @@ Rulings taken while executing, newest last.
     to D, and removes `quality-preview` with every guard it held: from here on
     every call runs every rule, and a caller that still passes the input fails
     to start.
+24. prek fetches the latest mise when none is on PATH, and a release it found
+    had no assets. The `hooks` step of `ci.yml` and `hygiene.yml` gets the mise
+    `scripts/bootstrap.sh` pins, installed with its digest like every other
+    tool; the version test reads mise's pin from `bootstrap.sh`.

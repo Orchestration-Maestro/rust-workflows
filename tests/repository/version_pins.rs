@@ -30,8 +30,15 @@ fn the_local_gate_and_ci_install_the_same_tool_versions() {
         (!digits.is_empty()).then_some(digits)
     };
 
-    let local = pinned_tools(&root);
+    let mut local = pinned_tools(&root);
     assert!(local.len() > 5, "no pinned tools found in mise.toml");
+    // mise installs everything else, so bootstrap.sh pins mise itself.
+    let bootstrap = fs::read_to_string(root.join("scripts/bootstrap.sh")).unwrap();
+    let mise = bootstrap
+        .lines()
+        .find_map(|line| line.strip_prefix("readonly MISE_VERSION=v"))
+        .unwrap();
+    local.insert("mise".to_owned(), mise.to_owned());
 
     // ci.yml's pins are the tables of its `rust-gate install-tools` steps.
     let ci = workflow("ci");
