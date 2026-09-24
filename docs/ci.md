@@ -172,7 +172,11 @@ the fix, `rust-gate sync`. Each managed file opens with
 
 Run in a repository's root, `rust-gate sync` writes them and `rust-gate
 sync --check` compares them. The caller pins the release its `uses:` lines
-already name; `RUST_WORKFLOWS_PIN='<commit> v<version>'` moves it. `rust-gate
+already name; `RUST_WORKFLOWS_PIN='<commit> v<version>'` moves it. Every
+other call to rust-workflows, in `.github/workflows/` or the organization's
+workflow templates, moves with the caller and counts as managed: a release job
+pinned apart from CI would ship with a gate CI never ran, and Dependabot leaves
+every rust-workflows pin to `sync`. `rust-gate
 init` writes them for a repository with no caller yet, at the release
 `RUST_WORKFLOWS_PIN` names. What a repository may say goes in
 `maestro-quality.toml`: the words it means, `[typos] words = ["jaq"]`, and the
