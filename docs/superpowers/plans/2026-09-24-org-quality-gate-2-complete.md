@@ -264,3 +264,8 @@ Rulings taken while executing, newest last.
     bench is declared; the runner is one pinned row of `install-tools`. The
     base runs in a `git worktree` of the merge commit's first parent, both runs
     sharing one gungraun home, so the second compares with the first.
+20. The pull request of phases A to D carries `feat!:`: it renames the example
+    packages, which the API step, at the pinned gate, reads as a break, and it
+    changes two defaults a caller meets on moving its pin, the coverage floor
+    and the dependency audit. Release-please proposes 2.0.0 from it, and phase
+    E's repin joins that release rather than opening it.

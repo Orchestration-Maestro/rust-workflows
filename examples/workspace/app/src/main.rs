@@ -2,11 +2,14 @@
 
 #![forbid(unsafe_code)]
 
-use std::process;
+use std::process::ExitCode;
 
-fn main() {
+fn main() -> ExitCode {
     match maestro_workspace_arithmetic::checked_sum(20, 22) {
-        Some(total) => println!("{total}"),
-        None => process::exit(1),
+        Some(total) => {
+            println!("{total}");
+            ExitCode::SUCCESS
+        }
+        None => ExitCode::FAILURE,
     }
 }
