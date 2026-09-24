@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.0.1...v2.1.0) (2026-09-24)
+
+
+### Features
+
+* move every rust-workflows pin with the caller ([#39](https://github.com/Orchestration-Maestro/rust-workflows/issues/39)) ([bd7b23f](https://github.com/Orchestration-Maestro/rust-workflows/commit/bd7b23fac76cee34798e2e0eb9cce44a01a8b32f))
+
 ## [2.0.1](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.0.0...v2.0.1) (2026-09-24)
 
 
