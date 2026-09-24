@@ -1,0 +1,41 @@
+# The organization's quality rules as this repository shapes them: the
+# layers its two layered crates declare, and the seams that keep one caller,
+# each with its reason. Read by rust-gate architecture.
+
+[[crate]]
+root = "gate/src/main.rs"
+layers = ["steps", "checks", "runner"]
+
+[[crate]]
+root = "tests/workflows.rs"
+layers = ["ci gate nightly publishers repository", "harness"]
+
+[[exception]]
+rule = "ARC-005"
+path = "gate/src/runner/mod.rs"
+item = "enter"
+reason = "the step registry is the only thing that can run a step"
+
+[[exception]]
+rule = "ARC-005"
+path = "gate/src/runner/mod.rs"
+item = "add_to_path"
+reason = "the fourth GITHUB_* writer, beside export, output and summary"
+
+[[exception]]
+rule = "ARC-005"
+path = "tests/harness/mod.rs"
+item = "Described"
+reason = "the gate's description of itself is read through the harness alone"
+
+[[exception]]
+rule = "ARC-005"
+path = "tests/harness/mod.rs"
+item = "describe_text"
+reason = "the gate's description of itself is read through the harness alone"
+
+[[exception]]
+rule = "ARC-005"
+path = "tests/harness/mod.rs"
+item = "helper_action"
+reason = "workflow and action YAML are read through the harness alone"

@@ -71,20 +71,21 @@ imports flowing one way only:
   `use crate::checks::checkout_paths::{canonical, inside};`.
 - `gate/src/steps/` is one module per step, private to the directory and
   named after what the step does. A step that keeps a seam of its own becomes
-  a directory: `quality_scorecard/mod.rs` is the step and
+  a directory: `quality_scorecard/step.rs` is the step and
   `quality_scorecard/scorecard.rs` is its internal seam, reaching no further
   than its parent. Its `STEPS` declaration names the step:
   `validate_inputs.rs` holds `rust-gate validate`, `format_lint_test.rs`
   `rust-gate quality`, `publish_crate.rs` every `rust-gate publish-crate
   <step>`, `install_tools.rs` and `verify_payload.rs` the two commands
   several workflows share. Each module exposes one declaration, `STEPS`;
-  `steps/mod.rs` holds the registry and exposes `run` and `describe`, the two
+  `steps/registry.rs` holds the registry and `run` and `describe`, the two
   doors `main.rs` uses.
 
 The compiler keeps the layers apart: a step is private to `gate/src/steps/`, so
-neither the checks nor the runner can reach it. The test
-`imports_flow_one_way_through_the_layer_gates` keeps the rest: no step imports
-another step, no check imports a step, and a step exposes nothing but `STEPS`.
+neither the checks nor the runner can reach it. ARC-004, declared in
+`maestro-quality.toml`, keeps the imports one way, and
+`a_step_offers_only_its_declaration_and_reaches_no_sibling` the rest: no step
+imports another step, and a step exposes nothing but `STEPS`.
 
 The contract tests never read the gate's source. A test runs a step in a
 fixture and reads three things: what the step wrote, what it declares

@@ -59,6 +59,15 @@ check:
       cargo clippy --manifest-path "$manifest/Cargo.toml" --all-targets --locked -- -D warnings
     done
     cargo test --manifest-path gate/Cargo.toml --locked --offline
+    # The organization's module structure rules hold this repository too:
+    # every project here goes through the step consumers run.
+    for project in gate tests examples/binary examples/library examples/workspace; do
+      scratch=$(mktemp -d)
+      PROJECT="$PWD/$project" REPORTS="$scratch" RUNNER_TEMP="$scratch" \
+        GITHUB_WORKSPACE="$PWD" GITHUB_STEP_SUMMARY="$scratch/summary.md" \
+        cargo run --manifest-path gate/Cargo.toml --locked --offline --quiet -- architecture
+      rm -rf "$scratch"
+    done
     RUSTDOCFLAGS='-D warnings -D missing_docs' cargo doc --manifest-path gate/Cargo.toml \
       --no-deps --locked --offline --document-private-items
     cargo test --manifest-path tests/Cargo.toml --locked
@@ -280,7 +289,7 @@ _tables:
     done < <(jaq -r --from toml '.tools | keys[]' mise.toml)
     # The diagram quotes how many controls the scorecard reports; a test runs
     # the scorecard and holds this count to it.
-    controls="$(grep -oE '"(enforced|optional)"' gate/src/steps/quality_scorecard/mod.rs | wc -l)"
+    controls="$(grep -oE '"(enforced|optional)"' gate/src/steps/quality_scorecard/step.rs | wc -l)"
     sed -i -E "s/>[0-9]+ controls</>${controls} controls</" .github/assets/how-it-works.svg
     for document in README.md docs/*.md; do
       rendered="$(mktemp)"

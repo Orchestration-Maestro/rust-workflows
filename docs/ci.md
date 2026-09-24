@@ -39,6 +39,7 @@ committed `deny.toml` applies the same way to every pull request. See [runner se
 | `unused-dependencies` | boolean | `true` | Fail when a workspace member declares a dependency it never uses; remove it or set `false` |
 | `platforms` | string | Empty | Also build and test on `macos`, `windows` and `linux-arm`, space-separated; see [platform portability](#platform-portability) |
 | `api-compatibility` | boolean | `true` | Fail a pull request that breaks a library's public API without `!` after the type in its title; see [public API compatibility](#public-api-compatibility) |
+| `quality-preview` | boolean | `false` | Run the organization quality steps that ship with v2.0.0 before that release, the module structure rules first; v2.0.0 removes this input and runs them always |
 
 <!-- end generated -->
 
@@ -136,6 +137,43 @@ at 90 % or more, among functions of eight lines or more, through
 similarity-rs. It never fails the run: the listing lands in `duplication.txt`
 and its count in the step summary. A pair is a candidate to merge, or a shape
 two functions share on purpose; the report leaves that call to the consumer.
+
+### Module structure
+
+Preview until v2.0.0: the step runs only with `quality-preview: true`, and
+always from v2.0.0 on. `rust-gate architecture` reads every target Cargo
+reports and the files its `mod` declarations reach, and refuses each finding
+by its identifier, file and line:
+
+| Rule | Refuses |
+| --- | --- |
+| ARC-001 | An import cycle between files of one crate |
+| ARC-002 | A `mod.rs`, or a library root with modules, holding more than `mod` and `use` declarations |
+| ARC-003 | A path from outside a door that walks past a name the door re-exports |
+| ARC-004 | An import against the layers `maestro-quality.toml` declares for a target |
+| ARC-005 | An item a door offers past its parent that one outside module uses and nothing inside shares |
+| ARC-006 | A binary root holding more than declarations and a `fn main` of at most 25 lines |
+| ARC-007 | A `#[path]` attribute or an `include!` of Rust source |
+
+`architecture.txt` lists every finding, then every finding an exception
+excuses, with its reason. `maestro-quality.toml`, at the root of the
+repository, declares layers and takes exceptions; among these rules only
+ARC-005 takes one, and an exception that excuses nothing is itself refused:
+
+```toml
+[[crate]]
+root = "gate/src/main.rs"
+layers = ["steps", "checks", "runner"]
+
+[[exception]]
+rule = "ARC-005"
+path = "gate/src/runner/mod.rs"
+item = "enter"
+reason = "the step registry is the only thing that can run a step"
+```
+
+The rules still to come are in the organization quality gate design,
+`docs/superpowers/specs/2026-09-24-org-quality-gate-design.md`.
 
 ### Unsafe code
 
@@ -386,6 +424,7 @@ earlier failure. The scorecard identifies controls that never ran.
 | `tests.xml` | nextest JUnit, including failed tests when nextest produces it | always |
 | `complexity.txt`, `complexity.json` | Functions over the size thresholds and files over 300 lines of code; informational, never fails the run | always |
 | `duplication.txt` | Pairs of functions at or above 90 % similarity, eight lines or more; informational, never fails the run | always |
+| `architecture.txt` | Every ARC finding with its rule, file and line, then each finding an exception excuses, with its reason | `quality-preview: true` until v2.0.0 |
 | `coverage.lcov` | Line coverage in LCOV format | always |
 | `audit.json` | RustSec advisory results | always |
 | `secrets.json` | Redacted secret-scan findings | always |

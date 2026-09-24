@@ -88,6 +88,13 @@ name: Publish Rust crate
           the committed pin
         type: boolean
         default: true
+      quality-preview:
+        description: >-
+          Forwarded unchanged to the CI run, so a release passes the same gates
+          as the project's own CI. `rust-version` is not: a release builds with
+          the committed pin
+        type: boolean
+        default: false
       semver-check:
         description: >-
           Compare against the newest published version; leave off for a first
@@ -168,6 +175,7 @@ jobs:
       unsafe-policy: ${{ inputs.unsafe-policy }}
       unused-dependencies: ${{ inputs.unused-dependencies }}
       api-compatibility: ${{ inputs.api-compatibility }}
+      quality-preview: ${{ inputs.quality-preview }}
       platforms: ${{ inputs.platforms }}
   stage:
     name: Stage the crate package

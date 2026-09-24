@@ -2,10 +2,9 @@
 
 #![forbid(unsafe_code)]
 
-#[path = "harness/native_runtime.rs"]
-mod harness;
+mod native_runtime;
 
-use crate::harness::{checked, registry, root, temporary};
+use crate::native_runtime::{checked, registry, root, temporary};
 use std::fs;
 use std::process::Command;
 

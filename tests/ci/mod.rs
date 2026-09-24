@@ -2,6 +2,7 @@
 //! one module per gate.
 
 mod api_compatibility;
+mod architecture_rules;
 mod complexity_report;
 mod duplication_report;
 mod feature_combinations;

@@ -184,6 +184,23 @@ proofs = [
 ]
 
 [[gate]]
+name = "Module structure"
+kind = "opt-in"
+switch = "`quality-preview: true`, until v2.0.0 runs it always"
+standard = "ARC-001 to ARC-007"
+proofs = [
+  "an_import_cycle_between_two_files_is_refused_by_name",
+  "a_door_holding_a_function_is_refused_and_a_listing_door_passes",
+  "a_path_past_a_door_re_export_is_refused",
+  "declared_layers_refuse_an_import_within_or_against_the_order",
+  "layers_declared_for_a_root_no_target_has_are_refused",
+  "a_seam_serving_one_outside_caller_is_refused_unless_excused",
+  "a_binary_root_beyond_declarations_and_a_short_main_is_refused",
+  "path_attributes_and_rust_includes_are_refused_while_include_str_passes",
+  "the_quality_file_refuses_unknown_tables_and_unreasoned_exceptions",
+]
+
+[[gate]]
 name = "Semantic-version compatibility"
 kind = "opt-in"
 switch = "`semver-check: true` on `publish-crate.yml`; off for a first publication, which has no baseline"

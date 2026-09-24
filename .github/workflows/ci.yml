@@ -84,6 +84,13 @@ name: Rust CI
           compatibility](#public-api-compatibility)
         type: boolean
         default: true
+      quality-preview:
+        description: >-
+          Run the organization quality steps that ship with v2.0.0 before that
+          release, the module structure rules first; v2.0.0 removes this input
+          and runs them always
+        type: boolean
+        default: false
     outputs:
       artifact-id:
         description: >-
@@ -236,6 +243,12 @@ jobs:
       - name: Install the toolchain
         id: tools
         run: rust-gate tools
+      - name: Module structure rules ARC-001 to ARC-007
+        id: architecture
+        # Always on from v2.0.0. Until then only on request: this repository's
+        # own CI still runs the previously pinned gate, which lacks the step.
+        if: ${{ inputs.quality-preview }}
+        run: rust-gate architecture
       - name: Formatting, Clippy and tests
         id: quality
         run: rust-gate quality
