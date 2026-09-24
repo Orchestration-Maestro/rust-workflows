@@ -251,3 +251,9 @@ Rulings taken while executing, newest last.
     commit against its first parent, and need no network; PRL-001 counts a
     test as touched when a file under a `tests` directory changes or a new line
     falls inside a top-level `cfg(test)` item of the changed file.
+18. VET-001 checks the six imports by name and URL before `cargo vet --locked`
+    runs; the organization's audits file lives at rust-workflows'
+    `supply-chain/audits.toml`, read from `main`. Until it is merged there, a
+    ledger locks that import as empty, which is what the file holds, and
+    `cargo vet regenerate imports` refreshes it afterwards. taplo leaves
+    `supply-chain` to `cargo vet fmt`.

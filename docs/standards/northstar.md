@@ -68,10 +68,11 @@ time are a different measurement.
 ## ⚖️ Defaults a consumer inherits
 
 The coverage floor is 90%, the owned fixtures' and every caller's: the public
-`ci.yml` default is 90 and a lower `coverage-threshold` is refused (COV-001). Five gates are on by default as
+`ci.yml` default is 90 and a lower `coverage-threshold` is refused (COV-001). Six gates are on by default as
 deliberate exceptions to adoption safety, because a golden workflow enforces
 the standard: mutation testing, the unused-dependency check, the `unsafe` ban,
-SARIF reports and public API compatibility, each with one input to switch it off. The
+SARIF reports, public API compatibility and recorded dependency audits
+(VET-001), each with one input to switch it off. The
 scaffolding lints have no off switch. Dependency policy defaults to
 `license-policy: auto`: a consumer `deny.toml` when present, otherwise the
 source/version policy and the organization allowlist when provided. It says

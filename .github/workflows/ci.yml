@@ -54,11 +54,10 @@ name: Rust CI
         default: default
       dependency-audit:
         description: >-
-          Require a recorded cargo-vet audit for every dependency; opt-in
-          because it commits the team to reviewing third-party source on each
-          bump
+          Require a recorded cargo-vet audit for every dependency, the
+          organization's and five public audit sets imported (VET-001)
         type: boolean
-        default: false
+        default: true
       unsafe-policy:
         description: >-
           Refuses an `unsafe` block in any workspace member; `allow` leaves the

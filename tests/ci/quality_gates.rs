@@ -1,7 +1,7 @@
 //! `ci.yml`: the lint, documentation, coverage and analysis gates, each proven
 //! to fail when its tool does.
 
-use crate::harness::{Fixture, refused, succeeds, workflow};
+use crate::harness::{Fixture, refused, root, succeeds, workflow};
 use serde_json::{Value, json};
 use std::fs;
 
@@ -384,6 +384,19 @@ fn unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does() {
     );
     fs::create_dir_all(fixture.root.join("project/supply-chain")).unwrap();
     fs::write(fixture.root.join("project/supply-chain/config.toml"), "").unwrap();
+    refused(
+        &fixture.run("ci", "vet"),
+        "vet: supply-chain/config.toml does not import orchestration-maestro, mozilla, google, \
+         bytecode-alliance, isrg, zcash (VET-001); import the organization's audits and those \
+         of Mozilla, Google, the Bytecode Alliance, ISRG and the Zcash Foundation, then run \
+         cargo vet regenerate imports",
+    );
+    // The imports every repository holds, those of an example here.
+    fs::copy(
+        root().join("examples/binary/supply-chain/config.toml"),
+        fixture.root.join("project/supply-chain/config.toml"),
+    )
+    .unwrap();
     assert_eq!(fixture.run("ci", "vet").status.code(), Some(3));
     assert!(fixture.calls().contains("vet --locked"));
     fixture.stub("cargo", "echo audited");

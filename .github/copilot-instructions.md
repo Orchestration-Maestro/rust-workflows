@@ -94,6 +94,10 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── src/                                # Workspace library sources
 │   │   │   ├── lib.rs                          # Workspace library surface with doc comments
 │   │   │   └── main.rs                         # Binary entry point
+│   │   ├── supply-chain/                       # cargo-vet ledger: the six imports VET-001 requires, and the exemptions
+│   │   │   ├── audits.toml                     # The audits recorded here
+│   │   │   ├── config.toml                     # The imports and the reviewed exemptions
+│   │   │   └── imports.lock                    # The imported audits, pinned for cargo vet --locked
 │   │   ├── tests/                              # Workflow contract validation
 │   │   │   └── cli.rs                          # CLI integration test
 │   │   ├── Cargo.lock                          # Locked resolution for the test crate
@@ -104,6 +108,10 @@ generated SBOM output and local download markers are intentionally excluded.
 │   ├── library/                                # Library-only package fixture
 │   │   ├── src/                                # Workspace library sources
 │   │   │   └── lib.rs                          # Workspace library surface with doc comments
+│   │   ├── supply-chain/                       # cargo-vet ledger: the six imports VET-001 requires, and the exemptions
+│   │   │   ├── audits.toml                     # The audits recorded here
+│   │   │   ├── config.toml                     # The imports and the reviewed exemptions
+│   │   │   └── imports.lock                    # The imported audits, pinned for cargo vet --locked
 │   │   ├── Cargo.lock                          # Locked resolution for the test crate
 │   │   ├── Cargo.toml                          # Isolated workflow-contract test target
 │   │   ├── LICENSE                             # MIT notice included in the Cargo package
@@ -123,6 +131,10 @@ generated SBOM output and local download markers are intentionally excluded.
 │       │   ├── Cargo.toml                      # Isolated workflow-contract test target
 │       │   ├── LICENSE                         # MIT notice included in the Cargo package
 │       │   └── README.md                       # What the member is, for crates.io
+│       ├── supply-chain/                       # cargo-vet ledger: the six imports VET-001 requires, and the exemptions
+│       │   ├── audits.toml                     # The audits recorded here
+│       │   ├── config.toml                     # The imports and the reviewed exemptions
+│       │   └── imports.lock                    # The imported audits, pinned for cargo vet --locked
 │       ├── Cargo.lock                          # Locked resolution for the test crate
 │       ├── Cargo.toml                          # Isolated workflow-contract test target
 │       ├── deny.toml                           # Licence allowlist, dependency bans and source policy
@@ -226,6 +238,8 @@ generated SBOM output and local download markers are intentionally excluded.
 │   └── LICENSE                                 # MIT notice included in the Cargo package
 ├── scripts/                                    # Provisioning that has to run before the toolbelt exists
 │   └── bootstrap.sh                            # Verified pinned Linux x64 toolbelt and hooks
+├── supply-chain/                               # The audits the organization publishes for every repository to import
+│   └── audits.toml                             # cargo-vet audits recorded by the organization, VET-001's first import
 ├── tests/                                      # Workflow contract validation
 │   ├── ci/                                     # ci.yml, one module per gate it runs: what each step accepts, refuses, builds and reports
 │   │   ├── api_compatibility.rs                # ci.yml: an undeclared API break fails a pull request; what has no API is not applicable

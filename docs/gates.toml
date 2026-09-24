@@ -160,9 +160,10 @@ proofs = [
 
 [[gate]]
 name = "Recorded dependency audits"
-kind = "opt-in"
-switch = "`dependency-audit: true`, cargo-vet against your committed audits"
-standard = "SCH-007"
+kind = "default"
+switch = "`dependency-audit: false`"
+fails = "A dependency neither audited nor exempted, or a ledger without one of the six imports VET-001 requires"
+standard = "SCH-007, VET-001"
 proofs = [
   "unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does",
 ]

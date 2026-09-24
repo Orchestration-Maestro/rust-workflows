@@ -34,7 +34,7 @@ committed `deny.toml` applies the same way to every pull request. See [runner se
 | `mutation-test` | boolean | `true` | Run cargo-mutants and fail on surviving mutants; a pull request mutates its diff, a push or tag its own commit; set `false` when run time exceeds the job |
 | `sarif-reports` | boolean | `true` | Also emit Clippy and secret findings as SARIF, for `upload-sarif.yml` to show in code scanning |
 | `clippy-level` | string | `default` | `pedantic` or `nursery` also deny those Clippy groups |
-| `dependency-audit` | boolean | `false` | Require a recorded cargo-vet audit for every dependency; opt-in because it commits the team to reviewing third-party source on each bump |
+| `dependency-audit` | boolean | `true` | Require a recorded cargo-vet audit for every dependency, the organization's and five public audit sets imported (VET-001) |
 | `unsafe-policy` | string | `deny` | Refuses an `unsafe` block in any workspace member; `allow` leaves the decision to a project that needs it |
 | `unused-dependencies` | boolean | `true` | Fail when a workspace member declares a dependency it never uses; remove it or set `false` |
 | `platforms` | string | Empty | Also build and test on `macos`, `windows` and `linux-arm`, space-separated; see [platform portability](#platform-portability) |
@@ -451,12 +451,14 @@ the hardening step checks that the section is present rather than assuming it.
 
 ### Recorded dependency audits
 
-`dependency-audit` runs `cargo vet --locked`, which fails unless every dependency
-carries a recorded human audit. It is off by default because it commits a project
-to reviewing third-party source on every version bump; audits can be imported from
-publishers such as Mozilla and Google, so the initial cost is usually small and
-the ongoing cost is the real one. The gate requires a committed
-`supply-chain/config.toml` and says so explicitly rather than auditing nothing.
+`dependency-audit` is on by default (VET-001): the `vet` step runs
+`cargo vet --locked` over the committed `supply-chain/` ledger, after checking
+that its `config.toml` imports the organization's audits, published in
+rust-workflows' `supply-chain/audits.toml`, and those of Mozilla, Google, the
+Bytecode Alliance, ISRG and the Zcash Foundation, each at the URL cargo-vet's
+registry gives it. A crate one of them reviewed needs no exemption; the
+exemptions stay the repository's own reviewed state. `cargo vet init`, the six
+`[imports.*]` tables and `cargo vet regenerate imports` set a repository up.
 
 ### Reproducible builds and binary hardening
 

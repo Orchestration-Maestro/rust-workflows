@@ -59,7 +59,7 @@ name: Publish Rust binaries
           as the project's own CI. `rust-version` is not: a release builds with
           the committed pin
         type: boolean
-        default: false
+        default: true
       unsafe-policy:
         description: >-
           Forwarded unchanged to the CI run, so a release passes the same gates
