@@ -73,6 +73,9 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── engineering.md                      # Engineering rules, each with its enforcement status
 │   │   ├── northstar.md                        # The motto, four axes, the KPI table and the test behind each bar
 │   │   └── security.md                         # Security requirements and how they are enforced
+│   ├── superpowers/                            # Designs written and approved before a change is built
+│   │   └── specs/                              # One approved design per change, named by date and topic
+│   │       └── 2026-09-24-org-quality-gate-design.md  # The quality gate every organization repository inherits, and how
 │   ├── README.md                               # Complete workflow contracts and usage examples
 │   ├── ci.md                                   # Every CI input, output, gate and report
 │   ├── gates.toml                              # Every gate the README lists: what fails it, its switch, its standard and proof
