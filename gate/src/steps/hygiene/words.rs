@@ -5,6 +5,7 @@
 //! judges it and the gate does not. Records keep the words of their day, and
 //! a glossary names the words it refuses, so neither is read.
 
+use super::names::lies_under;
 use crate::checks::findings::Finding;
 use std::fs;
 use std::mem;
@@ -17,8 +18,9 @@ const ORGANIZATION: &str = include_str!("../../../golden-rules/glossary.md");
 /// The extensions of the text files read.
 const TEXT: &[&str] = &["md", "rs", "toml", "yml", "yaml", "sh", "py", "json", "txt"];
 
-/// The records, which keep the words they were written with.
-const RECORDS: &[&str] = &["docs/adr/", "docs/superpowers/", "specs/"];
+/// The directories of records, which keep the words they were written with,
+/// wherever they lie in the tree.
+const RECORDS: &[&str] = &["docs/adr", "docs/superpowers", "specs"];
 
 /// One word no repository uses: its words, the term to use, and the glossary
 /// that says so.
@@ -87,28 +89,37 @@ fn is_read(file: &str) -> bool {
         || name
             .rsplit_once('.')
             .is_some_and(|(_, extension)| TEXT.contains(&extension));
-    let record = name == "CHANGELOG.md" || RECORDS.iter().any(|record| file.starts_with(record));
+    let record = name == "CHANGELOG.md" || RECORDS.iter().any(|record| lies_under(file, record));
     let glossary = name == "CONTEXT.md" || name == "glossary.md";
     text && !record && !glossary && file != "maestro-quality.toml"
 }
 
-/// Whether `words` open with `never`, its last word also taken with a plural
-/// or past `s`, `es` or `ed`.
+/// Whether `words` open with `never`, written as one word or split in up
+/// to one more word than it has, `Pass_List` as `passlist`; the end also
+/// taken with a plural or past `s`, `es` or `ed`, or `ies` for a final `y`.
 fn matches(words: &[(String, usize)], never: &[String]) -> bool {
-    let Some((last, first)) = never.split_last() else {
+    let term = never.concat();
+    if term.is_empty() {
         return false;
-    };
-    let Some(said) = words.get(..never.len()) else {
-        return false;
-    };
-    let head = said
-        .iter()
-        .zip(first)
-        .all(|((word, _), never)| word == never);
-    head && said.last().is_some_and(|(word, _)| {
-        word.strip_prefix(last.as_str())
-            .is_some_and(|rest| ["", "s", "es", "ed"].contains(&rest))
+    }
+    (1..=never.len() + 1).any(|count| {
+        words.get(..count).is_some_and(|said| {
+            let said: String = said.iter().map(|(word, _)| word.as_str()).collect();
+            ends_like(&said, &term)
+        })
     })
+}
+
+/// Whether `said` is `term` itself, or `term` with a plural or past ending.
+fn ends_like(said: &str, term: &str) -> bool {
+    let plain = said
+        .strip_prefix(term)
+        .is_some_and(|rest| ["", "s", "es", "ed"].contains(&rest));
+    let plural = term
+        .strip_suffix('y')
+        .and_then(|stem| said.strip_prefix(stem))
+        .is_some_and(|rest| rest == "ies");
+    plain || plural
 }
 
 /// Every `_Never_` word of a glossary, with the term whose entry names it: an
@@ -135,14 +146,23 @@ fn refused(glossary: &str, source: &'static str) -> Vec<Never> {
     found
 }
 
-/// The words of each item of a `_Never_:` list, a parenthesised note left
-/// out.
+/// The words of each item of a `_Never_:` list, every parenthesised note
+/// left out first, so a comma inside a note splits no item.
 fn listed(list: &str) -> Vec<Vec<String>> {
-    list.trim()
+    let mut bare = String::new();
+    let mut depth = 0_usize;
+    for letter in list.chars() {
+        match letter {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            _ if depth == 0 => bare.push(letter),
+            _ => {}
+        }
+    }
+    bare.trim()
         .trim_end_matches('.')
         .split(',')
         .map(|item| {
-            let item = item.split_once('(').map_or(item, |(item, _)| item);
             words_of(item)
                 .into_iter()
                 .map(|(word, _)| word)
@@ -152,13 +172,14 @@ fn listed(list: &str) -> Vec<Vec<String>> {
         .collect()
 }
 
-/// The words of a text in lowercase, each with its line, URLs left out:
-/// `snake_case`, `kebab-case`, `camelCase`, `PascalCase` and `SCREAMING_CASE`
-/// all split into their words.
+/// The words of a text in lowercase, each with its line, URLs left out and
+/// a Markdown link's text kept: `snake_case`, `kebab-case`, `camelCase`,
+/// `PascalCase` and `SCREAMING_CASE` all split into their words.
 fn words_of(text: &str) -> Vec<(String, usize)> {
     let mut words = Vec::new();
     for (index, line) in text.lines().enumerate() {
-        for token in line.split_whitespace() {
+        let tokens = line.split_whitespace().flat_map(|token| token.split("]("));
+        for token in tokens {
             if token.contains("://") {
                 continue;
             }
@@ -221,6 +242,26 @@ mod tests {
         assert!(!matches(&words_of("coherence of the check"), &never));
         assert!(!matches(&words_of("coherence checker"), &never));
         assert!(!matches(&words_of("coherence"), &never));
+        let never = bare("passlist");
+        for said in [
+            "PassList",
+            "pass_list",
+            "PASS_LIST",
+            "passlists",
+            "pass-listed",
+        ] {
+            assert!(matches(&words_of(said), &never), "{said}");
+        }
+        assert!(!matches(&words_of("pass lister"), &never));
+        assert!(matches(&words_of("puppies"), &bare("puppy")));
+    }
+
+    #[test]
+    fn a_markdown_link_keeps_its_text_and_drops_its_url() {
+        assert_eq!(
+            bare("[allow list](https://x.y/deny_list)."),
+            ["allow", "list"]
+        );
     }
 
     #[test]
@@ -242,6 +283,12 @@ mod tests {
                 ("guard".to_owned(), "Gate"),
             ]
         );
+        let noted = refused(
+            "**Allowlist**:\n_Never_: gold list (in any sense, ever), green list\n",
+            "CONTEXT.md",
+        );
+        let words: Vec<String> = noted.iter().map(|never| never.words.join(" ")).collect();
+        assert_eq!(words, ["gold list", "green list"]);
     }
 
     #[test]
@@ -257,6 +304,8 @@ mod tests {
         assert!(is_read("docs/ci.md") && is_read("justfile") && is_read("src/a.rs"));
         assert!(!is_read("CHANGELOG.md") && !is_read("docs/adr/0001-a.md"));
         assert!(!is_read("specs/001/plan.md") && !is_read("CONTEXT.md"));
+        assert!(!is_read("sub/docs/adr/0001-a.md") && !is_read("sub/specs/a.md"));
+        assert!(is_read("docs/adrs.md") && is_read("inspecs/a.md"));
         assert!(!is_read("gate/golden-rules/glossary.md") && !is_read("logo.png"));
     }
 }

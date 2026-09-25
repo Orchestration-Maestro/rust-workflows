@@ -187,62 +187,58 @@ fn file_names_follow_the_form_of_their_kind() {
     );
 }
 
+/// `text` with `#` read as `i`, `@` as `a` and `&` as `A`: this repository's own
+/// hygiene reads this file too, and would refuse the words spelled out.
+fn spelled(text: &str) -> String {
+    text.replace('#', "i").replace('@', "a").replace('&', "A")
+}
+
 #[test]
 fn words_a_glossary_never_uses_are_refused_everywhere_but_records() {
+    let guide = spelled(concat!(
+        "Wh#telisted names pass a San#ty-Check.\n",
+        "See https://x.y/wh#telist for more.\n",
+        "A Wh#teList and a bl@ck_list.\n",
+    ));
+    let library = spelled("//! Babysitters restart servers.\nconst BL&CKLISTED: u8 = 0;\n");
+    let changelog = spelled("Removed the wh#telist.\n");
+    let record = spelled("A bl@cklist.\n");
     let fixture = checkout(&[
         (
             "CONTEXT.md",
             "**Supervisor**: The process that restarts servers.\n_Never_: babysitter\n",
         ),
-        (
-            "docs/guide.md",
-            concat!(
-                "Whitel",
-                "isted names pass a Sani",
-                "ty-Check.\n",
-                "See https://x.y/white",
-                "list for more.\n",
-            ),
-        ),
-        (
-            "src/lib.rs",
-            concat!(
-                "//! Babysitters restart servers.\nconst BLACK",
-                "LISTED: u8 = 0;\n"
-            ),
-        ),
-        ("CHANGELOG.md", concat!("Removed the white", "list.\n")),
-        ("docs/adr/0001-names.md", concat!("A black", "list.\n")),
+        ("docs/guide.md", &guide),
+        ("src/lib.rs", &library),
+        ("CHANGELOG.md", &changelog),
+        ("docs/adr/0001-names.md", &record),
     ]);
-    refused(&fixture.run("ci", "hygiene"), "hygiene: 4 findings");
+    refused(&fixture.run("ci", "hygiene"), "hygiene: 6 findings");
+    let never = "is a word the organization's glossary never uses; say";
     assert_eq!(
         report(&fixture),
-        concat!(
-            "HYG-007 docs/guide.md:1: `sani",
-            "ty check` is a word the organization's glossary ",
-            "never uses; say coherence check\n",
-            "HYG-007 docs/guide.md:1: `white",
-            "list` is a word the organization's glossary never ",
-            "uses; say allowlist\n",
-            "HYG-007 src/lib.rs:1: `babysitter` is a word CONTEXT.md never uses; say supervisor\n",
-            "HYG-007 src/lib.rs:2: `black",
-            "list` is a word the organization's glossary never uses; ",
-            "say denylist\n",
-        )
+        spelled(&format!(
+            concat!(
+                "HYG-007 docs/guide.md:1: `san#ty check` {never} coherence check\n",
+                "HYG-007 docs/guide.md:1: `wh#telist` {never} allowlist\n",
+                "HYG-007 docs/guide.md:3: `bl@cklist` {never} denylist\n",
+                "HYG-007 docs/guide.md:3: `wh#telist` {never} allowlist\n",
+                "HYG-007 src/lib.rs:1: `babysitter` is a word CONTEXT.md never uses; ",
+                "say supervisor\n",
+                "HYG-007 src/lib.rs:2: `bl@cklist` {never} denylist\n",
+            ),
+            never = never
+        ))
     );
-    fs::write(
-        fixture.root.join("maestro-quality.toml"),
-        concat!(
-            "[[exception]]\nrule = \"HYG-007\"\npath = \"src/lib.rs\"\nitem = \"black",
-            "list\"\n",
-            "reason = \"the name a generated binding keeps\"\n",
-        ),
-    )
-    .unwrap();
+    let exception = spelled(concat!(
+        "[[exception]]\nrule = \"HYG-007\"\npath = \"src/lib.rs\"\nitem = \"bl@cklist\"\n",
+        "reason = \"the name a generated binding keeps\"\n",
+    ));
+    fs::write(fixture.root.join("maestro-quality.toml"), exception).unwrap();
     // The fixture keeps its reports in its checkout, and the last one quotes
     // the words; a run on GitHub writes them outside it.
     fs::remove_file(fixture.root.join("reports/hygiene.txt")).unwrap();
-    refused(&fixture.run("ci", "hygiene"), "hygiene: 3 findings");
+    refused(&fixture.run("ci", "hygiene"), "hygiene: 5 findings");
     assert!(
         report(&fixture).contains("EXCUSED HYG-007 src/lib.rs:2:"),
         "{}",

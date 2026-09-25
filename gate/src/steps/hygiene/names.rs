@@ -1,11 +1,11 @@
 //! HYG-006: every file is named the way its kind is named across the
 //! organization, so a path reads the same in every repository. Files under a
 //! `fixtures`, `testdata` or `snapshots` directory stand in for somebody
-//! else's and are left alone.
+//! else's and are left alone. Whether a file is executable is what git
+//! records, so a run on Windows agrees with one on Linux.
 
 use crate::checks::findings::Finding;
-use std::fs;
-use std::path::Path;
+use std::collections::BTreeSet;
 
 /// The directories whose files are named by what they stand in for.
 const STAND_INS: &[&str] = &["fixtures", "testdata", "snapshots"];
@@ -62,8 +62,8 @@ const MODULE: Kind = Kind {
     fits: |stem, _| snake(stem) || dunder(stem),
 };
 
-/// HYG-006 over `files`.
-pub(super) fn findings(workspace: &Path, files: &[String]) -> Vec<Finding> {
+/// HYG-006 over `files`, `executables` the ones git records as executable.
+pub(super) fn findings(files: &[String], executables: &BTreeSet<String>) -> Vec<Finding> {
     let mut found = Vec::new();
     for file in files {
         let directories: Vec<&str> = file.split('/').collect();
@@ -73,8 +73,7 @@ pub(super) fn findings(workspace: &Path, files: &[String]) -> Vec<Finding> {
         if parents.iter().any(|parent| STAND_INS.contains(parent)) {
             continue;
         }
-        let executable = is_executable(&workspace.join(file));
-        let Some(kind) = kind_of(file, name, executable) else {
+        let Some(kind) = kind_of(file, name, executables.contains(file)) else {
             continue;
         };
         let stem = name.rsplit_once('.').map_or(*name, |(stem, _)| stem);
@@ -93,9 +92,7 @@ fn kind_of(file: &str, name: &str, executable: bool) -> Option<Kind> {
         return Some(WORKFLOW);
     }
     match extension {
-        Some("md") if file.starts_with("docs/adr/") || file.contains("/docs/adr/") => {
-            Some(DECISION)
-        }
+        Some("md") if lies_under(file, "docs/adr") => Some(DECISION),
         Some("md") => Some(MARKDOWN),
         Some("rs") => Some(RUST),
         Some("sh") => Some(SCRIPT),
@@ -105,19 +102,11 @@ fn kind_of(file: &str, name: &str, executable: bool) -> Option<Kind> {
     }
 }
 
-/// Whether the regular file at `path` is executable by anybody.
-#[cfg(unix)]
-fn is_executable(path: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt as _;
-    fs::symlink_metadata(path)
-        .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
-}
-
-/// Whether the file at `path` is executable: never, where modes are not Unix
-/// modes.
-#[cfg(not(unix))]
-fn is_executable(_path: &Path) -> bool {
-    false
+/// Whether `file` lies somewhere under a directory whose path ends with
+/// `directory`, matched segment by segment: `sub/docs/adr/a.md` lies under
+/// `docs/adr`, `docs/adrs/a.md` does not.
+pub(super) fn lies_under(file: &str, directory: &str) -> bool {
+    format!("/{file}").contains(&format!("/{directory}/"))
 }
 
 /// Whether `text` is words joined by `separator`, each made of the bytes
@@ -164,7 +153,17 @@ fn dunder(text: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{dunder, kebab, kind_of, numbered, snake, upper_snake};
+    use super::{dunder, kebab, kind_of, lies_under, numbered, snake, upper_snake};
+
+    #[test]
+    fn a_directory_is_matched_segment_by_segment() {
+        assert!(
+            lies_under("docs/adr/a.md", "docs/adr") && lies_under("x/docs/adr/a.md", "docs/adr")
+        );
+        assert!(
+            !lies_under("docs/adrs/a.md", "docs/adr") && !lies_under("mydocs/adr/a.md", "docs/adr")
+        );
+    }
 
     #[test]
     fn each_case_accepts_its_own_form_only() {

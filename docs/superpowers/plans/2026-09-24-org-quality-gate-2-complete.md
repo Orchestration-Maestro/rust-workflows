@@ -333,4 +333,6 @@ Rulings taken while executing, newest last.
     records, glossaries and `maestro-quality.toml`. `_Avoid_` words stay a
     review matter: their meaning depends on the sentence, and rust-workflows'
     own "harness" has 96 correct uses. rust-workflows renames its pull request
-    template to `PULL_REQUEST_TEMPLATE.md`.
+    template to `PULL_REQUEST_TEMPLATE.md`; its `.gitattributes`, a managed
+    file the pinned gate renders, keeps the old `export-ignore` line, which
+    follows at the next repin.

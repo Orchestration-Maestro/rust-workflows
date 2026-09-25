@@ -212,10 +212,11 @@ file it does not ignore, whatever its language, and refuses:
 | HYG-007 | A word the organization's glossary or the repository's `CONTEXT.md` marks `_Never_` |
 | SIZE-003 | A shell script or justfile line over 100 columns |
 
-HYG-006 reads each file's kind from its place, its extension and its mode. A
+HYG-006 reads each file's kind from its place, its extension and the mode
+git's index records, so a run on Windows agrees with one on Linux. A
 Markdown page is in lowercase kebab-case, or `UPPER_SNAKE` for a community
 file such as `README.md` or `CODE_OF_CONDUCT.md`; a page under a docs/adr
-directory is `NNNN-title.md` or `README.md`. A Rust file is in snake_case, a
+directory, at any depth, is `NNNN-title.md` or `README.md`. A Rust file is in snake_case, a
 file under `.github/workflows/` is a `.yml` in kebab-case, a `.sh` file or an
 executable is in kebab-case, and any other `.py` file, which Python imports,
 is in snake_case. Files under a `fixtures`, `testdata` or `snapshots`
@@ -225,15 +226,19 @@ tool imposes takes an exception naming its path.
 HYG-007 splits every text file into lowercase words, whatever the case it is
 written in, URLs left out, and refuses each word a glossary marks `_Never_`:
 the organization's glossary, which this release carries in
-`gate/golden-rules/glossary.md`, and the repository's own `CONTEXT.md`. A term
-of several words matches the same words in a row, and its last word also
-matches with `s`, `es` or `ed`. The finding names the term the glossary
-defines instead. Records keep the words of their day, so `CHANGELOG.md` and
-whatever lies under docs/adr, `docs/superpowers/` or specs are not read, nor is
-a glossary or `maestro-quality.toml`. An `_Avoid_` word is not refused: whether it means
-the concept depends on the sentence, and review judges that. A use the
-repository must keep takes an exception naming its path and the word as its
-`item`.
+`gate/golden-rules/glossary.md`, and the repository's own `CONTEXT.md`, each
+parenthesised note of its `_Never_` list left out. A Markdown link's text is
+read and its URL is not. A term matches the same words in a row, written as
+one word or split in up to one more word than it has, so `AllowList`,
+`allow_list` and `ALLOW_LIST` match the one-word term allowlist; its end also
+matches with `s`, `es` or `ed`, or `ies` for a final `y`. The finding names the term the
+glossary defines instead. Records keep the words of their day, so
+`CHANGELOG.md` and whatever lies under docs/adr, `docs/superpowers/` or specs,
+at any depth, are not read, nor is a glossary or `maestro-quality.toml`. An
+`_Avoid_` word is not refused: whether it means the concept depends on the
+sentence, and review judges that. A use the repository must keep takes an
+exception naming its path and, as its `item`, the word as the finding prints
+it: lowercase, its words separated by one space.
 
 The findings, and the ones an exception excuses with its reason, are in
 `hygiene.txt`.
