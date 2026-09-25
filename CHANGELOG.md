@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.1](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.5.0...v2.5.1) (2026-09-25)
+
+
+### Bug Fixes
+
+* pin the gate that ships this release's managed files ([#58](https://github.com/Orchestration-Maestro/rust-workflows/issues/58)) ([0c50f83](https://github.com/Orchestration-Maestro/rust-workflows/commit/0c50f832833c440abcc7d26f59a01802d2df10aa))
+
 ## [2.5.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.4.0...v2.5.0) (2026-09-25)
 
 
