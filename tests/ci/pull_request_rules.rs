@@ -1,7 +1,8 @@
 //! `ci.yml`'s pull request steps: COV-002, the coverage of the lines a pull
 //! request adds, and PRL-001 and PRL-002, a feature without a test and a
 //! change past four hundred lines, each read from a real change against a
-//! base commit.
+//! base commit; and PRL-003 and PRL-004, a title and a head branch outside
+//! the conventions, refused by `ci.yml` and by `hygiene.yml` alike.
 
 use crate::harness::{Fixture, refused, succeeds, tool};
 use std::fs;
@@ -45,7 +46,53 @@ fn pull_request(title: &str, files: &[(&str, &str)]) -> Fixture {
     fixture.set("GITHUB_WORKSPACE", &project.display().to_string());
     fixture.set("GITHUB_BASE_REF", "main");
     fixture.set("PULL_REQUEST_TITLE", title);
+    fixture.set("GITHUB_HEAD_REF", "feat/a-change");
     fixture
+}
+
+/// What PRL-003 says of the title `Add b`.
+const TITLE_FINDING: &str = "PRL-003 the title `Add b` is not a conventional header: write \
+     `<type>(<scope>)!: <subject>`, the type one of feat, fix, docs, style, refactor, perf, \
+     test, build, ci, chore, revert, the lowercase scope and the `!` optional, the subject \
+     opening in lowercase within 71 characters";
+
+/// What PRL-004 says of the branch `wip`.
+const BRANCH_FINDING: &str = "PRL-004 the branch `wip` is not named `<type>/<name>`: the \
+     type one of feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, then \
+     segments in lowercase kebab-case separated by `/`, such as feat/refuse-a-title";
+
+#[test]
+fn a_title_or_branch_outside_the_conventions_is_refused() {
+    let mut named = pull_request("Add b", &[("guide.md", "A guide.\n")]);
+    named.set("GITHUB_HEAD_REF", "wip");
+    refused(
+        &named.run("ci", "pull-request"),
+        &format!("pull-request: {TITLE_FINDING}; {BRANCH_FINDING}"),
+    );
+    let report = fs::read_to_string(named.root.join("reports/pull-request.txt")).unwrap();
+    assert!(
+        report.contains(&format!("{TITLE_FINDING}\n{BRANCH_FINDING}\n")),
+        "{report}"
+    );
+    // A repository without Rust is held to the same two by hygiene.yml.
+    refused(
+        &named.run("hygiene", "pull-request-names"),
+        &format!("pull-request-names: {TITLE_FINDING}; {BRANCH_FINDING}"),
+    );
+    // A bot's branch and a conventional title pass both; a push has no pull
+    // request to name.
+    let mut bot = pull_request("chore(main): release 2.4.0", &[("guide.md", "A.\n")]);
+    bot.set("GITHUB_HEAD_REF", "release-please--branches--main");
+    succeeds(&bot.run("ci", "pull-request"));
+    succeeds(&bot.run("hygiene", "pull-request-names"));
+    let summary = fs::read_to_string(bot.root.join("summary")).unwrap();
+    assert!(
+        summary.contains("PRL-003 and PRL-004: no finding."),
+        "{summary}"
+    );
+    named.set("GITHUB_BASE_REF", "");
+    succeeds(&named.run("hygiene", "pull-request-names"));
+    succeeds(&named.run("ci", "pull-request"));
 }
 
 #[test]

@@ -38,6 +38,8 @@ COV-001	Coverage floor	none	At least 90 % of lines covered
 COV-002	Covered changes	none	A pull request's new lines covered: 95 % for `feat` and `fix`, 90 % otherwise
 PRL-001	Features come with tests	none	A `feat` or `fix` that changes product code touches a test
 PRL-002	Reviewable size	none	A pull request past 400 changed lines is reported
+PRL-003	Conventional titles	none	A pull request title is a Conventional Commits header, as the commit hook reads one
+PRL-004	Conventional branches	none	A head branch is `<type>/<name>` in lowercase kebab-case, or a bot's
 DEP-001	One version, reviewed licences	exception	One version per crate, crates.io only, no yanked or unmaintained crate
 VET-001	Audited dependencies	none	Every dependency has a cargo-vet audit, from six imported audit sets
 PRF-001	Performance budget	exception	A declared benchmark rises by 5 % of its instructions at most

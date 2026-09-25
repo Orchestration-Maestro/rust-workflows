@@ -144,7 +144,7 @@ workflows.
 | [`ci.yml`](.github/workflows/ci.yml) | Locked Rust checks, 90% line coverage, security scans, SBOMs and release artifacts |
 | [`attest-binaries.yml`](.github/workflows/attest-binaries.yml) | Opt-in signed build provenance for a re-verified payload; isolated so its scopes bind only its callers |
 | [`fuzz.yml`](.github/workflows/fuzz.yml) | Opt-in bounded fuzz regression: replays the committed corpus, then explores for a fixed budget |
-| [`hygiene.yml`](.github/workflows/hygiene.yml) | The checks every repository holds to, for one without Rust: secrets, hygiene, managed files and the commit hooks over every file |
+| [`hygiene.yml`](.github/workflows/hygiene.yml) | The checks every repository holds to, for one without Rust: secrets, hygiene, the pull request title and branch, managed files and the commit hooks over every file |
 | [`publish-binaries.yml`](.github/workflows/publish-binaries.yml) | Same-revision CI, artifact verification, dry-run by default; existing GitHub Release when explicitly enabled |
 | [`publish-crate.yml`](.github/workflows/publish-crate.yml) | Same-revision CI and selected-package verification; explicit public crates.io publication only |
 | [`publish-evidence.yml`](.github/workflows/publish-evidence.yml) | Dry-run-first archive of release reports; live assets only on protected-tag GitHub Releases |

@@ -1,5 +1,5 @@
 name: Hygiene
-# Contract: The checks every repository holds to, for one without Rust: secrets, hygiene, managed files and the commit hooks over every file
+# Contract: The checks every repository holds to, for one without Rust: secrets, hygiene, the pull request title and branch, managed files and the commit hooks over every file
 "on":
   workflow_call:
 permissions:
@@ -31,6 +31,11 @@ jobs:
       - name: Name the checkout and the reports directory
         id: prepare
         run: rust-gate hygiene prepare
+      - name: Pull request title and branch PRL-003 and PRL-004
+        id: pull-request-names
+        env:
+          PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
+        run: rust-gate hygiene pull-request-names
       - name: Install verified tools
         id: install
         run: rust-gate install-tools
