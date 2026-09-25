@@ -165,6 +165,24 @@ fn ci_entry_jobs_accept_fork_pull_requests() {
 }
 
 #[test]
+fn ruleset_workflows_run_on_every_merge_group() {
+    // A merge queue merges a group only once every check its rulesets require
+    // has reported on the group's commit, so each workflow an organization
+    // ruleset requires runs on `merge_group`. Only a pull request's run gives
+    // way to a newer one: a cancelled merge group run would drop the entry.
+    for name in ["ci", "hygiene"] {
+        let data = workflow(name);
+        let triggers = data["on"].as_object().unwrap();
+        assert!(triggers.contains_key("pull_request"), "{name}");
+        assert!(triggers.contains_key("merge_group"), "{name}");
+        assert_eq!(
+            data["concurrency"]["cancel-in-progress"], "${{ github.event_name == 'pull_request' }}",
+            "{name}"
+        );
+    }
+}
+
+#[test]
 fn publisher_entry_jobs_reject_untrusted_pull_request_contexts() {
     for (name, job) in [
         ("publish-binaries", "preflight"),

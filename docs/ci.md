@@ -26,7 +26,9 @@ blocks the merge.
 A repository therefore holds no `ci.yml` caller. It keeps
 `maestro-quality.toml` and the files `rust-gate sync` writes. A run no
 workflow called takes its inputs from the `[ci]` table of `maestro-quality.toml`
-at the pull request's base commit, so a pull request cannot loosen its own gate;
+at the base commit, the tested commit's first parent: a pull request's base
+branch, or on a merge group the commit the entry lands on. A pull request
+therefore cannot loosen its own gate;
 an input the table leaves out takes its default below, and `platforms` takes
 `macos windows`. The same run uploads the Clippy and secret-scan SARIF to code
 scanning and the coverage to Codecov; see
@@ -134,7 +136,7 @@ repository; see
 ### Uploads to code scanning and Codecov
 
 When no workflow called `ci.yml`, in the run the organization's ruleset starts
-on a pull request, two jobs after the checks upload the same run's
+on a pull request or a merge group, two jobs after the checks upload the same run's
 `<artifact-name>-reports` artifact. No repository holds a workflow for them.
 
 - `upload`, "Upload Clippy and secret-scan SARIF", shows the Clippy and
@@ -162,15 +164,37 @@ CLI's signature check fails, once it tolerates errors; so the job installs the
 CLI from its GitHub release asset, verified by digest, and hands the action
 that binary.
 
-Organization rulesets run on pull requests only, so nothing uploads on a push
-to the default branch. Code scanning keeps comparing a pull request with the
-last analysis the retired callers recorded there under the same job and
-categories; it holds no finding, because a run with one fails and nothing
-merges. Codecov keeps its patch status; its project change and default-branch
-trend compare with the last report on the default branch, which ages, and its
-test analytics of the default branch stop. A central scheduled upload would
-restore them; it would need the organization's bot to hold `security_events`
-and a Codecov upload token for the organization.
+Organization rulesets start `ci.yml` on pull requests and merge groups, never
+on a push, so the default branch's baselines come from the merge queue. The
+organization's `merge_queue` rule sends every merge of a default branch
+through a merge group, squashed, and GitHub moves the branch to the group's
+commit only once every required check passed on it: the merge group's run
+tests the exact commit that lands. On a merge group both jobs file that run's
+results on the default branch, the SARIF with `ref` set to
+`refs/heads/<default branch>` and `sha` to the group's commit, the Codecov
+reports with that branch and commit. Code scanning then compares each pull
+request with the analysis of the commit it branched from, and Codecov's project
+change, default-branch trend and test analytics follow every merge. A pull
+request's run keeps its own ref and commit. No repository holds a file for
+this, no secret is stored and no app gains a permission.
+
+Without the `merge_queue` rule nothing uploads on the default branch: code
+scanning keeps comparing with the last analysis recorded there under the same
+job and categories, and Codecov's default-branch reports age.
+
+### On a merge group
+
+The merge group's commit is one squashed pull request on top of the default
+branch, or of the entries ahead of it in the queue. Its first parent is the
+base commit, so the settings, the mutated change and the baselines read the
+same change the pull request's own run did. The steps that measure a pull
+request against its base, changed-line coverage, the [pull request
+rules](#pull-request-rules), [public API
+compatibility](#public-api-compatibility) and the [performance
+budget](#performance-budget), record that they did not apply, as on a push: the
+queue admits a pull request only once its own run passed them against the
+same change, and a merge group has no title to read. Every other check runs
+again on the commit that lands.
 
 ### Every rule
 
@@ -855,8 +879,8 @@ license-policy=off is refused: the organization's licence policy always applies,
 Mutation testing builds and tests the workspace once per generated mutant. It
 is on by default, because a golden workflow enforces the standard, and every
 run mutates only its change, so the cost scales with the change: a pull request
-its diff against the base branch, a push or a tag its own commit against the
-parent. Squash-only merges make each default-branch commit exactly one pull
+its diff against the base branch, a merge group, a push or a tag its own commit
+against the parent. Squash-only merges make each default-branch commit exactly one pull
 request's change. Only a repository's first commit, which has no parent,
 mutates the whole workspace. The gate fails on any surviving or
 timed-out mutant. When outcomes exist, it copies `mutants.json` before returning

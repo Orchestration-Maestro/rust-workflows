@@ -3,6 +3,7 @@
 
 mod api_compatibility;
 mod architecture_rules;
+mod central_uploads;
 mod commit_hooks;
 mod complexity_report;
 mod copilot_guide;

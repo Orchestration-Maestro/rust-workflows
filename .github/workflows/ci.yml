@@ -433,6 +433,9 @@ jobs:
   # their scopes, which GitHub checks at startup even for a skipped job. The
   # job id `upload` keeps the code scanning configuration the retired callers
   # recorded on each default branch, `.github/workflows/ci.yml:upload`.
+  # A merge group's commit is the one the default branch moves to, the only
+  # branch the organization queues, so both uploads file it there: the
+  # baseline each pull request compares against.
   upload:
     name: Upload Clippy and secret-scan SARIF
     needs:
@@ -458,12 +461,16 @@ jobs:
         with:
           sarif_file: reports/clippy.sarif
           category: clippy
+          ref: ${{ github.event.merge_group && format('refs/heads/{0}', github.event.repository.default_branch) || '' }}
+          sha: ${{ github.event.merge_group.head_sha }}
       - name: Upload secret-scan findings
         if: ${{ hashFiles('reports/secrets.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd  # v4.38.1
         with:
           sarif_file: reports/secrets.sarif
           category: gitleaks
+          ref: ${{ github.event.merge_group && format('refs/heads/{0}', github.event.repository.default_branch) || '' }}
+          sha: ${{ github.event.merge_group.head_sha }}
   # Advisory: the checks job holds coverage to its floors, so a Codecov
   # outage fails no run. The CLI is a release asset verified by digest,
   # never a download the action would run unverified once errors pass.
@@ -512,6 +519,8 @@ jobs:
           use_oidc: true
           fail_ci_if_error: false
           binary: ${{ runner.temp }}/rust-tools/bin/codecov
+          override_branch: ${{ github.event.merge_group && github.event.repository.default_branch || '' }}
+          override_commit: ${{ github.event.merge_group.head_sha }}
       - name: Upload test results
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5  # v7.1.1
         with:
@@ -521,6 +530,8 @@ jobs:
           use_oidc: true
           fail_ci_if_error: false
           binary: ${{ runner.temp }}/rust-tools/bin/codecov
+          override_branch: ${{ github.event.merge_group && github.event.repository.default_branch || '' }}
+          override_commit: ${{ github.event.merge_group.head_sha }}
   gate:
     name: Required Rust CI
     needs:
