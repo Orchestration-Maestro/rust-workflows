@@ -8,6 +8,7 @@
 pub(crate) mod cargo_metadata;
 pub(crate) mod checkout_paths;
 pub(crate) mod findings;
+pub(crate) mod gate_rules;
 pub(crate) mod inputs;
 pub(crate) mod lint_policy;
 pub(crate) mod manifests;
