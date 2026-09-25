@@ -5,54 +5,52 @@ use std::fs;
 use std::path::Path;
 
 #[test]
-fn the_dependency_policy_holds_by_default_and_licences_only_with_a_list() {
-    // A project with no deny.toml still gets the line every project must hold:
-    // approved registries only, no git dependency, no wildcard version. Licences
-    // are checked only when a list exists, and the report says which applied.
+fn the_organization_dependency_policy_applies_to_every_repository() {
+    // DEP-001 for every project, rendered by the gate at run time with the
+    // duplicate versions maestro-quality.toml excuses: no deny.toml is copied
+    // into the repository, and the report says which policy applied.
     let record = r#"[[ "$1" == deny ]] || exit 0"#;
     let mut absent = Fixture::new();
     absent.set("DENY_CONFIG", "");
     absent.stub("cargo", record);
+    fs::write(
+        absent.root.join("maestro-quality.toml"),
+        "[[exception]]\nrule = \"DEP-001\"\npath = \"windows-sys@0.52\"\nreason = \"two \
+         platform crates pin it\"\n",
+    )
+    .unwrap();
     succeeds(&absent.run("ci", "licenses"));
     let report = fs::read_to_string(absent.root.join("reports/licenses.txt")).unwrap();
-    assert!(report.contains("licences NOT APPLIED"), "{report}");
     assert!(
-        report.contains("default policy: approved registries only"),
+        report.starts_with("policy: the organization's DEP-001, rendered by the gate"),
         "{report}"
     );
-    let config = fs::read_to_string(absent.root.join("default-deny.toml")).unwrap();
-    assert_eq!(
-        config,
-        "[bans]\nwildcards = \"deny\"\n\n[sources]\nunknown-registry = \"deny\"\n\
-         unknown-git = \"deny\"\n\
-         allow-registry = [\"https://github.com/rust-lang/crates.io-index\"]\n"
-    );
+    let config = fs::read_to_string(absent.root.join("organization-deny.toml")).unwrap();
+    for line in [
+        "  \"Unicode-3.0\",\n",
+        "yanked = \"deny\"\n",
+        "unknown-git = \"deny\"\n",
+        "multiple-versions = \"deny\"\n",
+    ] {
+        assert!(config.contains(line), "{line}: {config}");
+    }
+    assert!(config.ends_with(
+        "wildcards = \"deny\"\nskip = [\n  { crate = \"windows-sys@0.52\", reason = \"two \
+         platform crates pin it\" },\n]\n"
+    ));
     // RUNNER_TEMP carries a trailing slash in the fixture, so match the file
     // name and the check list rather than the exact path string.
     assert!(
         absent
             .calls()
-            .contains("/default-deny.toml check bans sources\n"),
+            .contains("/organization-deny.toml check licenses bans sources advisories\n"),
         "calls:\n{}",
         absent.calls()
     );
 
-    // Turned off deliberately: recorded, and nothing runs.
-    let mut off = Fixture::new();
-    off.set("LICENSE_POLICY", "off");
-    off.set("DENY_CONFIG", "");
-    off.stub("cargo", record);
-    succeeds(&off.run("ci", "licenses"));
-    assert!(
-        fs::read_to_string(off.root.join("reports/licenses.txt"))
-            .unwrap()
-            .contains("SKIPPED")
-    );
-    assert!(off.calls().is_empty());
-
-    // With a policy committed, the tool runs and its failure is the gate.
+    // The tool's failure is the gate.
     let mut enforced = Fixture::new();
-    enforced.set("DENY_CONFIG", "/somewhere/deny.toml");
+    enforced.set("DENY_CONFIG", "");
     enforced.stub(
         "cargo",
         r#"[[ "$1" == deny ]] || exit 0
@@ -60,54 +58,59 @@ echo "checking"; exit 1"#,
     );
     assert!(
         !enforced.run("ci", "licenses").status.success(),
-        "a committed policy that fails must fail the job"
+        "a policy that fails must fail the job"
     );
 }
 
 #[test]
-fn the_organization_allowlist_adds_licences_and_a_committed_policy_wins() {
-    // Without a deny.toml, the organization list is the only licence policy;
-    // a committed deny.toml wins over it, and a malformed list is refused
-    // before cargo-deny runs.
+fn the_organization_allowlist_adds_licences_and_a_committed_policy_is_refused() {
+    // The organization list adds licences to DEP-001's; a deny.toml the
+    // repository wrote itself is refused, one rust-gate sync wrote is left to
+    // sync to delete, and a malformed list is refused before cargo-deny runs.
     let record = r#"[[ "$1" == deny ]] || exit 0"#;
-    // The organization list adds licences to the default policy.
     let mut org = Fixture::new();
     org.set("DENY_CONFIG", "");
-    org.set("LICENSE_ALLOWLIST", "MIT,Apache-2.0");
+    org.set("LICENSE_ALLOWLIST", "MIT,ISC");
     org.stub("cargo", record);
     succeeds(&org.run("ci", "licenses"));
-    let config = fs::read_to_string(org.root.join("default-deny.toml")).unwrap();
+    let config = fs::read_to_string(org.root.join("organization-deny.toml")).unwrap();
     assert!(
-        config.ends_with("\n[licenses]\nallow = [\"MIT\", \"Apache-2.0\"]\n"),
+        config.contains("  \"Unlicense\",\n  \"ISC\",\n]\n"),
         "{config}"
     );
-    assert!(config.contains("unknown-git = \"deny\""));
-    assert!(
-        org.calls()
-            .contains("/default-deny.toml check bans sources licenses\n"),
-        "calls:\n{}",
-        org.calls()
-    );
+    assert_eq!(config.matches("\"MIT\"").count(), 1, "{config}");
     assert!(
         fs::read_to_string(org.root.join("reports/licenses.txt"))
             .unwrap()
-            .contains("organization licence allowlist: MIT,Apache-2.0")
+            .contains("organization licence allowlist: MIT,ISC")
     );
 
-    // A committed policy wins over the organization list and the default.
     let mut own = Fixture::new();
     own.set("DENY_CONFIG", "/somewhere/deny.toml");
-    own.set("LICENSE_ALLOWLIST", "MIT");
     own.stub("cargo", record);
-    succeeds(&own.run("ci", "licenses"));
-    assert!(
-        own.calls().contains(
-            "deny --config /somewhere/deny.toml check licenses bans sources advisories\n"
-        )
+    refused(
+        &own.run("ci", "licenses"),
+        "deny.toml: the organization's DEP-001 policy applies to every repository; delete \
+         deny.toml and take exceptions in maestro-quality.toml",
     );
-    assert!(!own.root.join("default-deny.toml").exists());
+    assert!(own.calls().is_empty());
 
-    // A malformed list is refused before cargo-deny runs.
+    let mut synced = Fixture::new();
+    let copy = synced.root.join("project/deny.toml");
+    fs::write(
+        &copy,
+        "# generated by rust-gate sync; do not edit\n[bans]\nmultiple-versions = \"allow\"\n",
+    )
+    .unwrap();
+    synced.set("DENY_CONFIG", &copy.display().to_string());
+    synced.stub("cargo", record);
+    succeeds(&synced.run("ci", "licenses"));
+    assert!(
+        synced
+            .calls()
+            .contains("/organization-deny.toml check licenses bans sources advisories\n")
+    );
+
     let mut bad = Fixture::new();
     bad.set("DENY_CONFIG", "");
     bad.set("LICENSE_ALLOWLIST", "MIT; GPL-3.0");

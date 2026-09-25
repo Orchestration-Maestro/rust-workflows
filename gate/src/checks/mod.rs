@@ -2,7 +2,8 @@
 //! names the kind of rule it reaches for: paths in the checkout, simple
 //! names, Rust versions, the release vocabulary, private directories,
 //! Cargo's records, the typed `ci.yml` inputs, Rust source read into module
-//! trees, `maestro-quality.toml` and the findings rules report. Built on the
+//! trees, `maestro-quality.toml`, the tools' configuration passed at run time
+//! and the findings rules report. Built on the
 //! runner, never on a step.
 
 pub(crate) mod cargo_metadata;
@@ -13,7 +14,7 @@ pub(crate) mod inputs;
 pub(crate) mod lint_policy;
 pub(crate) mod manifests;
 pub(crate) mod module_tree;
-pub(crate) mod nextest_profile;
+pub(crate) mod organization_config;
 pub(crate) mod private_directories;
 pub(crate) mod pull_request;
 pub(crate) mod quality_config;

@@ -58,8 +58,9 @@ golden workflow enforces the standard: mutation testing, the unused-dependency
 check, the `unsafe` ban, SARIF reports, public API compatibility and recorded
 dependency audits (VET-001), each with one input to switch it off. The
 scaffolding lints and the dependency policy have no off switch:
-`license-policy` accepts `auto` and `enforce`, both the organization's policy,
-and refuses `off`. The policy says when no licence list applied.
+`license-policy` accepts `auto` and `enforce`, both DEP-001, the organization's
+policy the gate renders at run time, with the organization allowlist's licences
+added when provided, and refuses `off`. A committed `deny.toml` is refused.
 Every other default may not change to something that fails a consumer on
 upgrade. The README lists every gate against these axes. Coverage measures Rust
 fixture lines, not how completely the gate's own refusals are tested; preserve
@@ -160,7 +161,7 @@ any exact stable version from the MSRV up is installed.
 | SDL-005 | **Deterministic.** Publication requires a protected environment; the workflow cannot self-authorize. |
 | SDL-006 | **Deterministic.** Gitleaks on source; the Cargo configuration is written to an isolated `CARGO_HOME`, atomically owner-only through mode 0700 on Unix or a protected inheritable owner DACL on Windows, and carries no credential. Only the protected live Cargo step receives the crates.io token. |
 | SDL-007 | **Deterministic in part.** Reports are redacted before upload; log masking is GitHub's. |
-| SDL-008 | **Deterministic.** `Cargo.lock` committed, `--locked` everywhere, `cargo audit` denying yanked, unsound and unmaintained crates, and `cargo deny` against the consumer's `deny.toml` (licences, bans, sources, advisories) or the generated default policy (sources and bans) without one. |
+| SDL-008 | **Deterministic.** `Cargo.lock` committed, `--locked` everywhere, `cargo audit` denying yanked, unsound and unmaintained crates, and `cargo deny` against DEP-001, the organization's policy the gate renders at run time (licences, bans, sources, advisories). |
 
 ## Security testing (SST)
 
@@ -196,7 +197,7 @@ This is where the repository does most of its work.
 | SCH-007 | Reviewed dependency updates | **Deterministic.** Dependabot proposes, one grouped pull request per ecosystem for patch and minor updates; the organization's bot queues those to merge only behind the full gate. A major update waits for a person. |
 | SCH-008 | Embedded dependency metadata | **Met.** Both release builds run through `cargo auditable`, embedding the resolved dependency list in a `.dep-v0` ELF section, and the hardening step fails when that section is missing rather than assuming the tool ran. |
 | SCH-009 | Reproducibility | **Met, and claimed only because it is measured.** The release build runs a second time into a different target directory and the digests must match. The claim rests on that comparison, not on a successful build. |
-| SCH-010 | Third-party and vendored policy | **Deterministic.** A committed `deny.toml` binds licences, bans and sources; without one the default policy still refuses git dependencies, unknown registries and wildcard versions, and the organization allowlist binds licences when set. Nothing is vendored. |
+| SCH-010 | Third-party and vendored policy | **Deterministic.** DEP-001, rendered by the gate at run time, binds licences, bans, sources and advisories in every repository, with the organization allowlist's licences added when set; a committed `deny.toml` is refused. Nothing is vendored. |
 | SCH-011 | Published artifact verification | **Met, and exercised.** [SECURITY.md](../../SECURITY.md) documents checksums, attestation identity and subject, both SBOM formats and the embedded dependency list. The procedure was run, every step passing, on the assets of release-canary v0.1.0. |
 
 ### What is left

@@ -27,7 +27,7 @@ generated SBOM output and local download markers are intentionally excluded.
 ```text
 .                                               # Repository root
 ├── .config/                                    # Tool settings that live in a directory
-│   └── nextest.toml                            # TST-004: the nextest profile, retries = 0; rendered by rust-gate sync
+│   └── nextest.toml                            # TST-004: the nextest profile, retries = 0, for this repository's own runs
 ├── .github/                                    # GitHub metadata, templates and workflows
 │   ├── ISSUE_TEMPLATE/                         # Structured issue forms and the chooser
 │   │   ├── bug_report.yml                      # Bug form: runner, arch, regression, release impact
@@ -143,7 +143,6 @@ generated SBOM output and local download markers are intentionally excluded.
 │       │   └── imports.lock                    # The imported audits, pinned for cargo vet --locked
 │       ├── Cargo.lock                          # Locked resolution for the test crate
 │       ├── Cargo.toml                          # Isolated workflow-contract test target
-│       ├── deny.toml                           # Licence allowlist, dependency bans and source policy
 │       └── rust-toolchain.toml                 # Exact stable compiler pin for tests
 ├── gate/                                       # The gate: one binary the workflows build at the pinned commit
 │   ├── golden-rules/                           # The golden rules this release carries, copied from .github
@@ -164,7 +163,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── manifests.rs                    # What Cargo says beyond module trees: packages, the workspace, what members inherit
 │   │   │   ├── mod.rs                          # The registry of every step, run and describe, the two doors main.rs calls
 │   │   │   ├── module_tree.rs                  # Every Cargo target's module tree: files, items, named paths and re-exports
-│   │   │   ├── nextest_profile.rs              # TST-004: the one nextest profile, retries = 0, the gate's and every repository's
+│   │   │   ├── organization_config.rs          # The tools' configuration passed at run time, and the header sync writes
 │   │   │   ├── private_directories.rs          # Private temporary directories under the runner's own
 │   │   │   ├── pull_request.rs                 # A pull request against its base: added and touched lines, the title's type
 │   │   │   ├── quality_config.rs               # maestro-quality.toml read through jaq: declared layers and reasoned exceptions
@@ -186,7 +185,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   │   ├── cycles.rs                   # ARC-001: no import cycle between the files of a crate
 │   │   │   │   ├── doors.rs                    # ARC-002 and ARC-003: doors only declare, and paths go through them
 │   │   │   │   ├── layers.rs                   # ARC-004: imports run only to the layers on the right
-│   │   │   │   ├── lints.rs                    # LNT-001: the lints denied in the root manifest, clippy.toml no looser
+│   │   │   │   ├── lints.rs                    # LNT-001: the lints denied in the root manifest, a committed clippy.toml no looser
 │   │   │   │   ├── mod.rs                      # The step's door: its modules and its declaration
 │   │   │   │   ├── names.rs                    # NAME-001, NAME-002 and NAME-003: package, test and feature names
 │   │   │   │   ├── packages.rs                 # LIB-002, TST-003, WSP-001 and WSP-002, read from the manifests
@@ -212,10 +211,10 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   │   ├── widths.rs                   # SIZE-003 for shell scripts and justfiles
 │   │   │   │   └── words.rs                    # HYG-007: no word a glossary marks _Never_, the organization's or CONTEXT.md's
 │   │   │   ├── managed_files/                  # rust-gate sync, sync --check, init and managed-files: the files every repository holds
-│   │   │   │   ├── hooks.rs                    # The commit hooks rendered: prek's checks, each tool through mise, the gate at the release
+│   │   │   │   ├── hooks.rs                    # The commit hooks rendered: prek's checks, each tool through mise with the organization's options, the gate at the release
 │   │   │   │   ├── mod.rs                      # The steps' door: their modules and their declaration
 │   │   │   │   ├── pin.rs                      # The release a caller pins: a commit and its version
-│   │   │   │   ├── render.rs                   # Every managed file rendered, this repository's own among them
+│   │   │   │   ├── render.rs                   # Every managed file rendered: what a tool or GitHub reads from the repository itself
 │   │   │   │   └── step.rs                     # The steps: write, compare, and refuse by name what differs
 │   │   │   ├── quality_scorecard/              # rust-gate scorecard: the step and the value it renders
 │   │   │   │   ├── mod.rs                      # The step's door: its two modules and its declaration
@@ -234,16 +233,16 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── commit_hooks.rs                 # rust-gate hooks: the repository's commit hooks over every file, through the pinned prek
 │   │   │   ├── configure_cargo_registry.rs       # rust-gate registry: private job-local Cargo home for direct crates.io
 │   │   │   ├── declared_msrv.rs                # rust-gate msrv: every member declares a rust-version the compiler under test reaches
-│   │   │   ├── dependency_policy.rs            # rust-gate licenses: the consumer's deny.toml, or the generated default policy
+│   │   │   ├── dependency_policy.rs            # rust-gate licenses: DEP-001 rendered at run time; a committed deny.toml refused
 │   │   │   ├── feature_combinations.rs         # rust-gate features: cargo hack builds each declared feature, not only the default set
-│   │   │   ├── format_lint_test.rs             # rust-gate quality: fmt, Clippy, tests, doc tests, strict rustdoc
+│   │   │   ├── format_lint_test.rs             # rust-gate quality: fmt, Clippy, tests, doc tests, strict rustdoc, with the organization's configuration
 │   │   │   ├── fuzz_regression.rs              # rust-gate fuzz: inputs, nightly toolchain with cargo-fuzz, corpus replay and exploration
 │   │   │   ├── gate_rules.rs                   # rust-gate gate-rules: the list of rules, one a line
 │   │   │   ├── hygiene_workflow.rs             # rust-gate hygiene prepare: the checkout and reports directory of hygiene.yml
 │   │   │   ├── install_toolchain.rs            # rust-gate install-tools: what it refuses, honours, and ci.yml installs
 │   │   │   ├── install_tools.rs                # rust-gate install-tools: official release assets, digests verified before extraction
 │   │   │   ├── line_coverage.rs                # rust-gate coverage: LCOV line coverage, failing below the threshold
-│   │   │   ├── local_runs.rs                   # rust-gate architecture --local and hygiene --local: a step as a commit hook runs it
+│   │   │   ├── local_runs.rs                   # rust-gate architecture, hygiene and clippy --local: a step as a commit hook runs it
 │   │   │   ├── mod.rs                          # One module per step, the registry among them; run and describe are its doors
 │   │   │   ├── mutation_testing.rs             # rust-gate mutants: cargo-mutants scoped to the change, a diff or the last commit
 │   │   │   ├── performance.rs                  # rust-gate performance: PRF-001, declared benchmarks base against head under gungraun
@@ -286,7 +285,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── install_tools.rs                    # rust-gate install-tools: what it refuses, honours, and ci.yml installs
 │   │   ├── managed_files.rs                    # init, sync, sync --check and managed-files: written, refused by name, written back
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
-│   │   ├── organization_lints.rs               # LNT-001: written, refused when missing or looser, and read by real Clippy
+│   │   ├── organization_lints.rs               # LNT-001: written, refused when missing or looser, and read by real Clippy through the gate
 │   │   ├── performance_budget.rs               # PRF-001: a rise past 5 % refused unless excused, and when nothing is measured
 │   │   ├── platform_portability.rs             # ci.yml: named platforms become pinned runners that the required status holds
 │   │   ├── pull_request_rules.rs               # COV-002, PRL-001 and PRL-002 over a real change against a base commit
@@ -355,8 +354,8 @@ generated SBOM output and local download markers are intentionally excluded.
 ├── .gitattributes                              # Text normalization, Rust-aware diff, binary images
 ├── .gitignore                                  # Local tools/caches, Cargo build output, Windows markers
 ├── .pre-commit-config.yaml                     # This repository's own hooks: the organization's set on the pinned toolbelt, and its generated tables
-├── .rumdl.toml                                 # Markdown structure: lines wrap where their writer wraps them; rendered by rust-gate sync
-├── .taplo.toml                                 # TOML formatting: arrays keep the shape they were written in
+├── .rumdl.toml                                 # Markdown structure: lines wrap where their writer wraps them; this repository's own
+├── .taplo.toml                                 # TOML formatting: arrays keep the shape they were written in; this repository's own
 ├── .yamlfmt.yml                                # YAML formatting for workflows and metadata
 ├── AGENTS.md                                   # Authoritative workflow objectives and constraints
 ├── CHANGELOG.md                                # Written by release-please from conventional commit titles
@@ -366,14 +365,14 @@ generated SBOM output and local download markers are intentionally excluded.
 ├── README.md                                   # Complete workflow contracts and usage examples
 ├── SECURITY.md                                 # Runner trust, token handling, publication boundaries
 ├── SUPPORT.md                                  # Troubleshooting and safe diagnostic steps
-├── clippy.toml                                 # The organization's thresholds and test allowances; rendered by rust-gate sync
-├── deny.toml                                   # DEP-001 and the reviewed licences; rendered by rust-gate sync
+├── clippy.toml                                 # The organization's thresholds and test allowances, for this repository's own Clippy
+├── deny.toml                                   # DEP-001 and the reviewed licences, for this repository's own cargo-deny
 ├── justfile                                    # Development commands: setup and check
 ├── maestro-quality.toml                        # The layers this repository's crates declare, its reasoned exceptions and its words
 ├── mise.lock                                   # Resolved URL and checksum of every toolbelt download
 ├── mise.toml                                   # The toolbelt: each tool at the version CI pins
 ├── rust-toolchain.toml                         # The one compiler pin: the gate, the tests and the action build with it
-├── rustfmt.toml                                # The 2024 formatting style; rendered by rust-gate sync
+├── rustfmt.toml                                # The 2024 formatting style, for this repository's own rustfmt
 ├── typos.toml                                  # The words this repository means, from maestro-quality.toml; rendered by rust-gate sync
 └── version.txt                                 # Simple-release version, not a compiler pin
 ```

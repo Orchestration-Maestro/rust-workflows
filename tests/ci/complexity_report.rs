@@ -40,7 +40,7 @@ printf '%s' "$MESSAGES""#,
     );
     assert!(report.contains("file\t301\t300\tsrc/long.rs"), "{report}");
     assert!(
-        report.contains("thresholds from this workflow's defaults"),
+        report.contains("thresholds from the organization's clippy.toml"),
         "{report}"
     );
     let data = fs::read_to_string(fixture.root.join("reports/complexity.json")).unwrap();
@@ -50,7 +50,7 @@ printf '%s' "$MESSAGES""#,
     );
     assert!(
         fixture.calls().contains("CLIPPY_CONF_DIR=/"),
-        "without a consumer clippy.toml the defaults must be handed to Clippy: {}",
+        "without a consumer clippy.toml the organization's must be handed to Clippy: {}",
         fixture.calls()
     );
 

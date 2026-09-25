@@ -1,8 +1,9 @@
 //! `ci.yml` and `rust-gate lints --write`: LNT-001, the organization's lints
-//! denied in the root manifest and its thresholds in `clippy.toml`, written by
-//! the gate, refused when missing or looser, and read by Clippy itself.
+//! denied in the root manifest, written by the gate and refused when missing;
+//! its thresholds, handed to Clippy at run time, and a `clippy.toml` a
+//! repository commits refused when looser; all of it read by Clippy itself.
 
-use crate::harness::{Fixture, refused, succeeds, tool};
+use crate::harness::{Fixture, refused, root, succeeds};
 use std::fs;
 use std::process::Output;
 
@@ -15,21 +16,15 @@ fn report(fixture: &Fixture) -> String {
     fs::read_to_string(fixture.root.join("reports/architecture.txt")).unwrap()
 }
 
-/// Real Clippy over the fixture's project, every warning denied.
+/// Real Clippy over the fixture's project, run the way the pre-push hook
+/// runs it: through the gate, which hands Clippy the organization's
+/// thresholds.
 fn clippy(fixture: &Fixture) -> Output {
-    tool("cargo")
-        .args([
-            "clippy",
-            "--all-targets",
-            "--offline",
-            "--",
-            "-D",
-            "warnings",
-        ])
-        .env("CARGO_TARGET_DIR", fixture.root.join("target"))
-        .current_dir(fixture.root.join("project"))
-        .output()
-        .unwrap()
+    fixture.run_body(&format!(
+        "cd project && cargo generate-lockfile --offline && CARGO_TARGET_DIR={} rust-gate \
+         clippy --local",
+        fixture.root.join("target").display()
+    ))
 }
 
 #[test]
@@ -98,7 +93,10 @@ fn a_manifest_without_the_organization_lints_is_refused_until_written() {
 fn a_clippy_toml_looser_than_the_organization_s_is_refused() {
     let fixture = Fixture::with_sources(&[("src/lib.rs", CLEAN)]);
     let config = fixture.root.join("clippy.toml");
-    let organization = fs::read_to_string(&config).unwrap();
+    // Without one, the gate hands Clippy the organization's own.
+    succeeds(&fixture.run("ci", "architecture"));
+    let organization = fs::read_to_string(root().join("clippy.toml")).unwrap();
+    fs::write(&config, &organization).unwrap();
     succeeds(&fixture.run("ci", "architecture"));
     // Tighter is the repository's call.
     fs::write(
@@ -127,23 +125,14 @@ fn a_clippy_toml_looser_than_the_organization_s_is_refused() {
          LNT-001 clippy.toml: `too-many-lines-threshold` is 150, looser than the organization's \
          100\n"
     );
-    fs::remove_file(&config).unwrap();
-    refused(
-        &fixture.run("ci", "architecture"),
-        "source rules: 1 finding",
-    );
-    assert_eq!(
-        report(&fixture),
-        "LNT-001 clippy.toml: no clippy.toml holds the organization's thresholds; add one at \
-         the repository root\n"
-    );
 }
 
 #[test]
 fn clippy_knows_every_organization_lint_and_applies_it() {
-    // Real Clippy on the written block and the organization's clippy.toml: a
-    // lint or a key Clippy does not know fails this run, and a denied lint
-    // fails code that breaks it.
+    // Real Clippy on the written block and the organization's clippy.toml the
+    // gate hands it: a lint or a key Clippy does not know fails this run, a
+    // denied lint fails code that breaks it, and a function over the
+    // organization's 100 lines is refused with no clippy.toml committed.
     let fixture = Fixture::with_sources(&[("src/lib.rs", CLEAN)]);
     succeeds(&clippy(&fixture));
     let unwrapping = CLEAN.replace(
@@ -158,4 +147,18 @@ fn clippy_knows_every_organization_lint_and_applies_it() {
         stderr.contains("used `unwrap()` on an `Option` value"),
         "{stderr}"
     );
+    let long = format!(
+        "{CLEAN}\n/// Counts.\n#[must_use]\npub fn count() -> u32 {{\n    let mut total = 0;\n\
+         {}    total\n}}\n",
+        "    total += 1;\n".repeat(100)
+    );
+    fs::write(fixture.root.join("project/src/lib.rs"), long).unwrap();
+    let output = clippy(&fixture);
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("this function has too many lines (") && stderr.contains("/100)"),
+        "{stderr}"
+    );
+    assert!(!fixture.root.join("clippy.toml").exists());
 }

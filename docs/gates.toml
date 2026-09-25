@@ -150,12 +150,12 @@ proofs = [
 [[gate]]
 name = "Dependency policy"
 kind = "always"
-fails = "Violations of your `deny.toml`, or the default source/version policy; licence checks apply only with a consumer policy or `LICENSE_ALLOWLIST`. No repository opts out: `license-policy: off` is refused"
-standard = "SCH-010"
+fails = "A violation of DEP-001, the organization's policy the gate renders at run time: a duplicate version not excused in `maestro-quality.toml`, a wildcard, a source other than crates.io, a yanked or unmaintained crate, or a licence outside the reviewed list and `LICENSE_ALLOWLIST`; a committed `deny.toml`. No repository opts out: `license-policy: off` is refused"
+standard = "SCH-010, DEP-001"
 proofs = [
   "ci_validates_the_licence_and_unsafe_policies_before_any_work",
-  "the_organization_allowlist_adds_licences_and_a_committed_policy_wins",
-  "the_dependency_policy_holds_by_default_and_licences_only_with_a_list",
+  "the_organization_allowlist_adds_licences_and_a_committed_policy_is_refused",
+  "the_organization_dependency_policy_applies_to_every_repository",
 ]
 
 [[gate]]
@@ -233,8 +233,8 @@ proofs = [
 [[gate]]
 name = "Managed files"
 kind = "always"
-fails = "A managed file whose bytes differ from the gate's rendering, missing ones included"
-standard = "The generated files of every repository, TST-004, DEP-001"
+fails = "A managed file whose bytes differ from the gate's rendering, missing ones included, or a file sync wrote before its tool took the organization's configuration at run time"
+standard = "The generated files of every repository"
 proofs = [
   "init_writes_every_managed_file_and_the_check_finds_them_equal",
   "a_managed_file_changed_by_hand_is_refused_and_sync_writes_it_back",

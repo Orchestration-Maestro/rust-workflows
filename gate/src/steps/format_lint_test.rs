@@ -1,6 +1,8 @@
 //! `rust-gate quality`: formatting, Clippy with every warning denied, the
 //! tests, the doc tests and strict rustdoc, after every workspace manifest
-//! and source path is confirmed to lie inside the checkout.
+//! and source path is confirmed to lie inside the checkout. rustfmt and
+//! Clippy take the organization's configuration from the gate at run time,
+//! not from a file copied into the repository.
 //!
 //! The tests run under nextest, which gives each one its own process. Two
 //! tests that share a global, a current directory or a temporary path pass
@@ -12,7 +14,7 @@
 
 use crate::checks::checkout_paths::canonical;
 use crate::checks::inputs::{UnsafePolicy, clippy_level, unsafe_policy};
-use crate::checks::nextest_profile::nextest_profile;
+use crate::checks::organization_config::{RUSTFMT_OPTIONS, clippy_directory};
 use crate::runner::{Cmd, Job, Outcome, Step, flag, non_empty, path};
 use std::fs;
 use std::path::Path;
@@ -42,6 +44,11 @@ pub(crate) const STEPS: &[Step] = &[Step {
     run,
 }];
 
+/// TST-004: the settings of the one nextest profile the organization runs
+/// its tests with, `retries = 0`, so a flaky test fails the run instead of
+/// passing on its second try.
+const NEXTEST_SETTINGS: &str = "retries = 0\n";
+
 /// The manifest and every source path of every workspace member.
 const MEMBER_PATHS: &str =
     ".workspace_members as $members | .packages[] | select(.id as $id | $members | index($id)) |
@@ -59,9 +66,9 @@ const MEMBER_PATHS: &str =
 fn run_the_tests(job: &Job) -> Outcome {
     let report = job.report("tests.xml")?;
     let profile = job.temp.join("nextest.toml");
-    let body = nextest_profile(
-        "gate",
-        &format!("junit = {{ path = '{}' }}\n", report.display()),
+    let body = format!(
+        "[profile.gate]\n{NEXTEST_SETTINGS}junit = {{ path = '{}' }}\n",
+        report.display()
     );
     fs::write(&profile, body)
         .map_err(|error| format!("cannot write {}: {error}", profile.display()))?;
@@ -93,7 +100,10 @@ fn run() -> Outcome {
             return Err("Workspace manifests and sources must remain inside checkout".into());
         }
     }
-    Cmd::new("cargo fmt --all --check").cwd(project).run()?;
+    Cmd::new("cargo fmt --all --check -- --config")
+        .arg(RUSTFMT_OPTIONS)
+        .cwd(project)
+        .run()?;
     // Lints passed after `--` reach the selected workspace members only, so
     // denying unsafe here never fails on a dependency that legitimately uses
     // it. RUSTFLAGS would apply to the whole graph and break almost any real
@@ -118,11 +128,14 @@ fn run() -> Outcome {
         lints.extend(["-D", group]);
     }
     let clippy_json = job.report("clippy.json")?;
-    let verdict =
+    let mut clippy =
         Cmd::new("cargo clippy --workspace --all-targets --locked --message-format=json --")
             .args(&lints)
-            .cwd(project)
-            .stdout_to(&clippy_json);
+            .cwd(project);
+    if let Some(directory) = clippy_directory(project, &root, temp)? {
+        clippy = clippy.env("CLIPPY_CONF_DIR", &directory);
+    }
+    let verdict = clippy.stdout_to(&clippy_json);
     // Emit diagnostics even when Clippy fails; a converter must not replace
     // the compiler's original failure with its own exit status.
     let reports = clippy_reports(&job, &clippy_json);

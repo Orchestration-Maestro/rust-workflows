@@ -93,14 +93,15 @@ fn a_real_clippy_failure_keeps_json_sarif_and_its_status() {
             .unwrap();
             assert!(!sarif["runs"][0]["results"].as_array().unwrap().is_empty());
         }
+        // Clippy reads the organization's thresholds from the directory the
+        // gate names, since the fixture commits no clippy.toml.
         let trace = fixture.trace();
-        assert_eq!(
-            trace
-                .lines()
-                .filter(|line| line.starts_with("cargo clippy "))
-                .count(),
-            1
-        );
+        let clippy: Vec<&str> = trace
+            .lines()
+            .filter(|line| line.contains("cargo clippy "))
+            .collect();
+        assert_eq!(clippy.len(), 1, "{trace}");
+        assert!(clippy[0].starts_with("CLIPPY_CONF_DIR="), "{trace}");
         assert!(
             !trace.contains("cargo nextest"),
             "failed lint must still stop the tests"

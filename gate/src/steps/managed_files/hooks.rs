@@ -2,11 +2,15 @@
 //! `.pre-commit-config.yaml`: prek's own checks, each tool through prek's
 //! `mise` language at the version this repository's `mise.toml` pins, the
 //! commit message rules, and for Rust the formatter, the gate's source rules at
-//! the pinned release and Clippy before a push. At the same release, the gate
+//! the pinned release and Clippy before a push. Each tool takes the
+//! organization's configuration on its command line, from the hook, rather
+//! than from a file in the repository; Clippy takes it through
+//! `rust-gate clippy --local`, since no option carries it. At the same release, the gate
 //! keeps the rule map and the Copilot guide current: a hook rewrites either when
 //! it is stale, so the next commit carries it. A developer needs prek and
 //! rustup, nothing else.
 
+use crate::checks::organization_config::RUSTFMT_OPTIONS;
 use std::fmt::Write as _;
 
 /// Every tool a hook runs and the `mise` spec that installs it.
@@ -51,8 +55,8 @@ const BUILTIN: &str = concat!(
 );
 
 /// A hook whose tools prek installs through mise: its id, its name, the
-/// tools it needs, its command, and the files it reads, as a `types:` or
-/// `files:` line, or nothing for every file.
+/// tools it needs, its command with the organization's configuration, and the
+/// files it reads, as a `types:` or `files:` line, or nothing for every file.
 struct ToolHook {
     /// The hook's id, what `SKIP` names.
     id: &'static str,
@@ -64,6 +68,8 @@ struct ToolHook {
     entry: &'static str,
     /// The `types:` or `files:` line, or empty.
     files: &'static str,
+    /// The `exclude:` pattern of files it leaves alone, or empty.
+    exclude: &'static str,
     /// Whether it reads the repository itself rather than the files passed.
     whole: bool,
 }
@@ -76,6 +82,7 @@ const TOOL_HOOKS: &[ToolHook] = &[
         tools: &["typos"],
         entry: "typos --force-exclude",
         files: "",
+        exclude: "",
         whole: false,
     },
     ToolHook {
@@ -84,22 +91,26 @@ const TOOL_HOOKS: &[ToolHook] = &[
         tools: &["gitleaks"],
         entry: "gitleaks git --pre-commit --staged --redact --no-banner",
         files: "",
+        exclude: "",
         whole: true,
     },
     ToolHook {
         id: "yamlfmt",
         name: "YAML formatting",
         tools: &["yamlfmt"],
-        entry: "yamlfmt -no_global_conf -lint",
+        entry: "yamlfmt -no_global_conf -lint -formatter indent=2,include_document_start=false,\
+                retain_line_breaks_single=true,pad_line_comments=2,line_ending=lf",
         files: "types: [yaml]",
+        exclude: "",
         whole: false,
     },
     ToolHook {
         id: "taplo",
         name: "TOML formatting",
         tools: &["taplo"],
-        entry: "taplo fmt --check --diff",
+        entry: "taplo fmt --check --diff --no-auto-config --option array_auto_collapse=false",
         files: "types: [toml]",
+        exclude: "(^|/)supply-chain/",
         whole: false,
     },
     ToolHook {
@@ -108,6 +119,7 @@ const TOOL_HOOKS: &[ToolHook] = &[
         tools: &["actionlint", "shellcheck"],
         entry: "actionlint",
         files: "files: '^\\.github/workflows/.*\\.ya?ml$'",
+        exclude: "",
         whole: false,
     },
     ToolHook {
@@ -116,6 +128,7 @@ const TOOL_HOOKS: &[ToolHook] = &[
         tools: &["zizmor"],
         entry: "zizmor --offline --persona=pedantic --no-progress",
         files: "files: '^\\.github/(workflows/.*|dependabot|actions/.*/action)\\.ya?ml$'",
+        exclude: "",
         whole: false,
     },
     ToolHook {
@@ -124,6 +137,7 @@ const TOOL_HOOKS: &[ToolHook] = &[
         tools: &["shellcheck"],
         entry: "shellcheck",
         files: "types: [shell]",
+        exclude: "",
         whole: false,
     },
     ToolHook {
@@ -132,14 +146,18 @@ const TOOL_HOOKS: &[ToolHook] = &[
         tools: &["shfmt"],
         entry: "shfmt -d",
         files: "types: [shell]",
+        exclude: "",
         whole: false,
     },
     ToolHook {
         id: "rumdl",
         name: "Markdown structure",
         tools: &["rumdl"],
-        entry: "rumdl check --no-cache",
+        entry: "rumdl check --no-cache --no-config --disable MD013,MD041 --config \
+                'MD033.allowed-elements = [\"a\", \"br\", \"details\", \"h1\", \"img\", \"p\", \
+                \"picture\", \"source\", \"strong\", \"summary\"]'",
         files: "types: [markdown]",
+        exclude: "^CHANGELOG\\.md$",
         whole: false,
     },
     ToolHook {
@@ -148,6 +166,7 @@ const TOOL_HOOKS: &[ToolHook] = &[
         tools: &["lychee"],
         entry: "lychee --offline --no-progress",
         files: "types: [markdown]",
+        exclude: "",
         whole: false,
     },
     ToolHook {
@@ -156,6 +175,7 @@ const TOOL_HOOKS: &[ToolHook] = &[
         tools: &["editorconfig-checker"],
         entry: "editorconfig-checker -disable-indent-size",
         files: "",
+        exclude: "",
         whole: false,
     },
 ];
@@ -177,22 +197,21 @@ const MESSAGE: &str = concat!(
     "        stages: [commit-msg]\n",
 );
 
-/// The Rust hooks run by the toolchain rustup provides.
-const CARGO: &str = concat!(
-    "      - id: rustfmt\n",
-    "        name: Rust formatting\n",
-    "        language: system\n",
-    "        entry: cargo fmt --all --check\n",
-    "        types: [rust]\n",
-    "        pass_filenames: false\n",
-    "      - id: clippy\n",
-    "        name: Clippy with the organization's lints\n",
-    "        language: system\n",
-    "        entry: cargo clippy --workspace --all-targets --locked -- -D warnings\n",
-    "        types: [rust]\n",
-    "        pass_filenames: false\n",
-    "        stages: [pre-push]\n",
-);
+/// The formatter, run by the toolchain rustup provides with the
+/// organization's options.
+fn rustfmt_hook() -> String {
+    format!(
+        concat!(
+            "      - id: rustfmt\n",
+            "        name: Rust formatting\n",
+            "        language: system\n",
+            "        entry: cargo fmt --all --check -- --config {options}\n",
+            "        types: [rust]\n",
+            "        pass_filenames: false\n",
+        ),
+        options = RUSTFMT_OPTIONS,
+    )
+}
 
 /// The `.pre-commit-config.yaml` of a repository whose caller pins release
 /// `version`, with the Rust hooks when it builds Rust.
@@ -221,6 +240,9 @@ pub(super) fn commit_hooks(header: &str, rust: bool, version: &str) -> String {
         if !hook.files.is_empty() {
             let _ = writeln!(text, "        {}", hook.files);
         }
+        if !hook.exclude.is_empty() {
+            let _ = writeln!(text, "        exclude: '{}'", hook.exclude);
+        }
         if hook.whole {
             text.push_str("        pass_filenames: false\n");
         }
@@ -239,7 +261,13 @@ pub(super) fn commit_hooks(header: &str, rust: bool, version: &str) -> String {
         jaq = JAQ,
     );
     if rust {
-        text.push_str(CARGO);
+        text.push_str(&rustfmt_hook());
+        let _ = write!(
+            text,
+            "      - id: clippy\n        name: Clippy with the organization's lints\n        \
+             entry: rust-gate clippy --local\n        types: [rust]\n        stages: \
+             [pre-push]\n{gate}"
+        );
         let _ = write!(
             text,
             "      - id: rust-gate-architecture\n        name: Source rules\n        entry: \
@@ -285,7 +313,7 @@ mod tests {
         ));
         assert!(rust.contains("rust-workflows:v2.0.0:rust-gate\"\n"));
         let other = commit_hooks("# h\n", false, "2.0.0");
-        assert_eq!(rust.matches("language: rust\n").count(), 4);
+        assert_eq!(rust.matches("language: rust\n").count(), 5);
         assert_eq!(other.matches("language: rust\n").count(), 3);
         for (id, entry) in [
             ("rust-gate-rules", "rust-gate rules"),
