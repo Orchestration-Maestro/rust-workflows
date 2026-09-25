@@ -7,12 +7,22 @@ use std::fs;
 
 #[test]
 fn the_hooks_step_runs_prek_over_every_file_and_skips_what_ci_runs_itself() {
-    let fixture = Fixture::new();
+    let mut fixture = Fixture::new();
+    // The hooks run on the toolbelt `rust-gate setup` installs, installed first.
+    let tools = fixture.cached_mise("");
     fixture.stub(
         "prek",
         "printf '%s SKIP=%s\\n' \"$*\" \"$SKIP\" >> \"$CALLS\"\necho 'every hook passed'",
     );
     succeeds(&fixture.run("ci", "hooks"));
+    assert!(tools.join("bin/mise").exists());
+    assert!(
+        fixture
+            .calls()
+            .contains("mise\ninstall --locked\nmise\nbin-paths\nprek\n"),
+        "{}",
+        fixture.calls()
+    );
     assert!(
         fixture.calls().contains(
             "run --all-files --show-diff-on-failure --color never \

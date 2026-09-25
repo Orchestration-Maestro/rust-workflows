@@ -26,4 +26,5 @@ mod scorecard_and_required_status;
 mod scorecard_states;
 mod source_rules;
 mod supply_chain;
+mod toolbelt_setup;
 mod workspace_boundary;

@@ -56,6 +56,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── release-please.yml                  # Release pull request and tag on a GitHub App token, skipped until the app is set up
 │   │   ├── scorecard.yml                       # Weekly OpenSSF Scorecard of this repository, published for the badge and shown in code scanning
 │   │   ├── tool-updates.yml                    # Weekly pull request moving every pinned tool to its latest release, on the bot token
+│   │   ├── toolbelt-platforms.yml              # rust-gate setup from nothing and a consumer's hooks, on every platform the toolbelt is pinned for
 │   │   └── unsafe-audit.yml                    # Undefined-behaviour audit under Miri
 │   ├── CODEOWNERS                              # Required reviewers for every change
 │   ├── PULL_REQUEST_TEMPLATE.md                # Review checklist and release-impact prompt
@@ -153,6 +154,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── checks/                             # What the steps share, built on the runner and never on a step
 │   │   │   ├── cargo_metadata.rs               # The jaq programs several steps read over Cargo's records
 │   │   │   ├── checkout_paths.rs               # Canonical forms, containment in the checkout, symlinks, Rust sources
+│   │   │   ├── digests.rs                      # SHA-256, for mise's own download on every platform, where sha256sum is Linux's alone
 │   │   │   ├── findings.rs                     # A rule's finding as one report line, and the exceptions that excuse some
 │   │   │   ├── gate_rules.rs                   # The gate's one list of rules, and the exceptions it allows
 │   │   │   ├── gate_rules.tsv                  # Every rule: ID, short name, exception or none, what it holds
@@ -171,6 +173,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── rust_tests.rs                   # The tests inside Rust source: test functions, test-only code, waits on time
 │   │   │   ├── rust_versions.rs                # Rust version strings compared the way sort -V compared them
 │   │   │   ├── simple_names.rs                 # One validator for every simple-name rule, and hex strings
+│   │   │   ├── toolbelt.rs                     # The organization's toolbelt from the pins the gate embeds, installed and linked per user
 │   │   │   └── workflow_home.rs                # The home of the reusable workflows, whose ci.yml, Dependabot and hooks are its own
 │   │   ├── runner/                             # The runner as the gate sees it: inputs, GITHUB_* files, tools
 │   │   │   ├── commands.rs                     # Running a pinned tool: streamed, captured into a report, or both, and the trace
@@ -256,6 +259,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── require_every_check.rs          # rust-gate required: the one status a branch protection can require
 │   │   │   ├── secret_scan.rs                  # rust-gate secrets: Gitleaks over the current revision, findings redacted
 │   │   │   ├── stage_payload.rs                # rust-gate stage: the immutable payload, its provenance and checksums
+│   │   │   ├── toolbelt_setup.rs               # rust-gate setup: the pinned toolbelt for this user, its PATH line, the commit hooks
 │   │   │   ├── unsafe_audit.rs                 # rust-gate unsafe-audit: inputs, nightly toolchain with Miri, the run and its reach
 │   │   │   ├── unused_dependencies.rs          # rust-gate unused: cargo-machete on declared-but-unused dependencies
 │   │   │   ├── validate_inputs.rs              # rust-gate validate: every ci.yml input checked before any side effect
@@ -267,7 +271,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   ├── Cargo.toml                              # Isolated workflow-contract test target
 │   └── LICENSE                                 # MIT notice included in the Cargo package
 ├── scripts/                                    # Provisioning that has to run before the toolbelt exists
-│   └── bootstrap.sh                            # Verified pinned Linux x64 toolbelt and hooks
+│   └── bootstrap.sh                            # This repository's own verified toolbelt and hooks, on Linux x64
 ├── supply-chain/                               # The audits the organization publishes for every repository to import
 │   └── audits.toml                             # cargo-vet audits recorded by the organization, VET-001's first import
 ├── tests/                                      # Workflow contract validation
@@ -298,6 +302,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── scorecard_states.rs                 # ci.yml: selection, applicability and execution reported separately
 │   │   ├── source_rules.rs                     # ci.yml: SIZE, NAME, DOC, LIB, TST and WSP, each refused by name, and the limits a repository tightens
 │   │   ├── supply_chain.rs                     # ci.yml: dependency policy, direct crates.io reads and the scanners
+│   │   ├── toolbelt_setup.rs                   # rust-gate setup: the locked toolbelt linked and its PATH printed, a bad mise digest refused
 │   │   └── workspace_boundary.rs               # ci.yml: a workspace whose manifests or sources reach outside the checkout is refused before any lint
 │   ├── gate/                                   # The gate and the tests as structures: layers, no import cycle, the step registry, what holds every step and refusal
 │   │   ├── layer_boundaries.rs                 # This crate's own step shape, the checks door, seam unit tests and no whole-harness import
@@ -336,10 +341,11 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
 │   │   ├── north_star.rs                       # Promised controls run, every gate names its proof, no lint silenced
 │   │   ├── pinned_tool_usage.rs                # Every job installs every pinned tool it invokes before a step reads it
-│   │   ├── rendered_hooks_live.rs              # CHECK_NETWORK=1: the rendered hooks in a fresh clone with only prek and rustup
+│   │   ├── rendered_hooks_live.rs              # CHECK_NETWORK=1: the rendered hooks in a fresh clone on the toolbelt setup installs
 │   │   ├── secret_and_advisory_scans.rs        # Gitleaks over the tree; RustSec audits under CHECK_NETWORK=1
 │   │   ├── tool_updates.rs                     # Every install row is what mise locked; update-tools moves a pin everywhere at once
 │   │   ├── toolbelt_and_shellcheck.rs          # Toolbelt links to the locked builds; ShellCheck over every Bash line left
+│   │   ├── toolbelt_platforms.rs               # Every pin locked with a checksum on every platform, or its declared gap
 │   │   ├── version_pins.rs                     # Tool versions, the toolchain pin and the speed target, one copy each
 │   │   └── workflow_policy.rs                  # Permissions, timeouts, runners, trust boundaries, shell policy and the local calls
 │   ├── Cargo.lock                              # Locked resolution for the test crate
@@ -367,8 +373,8 @@ generated SBOM output and local download markers are intentionally excluded.
 ├── deny.toml                                   # DEP-001 and the reviewed licences, for this repository's own cargo-deny
 ├── justfile                                    # Development commands: setup and check
 ├── maestro-quality.toml                        # The layers this repository's crates declare, its reasoned exceptions and its words
-├── mise.lock                                   # Resolved URL and checksum of every toolbelt download
-├── mise.toml                                   # The toolbelt: each tool at the version CI pins
+├── mise.lock                                   # Resolved URL and checksum of every toolbelt download, on every platform
+├── mise.toml                                   # The organization's toolbelt: each tool at the version CI pins, and its gaps
 ├── rust-toolchain.toml                         # The one compiler pin: the gate, the tests and the action build with it
 ├── rustfmt.toml                                # The 2024 formatting style, for this repository's own rustfmt
 ├── typos.toml                                  # The words this repository means, from maestro-quality.toml; rendered by rust-gate sync

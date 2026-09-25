@@ -2,10 +2,11 @@
 //! wrote before, the caller of `ci.yml` included, and moves every call to
 //! rust-workflows to the release the repository declares; `sync --check` and
 //! the `managed-files` step of `ci.yml` refuse any difference, a retired file
-//! still present included, and Markdown settings at the root, which rumdl
-//! would read over the organization's; `init` writes them for a repository
-//! that declares no release yet, with its rule map and, in a git repository,
-//! its Copilot guide.
+//! still present included, Markdown settings at the root, which rumdl would
+//! read over the organization's, and tool pins of the repository's own, where
+//! `rust-gate setup` installs the organization's toolbelt; `init` writes them
+//! for a repository that declares no release yet, with its rule map and, in a
+//! git repository, its Copilot guide.
 
 use super::pin::{Pin, caller_pin, hook_version, parse_pin, repinned, workflow_pins};
 use super::render::{RETIRED, Repository, managed_files};
@@ -83,6 +84,20 @@ const MARKDOWN_SETTINGS: [&str; 10] = [
     "rumdl.toml",
 ];
 
+/// The files a repository would pin tools of its own in, beside the
+/// organization's toolbelt that `rust-gate setup` installs: two pins of one
+/// tool drift apart, and the one CI runs is the gate's. A
+/// `scripts/bootstrap.sh` counts when it fetches mise, the toolbelt's
+/// bootstrap; the home keeps all of them, as the source of the pins.
+const TOOL_PINS: [&str; 6] = [
+    ".github/workflows/tool-updates.yml",
+    ".mise.toml",
+    ".tool-versions",
+    "mise.lock",
+    "mise.toml",
+    "scripts/bootstrap.sh",
+];
+
 /// Run `managed-files`: the checkout's managed files against the rendering.
 fn in_ci() -> Outcome {
     let job = Job::current()?;
@@ -100,7 +115,8 @@ fn in_ci() -> Outcome {
         differing.len()
     ))?;
     refuse("managed files", &differing)?;
-    refuse_root_markdown("managed files", &root)
+    refuse_root_markdown("managed files", &root)?;
+    refuse_tool_pins("managed files", &root)
 }
 
 /// Run `sync`: write every managed file of the repository here.
@@ -114,7 +130,8 @@ fn sync() -> Outcome {
 fn check() -> Outcome {
     let root = canonical(Path::new("."))?;
     refuse("sync --check", &differences(&root, None)?)?;
-    refuse_root_markdown("sync --check", &root)
+    refuse_root_markdown("sync --check", &root)?;
+    refuse_tool_pins("sync --check", &root)
 }
 
 /// Run `init`: the managed files of a repository that declares no release
@@ -181,6 +198,29 @@ fn refuse_root_markdown(context: &str, root: &Path) -> Outcome {
     Err(Failure::from(format!(
         "{context}: {} would loosen the organization's Markdown settings at the root; a \
          .rumdl.toml in a subdirectory applies to it alone",
+        found.join(", ")
+    )))
+}
+
+/// Refuse the tool pins of the repository at `root`, by name, with what
+/// replaces them. The home's are the organization's.
+fn refuse_tool_pins(context: &str, root: &Path) -> Outcome {
+    if is_workflow_home(root) {
+        return Ok(());
+    }
+    let found: Vec<&str> = TOOL_PINS
+        .into_iter()
+        .filter(|path| match fs::read_to_string(root.join(path)) {
+            Ok(text) => *path != "scripts/bootstrap.sh" || text.contains("mise"),
+            Err(_) => false,
+        })
+        .collect();
+    if found.is_empty() {
+        return Ok(());
+    }
+    Err(Failure::from(format!(
+        "{context}: the repository pins tools of its own in {}; delete them, and run \
+         rust-gate setup, which installs every tool CI runs at the version it runs",
         found.join(", ")
     )))
 }

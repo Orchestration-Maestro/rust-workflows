@@ -1,15 +1,15 @@
 //! The rendered commit hooks against the network: in a fresh clone with only
-//! prek, rustup and the operating system on the PATH, every hook installs its
-//! own tool and passes over what the gate rendered.
+//! the toolbelt `rust-gate setup` installs, rustup and the operating system on
+//! the PATH, every hook passes over what the gate rendered.
 
-use crate::harness::{Fixture, succeeds, tool, toolbelt_path};
+use crate::harness::{Fixture, succeeds, tool};
 use std::env;
 use std::path::Path;
 
 #[test]
-fn the_rendered_hooks_run_in_a_fresh_clone_with_only_prek_and_rustup() {
-    // Every hook downloads its tool, so this runs under CHECK_NETWORK=1. The
-    // gate's own hooks install the release a caller pins, which does not
+fn the_rendered_hooks_run_in_a_fresh_clone_on_the_toolbelt_setup_installs() {
+    // Setup downloads the whole toolbelt, so this runs under CHECK_NETWORK=1.
+    // The gate's own hooks install the release a caller pins, which does not
     // exist before the release; they are skipped here and run in `just check`.
     // `rust-gate init` writes the rule map and the guide the other hooks read;
     // the guide links to AGENTS.md, which every repository keeps.
@@ -17,23 +17,20 @@ fn the_rendered_hooks_run_in_a_fresh_clone_with_only_prek_and_rustup() {
         return;
     }
     // A repository without Rust: the fixture's crate goes first.
-    let fixture = Fixture::new();
+    let mut fixture = Fixture::new();
+    let cache = fixture.root.join("cache");
+    fixture.set("XDG_CACHE_HOME", &cache.display().to_string());
     let repository = fixture.root.join("project");
     succeeds(&fixture.run_body(&format!(
         concat!(
             "cd project && rm -r Cargo.toml Cargo.lock src rust-toolchain.toml && git init -q ",
             "&& printf '# Probe\\n' > README.md && printf 'MIT\\n' > LICENSE && ",
             "printf '# Agents\\n' > AGENTS.md && ",
-            "RUST_WORKFLOWS_PIN='{} v2.0.0' rust-gate init && git add -A",
+            "RUST_WORKFLOWS_PIN='{} v2.0.0' rust-gate init && git add -A && rust-gate setup",
         ),
         "a".repeat(40)
     )));
-    let prek = toolbelt_path()
-        .split(':')
-        .map(Path::new)
-        .find(|directory| directory.join("prek").is_file())
-        .map(Path::to_path_buf)
-        .unwrap();
+    let toolbelt = cache.join("maestro/tools/bin");
     let cargo = env::var("CARGO_HOME").map_or_else(
         |_| Path::new(&env::var("HOME").unwrap()).join(".cargo/bin"),
         |home| Path::new(&home).join("bin"),
@@ -42,7 +39,7 @@ fn the_rendered_hooks_run_in_a_fresh_clone_with_only_prek_and_rustup() {
         .args(["run", "--all-files"])
         .env(
             "PATH",
-            format!("{}:{}:/usr/bin:/bin", prek.display(), cargo.display()),
+            format!("{}:{}:/usr/bin:/bin", toolbelt.display(), cargo.display()),
         )
         .env(
             "SKIP",

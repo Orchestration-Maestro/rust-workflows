@@ -362,6 +362,68 @@ fn markdown_settings_at_the_root_are_refused_and_a_subdirectory_keeps_its_own() 
 }
 
 #[test]
+fn tool_pins_of_the_repository_s_own_are_refused_with_the_replacement() {
+    let mut fixture = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
+    succeeds(&in_project(
+        &fixture,
+        &format!("{} rust-gate init", pin('a', "2.0.0")),
+    ));
+    let project = fixture.root.join("project");
+    fixture.set("GITHUB_WORKSPACE", &project.display().to_string());
+    // A bootstrap script that fetches no toolbelt is the repository's own.
+    fs::create_dir_all(project.join("scripts")).unwrap();
+    fs::write(
+        project.join("scripts/bootstrap.sh"),
+        "#!/bin/bash\ncargo fetch\n",
+    )
+    .unwrap();
+    succeeds(&in_project(&fixture, "rust-gate sync --check"));
+    fs::write(
+        project.join("scripts/bootstrap.sh"),
+        "#!/bin/bash\nmise install --locked\n",
+    )
+    .unwrap();
+    fs::create_dir_all(project.join(".github/workflows")).unwrap();
+    for (path, text) in [
+        ("mise.toml", "[tools]\njust = \"1.58.0\"\n"),
+        ("mise.lock", "lockfile_version = 2\n"),
+        (".tool-versions", "just 1.58.0\n"),
+        (".github/workflows/tool-updates.yml", "name: Tool updates\n"),
+    ] {
+        fs::write(project.join(path), text).unwrap();
+    }
+    refused(
+        &in_project(&fixture, "rust-gate sync --check"),
+        "sync --check: the repository pins tools of its own in \
+         .github/workflows/tool-updates.yml, .tool-versions, mise.lock, mise.toml, \
+         scripts/bootstrap.sh; delete them, and run rust-gate setup, which installs every tool \
+         CI runs at the version it runs",
+    );
+    for path in [
+        "mise.lock",
+        ".tool-versions",
+        ".github/workflows/tool-updates.yml",
+        "scripts/bootstrap.sh",
+    ] {
+        fs::remove_file(project.join(path)).unwrap();
+    }
+    fs::write(project.join(".mise.toml"), "[tools]\n").unwrap();
+    refused(
+        &fixture.run("ci", "managed-files"),
+        "managed files: the repository pins tools of its own in .mise.toml, mise.toml; delete \
+         them, and run rust-gate setup, which installs every tool CI runs at the version it \
+         runs",
+    );
+    // The home keeps the pins: they are the organization's.
+    fs::write(
+        project.join(".github/workflows/ci.yml"),
+        "name: CI\non:\n  workflow_call:\n",
+    )
+    .unwrap();
+    succeeds(&in_project(&fixture, "rust-gate sync --check"));
+}
+
+#[test]
 fn the_home_may_change_the_files_it_is_the_source_of() {
     let mut fixture = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
     succeeds(&in_project(

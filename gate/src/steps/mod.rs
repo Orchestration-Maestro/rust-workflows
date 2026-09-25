@@ -40,6 +40,7 @@ mod require_every_check;
 mod rule_map;
 mod secret_scan;
 mod stage_payload;
+mod toolbelt_setup;
 mod unsafe_audit;
 mod unused_dependencies;
 mod validate_inputs;

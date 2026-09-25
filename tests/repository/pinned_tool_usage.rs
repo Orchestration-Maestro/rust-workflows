@@ -5,11 +5,20 @@ use crate::harness::{Described, described, described_step, tool_rows, workflow_s
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
+/// The bodies that install the whole toolbelt, mise first, verified by
+/// digest, before they run any tool of it: `rust-gate setup` and the hooks
+/// step.
+const SETUP: [&str; 2] = ["rust-gate setup", "rust-gate hooks"];
+
 /// Whether `step` invokes `tool`: a gate body, what its step declares; a Bash
 /// body, what its lines show. A Cargo subcommand is named as Cargo runs it,
-/// `cargo mutants` for the `cargo-mutants` row.
+/// `cargo mutants` for the `cargo-mutants` row. A body of [`SETUP`] runs only
+/// what it installed itself.
 fn invokes(described: &[Described], step: &Value, tool: &str) -> bool {
-    let Some(run) = step["run"].as_str() else {
+    let Some(run) = step["run"]
+        .as_str()
+        .filter(|run| !SETUP.contains(&run.trim()))
+    else {
         return false;
     };
     let tool = tool.strip_prefix("cargo-").map_or_else(
@@ -30,14 +39,16 @@ fn invokes(described: &[Described], step: &Value, tool: &str) -> bool {
 }
 
 /// Whether a step of `steps` installs `tool`: the pinned table, or the
-/// toolbelt bootstrap, which installs every tool at the version and checksum
-/// mise.lock records.
+/// toolbelt bootstrap or a body of [`SETUP`], which install every tool at the
+/// version and checksum mise.lock records.
 fn installs(steps: &[Value], tool: &str) -> bool {
     steps.iter().any(|step| {
         tool_rows(step).iter().any(|row| row.name == tool)
             || step["run"].as_str().is_some_and(|run| {
-                run.lines()
-                    .any(|line| line.trim() == "scripts/bootstrap.sh")
+                SETUP.contains(&run.trim())
+                    || run
+                        .lines()
+                        .any(|line| line.trim() == "scripts/bootstrap.sh")
             })
     })
 }

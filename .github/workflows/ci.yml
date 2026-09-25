@@ -197,13 +197,6 @@ jobs:
           # from source cost every caller minutes of compile time on every job,
           # multiplied by the compiler matrix. Each asset is pinned by checksum.
           TOOLS: |
-            # prek runs the repository's commit hooks over every file; each hook
-            # brings its own tool at the version the gate renders.
-            prek j178/prek/releases/download/v0.5.3/prek-x86_64-unknown-linux-musl.tar.gz d4eae1f31c0817d0a9bfa532d4bb66df60a8b01f121def002021915e826c3d1f prek-x86_64-unknown-linux-musl/prek
-            # mise, which prek installs every hook's tool through, at the version
-            # and digest scripts/bootstrap.sh pins; without it on PATH, prek
-            # fetches whatever mise release it finds.
-            mise jdx/mise/releases/download/v2026.9.9/mise-v2026.9.9-linux-x64.tar.gz e4767e4854af5daeff2191b2bbdc94f834742a23efad591dbd33187861d41604 mise/bin/mise
             # gungraun's runner counts the declared benchmarks' instructions
             # (PRF-001); it must match the gungraun the benchmarks link.
             gungraun-runner gungraun/gungraun/releases/download/v0.19.4/gungraun-runner-v0.19.4-x86_64-unknown-linux-gnu.tar.gz f88194dac725ef0599b2812396518e9bd74aadaf75f5baf78df91ddb9eec67d3 gungraun-runner-v0.19.4-x86_64-unknown-linux-gnu/gungraun-runner
@@ -277,8 +270,10 @@ jobs:
       - name: Commit hooks over every file
         id: hooks
         env:
-          # mise asks GitHub's API for each hook's release; an anonymous
-          # runner shares its rate limit with every other job on its address.
+          # The step installs the toolbelt `rust-gate setup` installs, prek
+          # and every hook's tool; mise asks GitHub's API for each release's
+          # attestations, and an anonymous runner shares its rate limit with
+          # every other job on its address.
           MISE_GITHUB_TOKEN: ${{ github.token }}
         run: rust-gate hooks
       - name: Formatting, Clippy and tests

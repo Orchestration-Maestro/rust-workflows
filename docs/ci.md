@@ -382,22 +382,62 @@ commit runs are the organization's: prek's own checks (merge markers, YAML,
 TOML and JSON syntax, final newlines, trailing whitespace, line endings, files
 over 500 KB, case conflicts, shebangs), then typos, gitleaks over the staged
 change, yamlfmt, taplo, actionlint, zizmor, shellcheck, shfmt, rumdl, lychee
-offline and editorconfig-checker, each installed by prek through mise at the
-version rust-workflows' `mise.toml` pins; the commit message rules; and
+offline and editorconfig-checker, each run from the PATH at the version
+rust-workflows' `mise.toml` pins; the commit message rules; and
 `rust-gate hygiene --local`, the gate built by Cargo from the release the
 repository declares. Each tool takes the organization's options on its command line,
 as the table above lists. A Rust repository adds `cargo fmt`, `rust-gate
 architecture --local` and, before a push, `rust-gate clippy --local`, Clippy
-with the organization's lints and thresholds. A developer
-needs prek and rustup and nothing else.
+with the organization's lints and thresholds. A developer needs rustup and the
+toolbelt of [the tools on your machine](#the-tools-on-your-machine), nothing
+else.
 
-The `hooks` step runs the same hooks over every file through the pinned prek, skipping the formatter,
-Clippy and the gate's rules, which CI runs as steps of their own; the output is
-`hooks.txt`. mise asks GitHub's API for each hook's release, so the step hands
-it the job's read-only token as `MISE_GITHUB_TOKEN`: an anonymous runner shares
-its rate limit with every other job on its address. A repository without Rust calls `hygiene.yml` instead of `ci.yml`:
-the secret scan, `hygiene`, `pull-request-names`, `managed-files` and `hooks`, under the check
-`hygiene / Required hygiene`.
+The `hooks` step installs that same toolbelt, then runs the same hooks over
+every file on it, skipping the formatter, Clippy and the gate's rules, which CI
+runs as steps of their own; the output is `hooks.txt`. mise asks GitHub's API
+for each release's attestations, so the step hands it the job's read-only token
+as `MISE_GITHUB_TOKEN`: an anonymous runner shares its rate limit with every
+other job on its address. A repository without Rust calls `hygiene.yml` instead
+of `ci.yml`: the secret scan, `hygiene`, `pull-request-names`, `managed-files`
+and `hooks`, under the check `hygiene / Required hygiene`.
+
+### The tools on your machine
+
+One command gives a developer exactly the tools CI runs, at the versions it
+runs, in any repository of the organization:
+
+```bash
+cargo install --locked --git https://github.com/Orchestration-Maestro/rust-workflows \
+  --tag v<version> rust-gate
+rust-gate setup
+```
+
+The gate carries rust-workflows' `mise.toml` and `mise.lock`, read in when it
+is built. `rust-gate setup` fetches mise itself and refuses it unless its
+SHA-256 is the pinned one, then has mise install every tool under `--locked`
+into `~/.cache/maestro/tools/<version>` (`$XDG_CACHE_HOME` when set,
+`%LOCALAPPDATA%\maestro\tools` on Windows), reading no configuration but the
+gate's. It links every tool into one directory, `~/.cache/maestro/tools/bin`,
+and prints the line that puts it on the PATH; the line stays the same from one
+release to the next. Run inside a repository with a `.pre-commit-config.yaml`,
+it also installs the commit hooks. A second run finds everything in place and
+takes a fraction of a second. In a GitHub Actions job it also puts the
+directory on the PATH of every later step.
+
+The toolbelt is locked for Linux x64 and arm64, macOS x64 and arm64, and
+Windows x64. A tool that publishes no build for one of them is built from
+crates.io at its pinned version, `cargo install --locked`, as the `# source:`
+line above its pin declares. gungraun-runner is the one tool left out: it
+drives Valgrind, which runs on Linux alone, so on macOS and Windows `setup`
+names it and the [performance budget](#performance-budget) runs in Linux CI.
+`toolbelt-platforms.yml` runs `setup` from nothing on each of those platforms,
+then a consumer's rendered hooks through the `hooks` step.
+
+A repository keeps no tool pins of its own: `managed-files` and `rust-gate
+sync --check` refuse a `mise.toml`, `mise.lock`, `.mise.toml`,
+`.tool-versions`, a `scripts/bootstrap.sh` that fetches mise, and a
+`.github/workflows/tool-updates.yml`, naming `rust-gate setup` as what replaces
+them. Only rust-workflows keeps them, as the source of the pins.
 
 ### Pull request rules
 
@@ -434,7 +474,9 @@ of its own, then on the pull request, and refuses one whose instruction count
 rises more than 5 % (PRF-001). Instruction counts do not move with the runner's
 load. A regression the repository accepts is a PRF-001 exception whose `path`
 names the bench; its counts are still in `performance.txt`. Without a bench or a
-base, the step reports that it does not apply.
+base, the step reports that it does not apply. gungraun-runner exists for Linux
+alone, as Valgrind does, so the budget is measured in Linux CI; `rust-gate
+setup` leaves it out on macOS and Windows and says so.
 
 `changed-coverage.txt` names every new line that never ran, from the coverage
 step's LCOV; `pull-request.txt` holds the size and the PRL findings. A push has
