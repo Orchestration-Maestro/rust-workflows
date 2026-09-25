@@ -220,10 +220,11 @@ changes what this repository proves, not what it accepts; say so in the changelo
 
 The bar these gates serve is the [North Star](docs/standards/northstar.md):
 automate the guardrails to deliver faster, with higher quality, and more
-securely. Each row names the rule it lands in the
-[engineering](docs/standards/engineering.md) and
-[security](docs/standards/security.md) standards, or the North Star axis it
-serves, and the test that proves the gate fails when it should. Every gate
+securely. Each row names the rule it lands in, a golden rule of the
+[engineering](docs/standards/engineering.md) or
+[security](docs/standards/security.md) rule map or one of this repository's own
+[controls](docs/standards/controls.md), or the North Star axis it serves, and
+the test that proves the gate fails when it should. Every gate
 preserves the reports it produced, including Clippy and mutation diagnostics
 on failure. The scorecard distinguishes passed, disabled, non-applicable, failed
 and unrun controls; only passed controls count as active. Steps that never start
@@ -584,6 +585,7 @@ extracting it. Rust itself comes from the approved platform channel, never from
 - [Quality baseline and engineering rules](docs/standards/engineering.md)
 - [Security boundaries](docs/standards/security.md)
 - [Quality targets and CI evidence](docs/standards/northstar.md)
+- [North Star bars, consumer defaults and extended security controls](docs/standards/controls.md)
 - [Domain glossary](CONTEXT.md)
 - [LICENSE](LICENSE): MIT, including the gate, tests and examples. Third-party
   dependencies retain their own licences.

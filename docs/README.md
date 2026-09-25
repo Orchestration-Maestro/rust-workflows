@@ -16,9 +16,10 @@ documents and nothing else.
 
 | Document | Answers |
 | --- | --- |
-| [standards/northstar.md](standards/northstar.md) | The motto, the four axes with the gate that holds each bar and the test that proves it, the KPIs, and what counts as evidence for a green claim. |
-| [standards/engineering.md](standards/engineering.md) | The engineering rules and, for each one, the command or test that enforces it here, or an admission that it rests on judgement. |
-| [standards/security.md](standards/security.md) | Every security requirement this repository can act on, each with its real status. Two are unproven, and say so. |
+| [standards/northstar.md](standards/northstar.md) | The point and one KPI per pillar, part of the rule map `rust-gate rules` writes. |
+| [standards/engineering.md](standards/engineering.md) | The rule map of the organization's engineering rules: for each one, the command or test that enforces it here, or an admission that it rests on judgement; then this repository's stricter rules. |
+| [standards/security.md](standards/security.md) | The rule map of the organization's security rules, each with its real status here, and what this repository protects. |
+| [standards/controls.md](standards/controls.md) | What the rule map has no room for: the four axes with the gate that holds each bar and the test that proves it, the defaults a consumer inherits, what counts as evidence for a green claim, and the extended security controls, two of them unproven. |
 | [rust-gate.md](rust-gate.md) | Why every step body is one command of a binary built from the pinned commit, its invariants and its layout. |
 
 ## What these documents will not do

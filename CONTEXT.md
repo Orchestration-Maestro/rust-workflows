@@ -67,9 +67,9 @@ contract tests, so the two cannot disagree about what a body reads.
 ## Checks
 
 **North Star**: The motto every change is held to, automate the guardrails to
-deliver faster, with higher quality, and more securely, written out in
-`docs/standards/northstar.md` as four axes with one bar each, the gate that
-holds it and the test that proves it.
+deliver faster, with higher quality, and more securely: one KPI per pillar in
+`docs/standards/northstar.md`, and four axes in `docs/standards/controls.md`,
+one bar each, the gate that holds it and the test that proves it.
 
 **Proof**: The test a gate names in the README's Gates tables, the one that
 fails when the gate slips. A test that no longer exists turns the gate red.

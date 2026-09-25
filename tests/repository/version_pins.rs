@@ -125,10 +125,10 @@ fn every_rendered_hook_runs_a_pinned_version_and_this_repository_runs_them_all()
     };
     let here = ids(&root().join(".pre-commit-config.yaml"));
     for id in ids(&rendered) {
-        // The gate's rules and Clippy run in `just check` here, per crate. The
-        // rule map and the guide are not written here: this repository keeps
-        // its own standards pages and guide, under its own tests, until it
-        // maps its standards onto the golden rules.
+        // The gate's rules and Clippy run in `just check` here, per crate, and
+        // so does `rust-gate rules --check` on this repository's rule map. The
+        // guide is not written here: this repository keeps its own, the model,
+        // under its own inventory test.
         if matches!(
             id.as_str(),
             "rust-gate-architecture"
@@ -203,21 +203,30 @@ fn the_speed_target_is_the_one_the_gate_prints() {
         justfile.contains("echo \"SPEED: "),
         "the justfile must print the duration in check"
     );
-    let north_star = fs::read_to_string(root.join("docs/standards/northstar.md")).unwrap();
-    let rows: Vec<&str> = north_star
-        .lines()
-        .filter(|line| line.starts_with("| Speed |"))
-        .collect();
-    assert_eq!(rows.len(), 2, "one axis row and one KPI row for Speed");
-    assert!(
-        rows[0].contains(&format!("at or under {target} seconds")),
-        "the Speed bar must state the justfile's target: {}",
-        rows[0]
+    // The Speed bar lives in controls.md's four axes, its KPI in northstar.md.
+    let speed_row = |page: &str| -> Vec<String> {
+        fs::read_to_string(root.join("docs/standards").join(page))
+            .unwrap()
+            .lines()
+            .filter(|line| line.starts_with("| Speed |"))
+            .map(str::to_owned)
+            .collect()
+    };
+    let (bar, kpi) = (speed_row("controls.md"), speed_row("northstar.md"));
+    assert_eq!(
+        (bar.len(), kpi.len()),
+        (1, 1),
+        "one Speed bar and one Speed KPI"
     );
     assert!(
-        rows[1].contains(&format!("| {target} s or less |")),
+        bar[0].contains(&format!("at or under {target} seconds")),
+        "the Speed bar must state the justfile's target: {}",
+        bar[0]
+    );
+    assert!(
+        kpi[0].contains(&format!("| {target} s or less |")),
         "the Speed KPI must target the justfile's number: {}",
-        rows[1]
+        kpi[0]
     );
 }
 

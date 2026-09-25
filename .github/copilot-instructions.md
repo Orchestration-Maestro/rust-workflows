@@ -73,14 +73,16 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── own-inputs.jq                       # The inputs one publisher has and the other lacks
 │   │   └── shared-inputs.jq                    # The inputs both publishers share, the forwarded ones in one row
 │   ├── standards/                              # The bars this repository holds itself to
-│   │   ├── engineering.md                      # Engineering rules, each with its enforcement status
-│   │   ├── northstar.md                        # The motto, four axes, the KPI table and the test behind each bar
-│   │   └── security.md                         # Security requirements and how they are enforced
+│   │   ├── controls.md                         # The four axes and their proofs, consumer defaults, evidence, extended security controls
+│   │   ├── engineering.md                      # Rule map of the engineering rules, then this repository's stricter rules
+│   │   ├── northstar.md                        # The point and one KPI per pillar, written by rust-gate rules
+│   │   └── security.md                         # Rule map of the security rules, and what this repository protects
 │   ├── superpowers/                            # Designs written and approved before a change is built
 │   │   ├── plans/                              # One implementation plan per approved design, task by task
 │   │   │   ├── 2026-09-24-guide-and-rule-map-1-rules.md  # Plan 1 of the rule map in rust-gate: rust-gate rules and rules --check
 │   │   │   ├── 2026-09-24-guide-and-rule-map-2-guide.md  # Plan 2 of the rule map in rust-gate: rust-gate guide, as it ran, and its parity
 │   │   │   ├── 2026-09-24-guide-and-rule-map-3-hooks.md  # Plan 3 of the rule map in rust-gate: the commit hooks, init and the skipped CI hooks
+│   │   │   ├── 2026-09-24-guide-and-rule-map-5-own-rule-map.md  # Plan 5 of the rule map in rust-gate: this repository's own standards as its rule map
 │   │   │   ├── 2026-09-24-org-quality-gate-1-architecture.md  # Plan 1 of 2: the module structure rules, and this repository held to them
 │   │   │   └── 2026-09-24-org-quality-gate-2-complete.md  # Plan 2 of 2: every remaining rule, the generated files, the release and the repositories
 │   │   └── specs/                              # One approved design per change, named by date and topic
@@ -390,7 +392,9 @@ The direct documents describe the current public and platform contracts:
 `docs/README.md`. `docs/standards/` holds what guides every change: the quality
 targets in `docs/standards/northstar.md`, the engineering rules and rustdoc style
 in `docs/standards/engineering.md`, and the security boundaries and enforcement
-standards in `docs/standards/security.md`.
+standards in `docs/standards/security.md`, the three pages of the rule map
+`rust-gate rules` writes; `docs/standards/controls.md` holds, by hand, what the
+rule map has no room for.
 
 ## `examples/`: real consumers of the workflows
 

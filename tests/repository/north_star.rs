@@ -61,7 +61,9 @@ const PROMISED_CONTROLS: &[(&str, &[&str], &[&str])] = &[
 #[test]
 fn north_star_promises_are_enforced_by_the_local_gate() {
     let root = root();
-    let north_star = fs::read_to_string(root.join("docs/standards/northstar.md")).unwrap();
+    // The four axes, each bar with the gate that holds it and its proof, live
+    // beside the rule map in controls.md; northstar.md keeps one KPI per pillar.
+    let north_star = fs::read_to_string(root.join("docs/standards/controls.md")).unwrap();
     let justfile = fs::read_to_string(root.join("justfile")).unwrap();
     // The example gate replays ci.yml's own step bodies, selected by id, so a
     // promised command may live in the workflow rather than in the justfile.
@@ -87,7 +89,7 @@ fn north_star_promises_are_enforced_by_the_local_gate() {
     // describes what is *not* claimed and must not create a requirement.
     let table = north_star
         .split_once("Four axes")
-        .expect("North Star must keep its four-axis table")
+        .expect("controls.md must keep the North Star's four-axis table")
         .1
         .split_once("\n## ")
         .map_or_else(|| north_star.clone(), |(rows, _)| rows.to_owned());

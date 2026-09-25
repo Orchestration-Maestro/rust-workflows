@@ -63,6 +63,7 @@ fn required_files_exist(root: &Path) {
         "docs/standards/engineering.md",
         "docs/standards/engineering.md",
         "docs/standards/security.md",
+        "docs/standards/controls.md",
         "CONTEXT.md",
         ".pre-commit-config.yaml",
         ".gitattributes",
