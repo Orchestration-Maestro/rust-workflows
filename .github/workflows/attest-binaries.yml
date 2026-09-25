@@ -58,7 +58,7 @@ jobs:
       attested: ${{ steps.outcome.outputs.attested }}
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@f54152a049c3e4645866283016e70c293a8260b7  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@c7f8f36be750870cc121a5719a499916e98e5c17  # rust-workflows: the commit that ships this gate
       - name: Validate consumer inputs
         id: validate
         env:
