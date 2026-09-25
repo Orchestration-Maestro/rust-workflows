@@ -27,7 +27,7 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@c7f8f36be750870cc121a5719a499916e98e5c17  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@4f1bef9262c4cd87fccf7683fa1872465c7af7a9  # rust-workflows: the commit that ships this gate
       - name: Name the checkout and the reports directory
         id: prepare
         run: rust-gate hygiene prepare

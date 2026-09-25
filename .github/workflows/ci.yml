@@ -135,7 +135,7 @@ jobs:
           # push or tag.
           fetch-depth: 2
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@c7f8f36be750870cc121a5719a499916e98e5c17  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@4f1bef9262c4cd87fccf7683fa1872465c7af7a9  # rust-workflows: the commit that ships this gate
       - name: Validate consumer inputs
         id: validate
         env:
@@ -425,7 +425,7 @@ jobs:
       revision: ${{ needs.checks.outputs.revision }}
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@c7f8f36be750870cc121a5719a499916e98e5c17  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@4f1bef9262c4cd87fccf7683fa1872465c7af7a9  # rust-workflows: the commit that ships this gate
       - name: Require every check
         id: required
         env:
