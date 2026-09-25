@@ -6,13 +6,21 @@ use crate::harness::{root, tool_rows, workflow};
 use serde_json::{Value, json};
 use std::fs;
 
-/// Where ci.yml's uploads run: only when no workflow called it, from the
-/// organization's ruleset in a repository's own context, and never for a fork
-/// pull request, whose token can neither write security events nor log in to
-/// Codecov; its reports stay in the artifact.
-const UPLOADS_RUN: &str = "${{ inputs.artifact-key == '' && \
+/// Where ci.yml's uploads run: once the checks passed, only when no workflow
+/// called it, from the organization's ruleset in a repository's own context,
+/// and never for a fork pull request, whose token can neither write security
+/// events nor log in to Codecov; its reports stay in the artifact. A merge
+/// group also waits for the portability legs and uploads nothing when one
+/// failed, since its commit then never lands.
+const UPLOADS_RUN: &str = "${{ !cancelled() && needs.checks.result == 'success' && \
+     (github.event_name != 'merge_group' || needs.portability.result == 'success' || \
+     needs.portability.result == 'skipped') && inputs.artifact-key == '' && \
      github.event_name != 'pull_request_target' && (!github.event.pull_request || \
      github.event.pull_request.head.repo.full_name == github.repository) }}";
+
+/// The jobs the uploads wait for: the checks that wrote the reports, and the
+/// portability legs that decide whether a merge group's commit lands.
+const UPLOADS_NEED: [&str; 2] = ["checks", "portability"];
 
 #[test]
 fn sarif_reports_upload_from_the_organizations_check_alone() {
@@ -26,7 +34,7 @@ fn sarif_reports_upload_from_the_organizations_check_alone() {
         true
     );
     let job = &ci["jobs"]["upload"];
-    assert_eq!(job["needs"], json!(["checks"]));
+    assert_eq!(job["needs"], json!(UPLOADS_NEED));
     assert_eq!(job["if"], UPLOADS_RUN);
     assert_eq!(
         job["permissions"],
@@ -84,7 +92,7 @@ fn codecov_uploads_run_a_verified_cli_and_never_block() {
     // from a release asset verified by digest.
     let ci = workflow("ci");
     let job = &ci["jobs"]["coverage"];
-    assert_eq!(job["needs"], json!(["checks"]));
+    assert_eq!(job["needs"], json!(UPLOADS_NEED));
     assert_eq!(job["if"], UPLOADS_RUN);
     assert_eq!(
         job["permissions"],
@@ -172,8 +180,19 @@ fn merge_group_uploads_land_on_the_default_branch() {
         assert_eq!(step["with"]["override_branch"], branch);
         assert_eq!(step["with"]["override_commit"], commit);
     }
-    // A merge group has no pull request, so the fork guard lets both run.
+    // A merge group has no pull request, so the fork guard lets both run,
+    // but only once every portability leg passed: a failed one keeps the
+    // group's commit off the default branch, and its results with it. A pull
+    // request uploads whatever the legs say, as soon as they end.
     assert!(UPLOADS_RUN.contains("!github.event.pull_request ||"));
+    assert!(UPLOADS_RUN.contains(
+        "(github.event_name != 'merge_group' || needs.portability.result == 'success' || \
+         needs.portability.result == 'skipped')"
+    ));
+    for job in ["upload", "coverage"] {
+        assert_eq!(ci["jobs"][job]["needs"], json!(UPLOADS_NEED), "{job}");
+        assert_eq!(ci["jobs"][job]["if"], UPLOADS_RUN, "{job}");
+    }
 }
 
 #[test]

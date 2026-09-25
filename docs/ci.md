@@ -136,8 +136,9 @@ repository; see
 ### Uploads to code scanning and Codecov
 
 When no workflow called `ci.yml`, in the run the organization's ruleset starts
-on a pull request or a merge group, two jobs after the checks upload the same run's
-`<artifact-name>-reports` artifact. No repository holds a workflow for them.
+on a pull request or a merge group, two jobs upload the same run's
+`<artifact-name>-reports` artifact once the checks passed and the portability
+legs ended. No repository holds a workflow for them.
 
 - `upload`, "Upload Clippy and secret-scan SARIF", shows the Clippy and
   secret-scan SARIF in the Security tab under the categories `clippy` and
@@ -178,6 +179,14 @@ request with the analysis of the commit it branched from, and Codecov's project
 change, default-branch trend and test analytics follow every merge. A pull
 request's run keeps its own ref and commit. No repository holds a file for
 this, no secret is stored and no app gains a permission.
+
+Only a commit that lands may be filed on the default branch. A merge group
+whose portability legs failed uploads nothing, since the queue drops it, while
+a pull request uploads whatever the legs say. The ruleset builds one group at a
+time, `max_entries_to_build: 1`, so no group is built on an entry ahead of it
+that may still fail. One case remains: a required check outside `ci.yml`, such
+as CodeQL's, that fails a group after both uploads ran. Its results then stay
+the default branch's latest until the next merge files its own.
 
 Without that ruleset nothing uploads on the default branch: code scanning keeps
 comparing with the last analysis recorded there under the same job and

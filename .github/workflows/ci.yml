@@ -435,14 +435,17 @@ jobs:
   # recorded on each default branch, `.github/workflows/ci.yml:upload`.
   # A merge group's commit is the one the default branch moves to, the only
   # branch a repository's merge-queue ruleset queues, so both uploads file it
-  # there: the baseline each pull request compares against.
+  # there: the baseline each pull request compares against. A merge group
+  # waits for the portability legs and uploads nothing when one failed: its
+  # commit never lands. A pull request uploads whatever they say.
   upload:
     name: Upload Clippy and secret-scan SARIF
     needs:
       - checks
+      - portability
     # A fork pull request's token cannot write security events; its SARIF
     # stays in the reports artifact.
-    if: ${{ inputs.artifact-key == '' && github.event_name != 'pull_request_target' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ !cancelled() && needs.checks.result == 'success' && (github.event_name != 'merge_group' || needs.portability.result == 'success' || needs.portability.result == 'skipped') && inputs.artifact-key == '' && github.event_name != 'pull_request_target' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -478,9 +481,10 @@ jobs:
     name: Upload coverage and test results to Codecov
     needs:
       - checks
+      - portability
     # A fork pull request gets no OIDC token; its reports stay in the reports
     # artifact.
-    if: ${{ inputs.artifact-key == '' && github.event_name != 'pull_request_target' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ !cancelled() && needs.checks.result == 'success' && (github.event_name != 'merge_group' || needs.portability.result == 'success' || needs.portability.result == 'skipped') && inputs.artifact-key == '' && github.event_name != 'pull_request_target' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
