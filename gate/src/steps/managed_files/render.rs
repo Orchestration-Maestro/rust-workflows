@@ -67,7 +67,9 @@ const SOURCES: &[(&str, &str)] = &[
 /// The organization's formatting: rustfmt's own, in the 2024 style.
 const RUSTFMT: &str = "style_edition = \"2024\"\n";
 
-/// DEP-001's cargo-deny policy, up to its exceptions.
+/// DEP-001's cargo-deny policy, up to its exceptions. The LLVM exception
+/// only adds a permission to Apache-2.0: cap-std's Windows dependency `winx`
+/// carries it alone.
 const DENY: &str = concat!(
     "# DEP-001: one version of each crate, no wildcard requirement, crates.io\n",
     "# alone, and no yanked or unmaintained crate; the licences the organization\n",
@@ -79,6 +81,7 @@ const DENY: &str = concat!(
     "[licenses]\n",
     "allow = [\n",
     "  \"Apache-2.0\",\n",
+    "  \"Apache-2.0 WITH LLVM-exception\",\n",
     "  \"MIT\",\n",
     "  \"MIT-0\",\n",
     "  \"Unicode-3.0\",\n",
@@ -412,6 +415,11 @@ mod tests {
                 .unwrap()
         };
         assert_eq!(text("mise.lock"), MISE_LOCK);
+        // DEP-001 reviewed the LLVM exception, which winx carries alone.
+        assert!(
+            text("deny.toml")
+                .contains("  \"Apache-2.0\",\n  \"Apache-2.0 WITH LLVM-exception\",\n")
+        );
         assert!(
             text("scripts/bootstrap.sh").starts_with(&format!("#!/usr/bin/env bash\n{HEADER}"))
         );

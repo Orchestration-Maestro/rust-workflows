@@ -271,7 +271,10 @@ inputs its caller passes, `[ci] platforms = "macos windows linux-arm"`, where
 `macos` and `windows` are never left out
 ([platform portability](#platform-portability)). The generated
 `deny.toml` holds DEP-001: one version of each crate, no wildcard requirement,
-crates.io alone, no yanked or unmaintained crate, and the reviewed licences; a
+crates.io alone, no yanked or unmaintained crate, and the reviewed licences,
+`Apache-2.0 WITH LLVM-exception` among them, since the exception only adds a
+permission to Apache-2.0 and cap-std's Windows dependency `winx` carries it
+alone; a
 duplicate the ecosystem forces is a DEP-001 exception whose `path` names the
 crate and version, `windows-sys@0.52`, rendered as one of cargo-deny's skips
 with its reason. The files every
