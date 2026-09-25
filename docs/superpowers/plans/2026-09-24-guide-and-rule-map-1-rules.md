@@ -1237,23 +1237,25 @@ done
 python3 - "$P" <<'EOF'
 import pathlib, sys
 root = pathlib.Path(sys.argv[1])
-c001_py = ("These pages, kept current by `scripts/golden-rules.py`; the drift check fails "
-           "on a rule not mapped yet")
-c001_rs = ("These pages, kept current by `rust-gate rules` at every commit; the daily drift "
-           "check reports a row not mapped yet")
 failed = False
 for repo in ("maestro-core", "maestro-model-router", "release-canary"):
     for page in ("engineering.md", "security.md", "northstar.md"):
-        py = (root / f"{repo}-py/docs/standards/{page}").read_text().replace(c001_py, c001_rs)
-        rs = (root / f"{repo}-rs/docs/standards/{page}").read_text()
-        same = py.split("\n## ", 1)[1:] == rs.split("\n## ", 1)[1:]
+        def body(side):
+            text = (root / f"{repo}-{side}/docs/standards/{page}").read_text()
+            lines = text.split("\n## ", 1)[1].split("\n")
+            return [line for line in lines if not line.startswith("| C-001 ")]
+        same = body("py") == body("rs")
         failed |= not same
         print(("same " if same else "DIFF ") + f"{repo} {page}")
+    engineering = (root / f"{repo}-rs/docs/standards/engineering.md").read_text()
+    upgraded = "kept current by `rust-gate rules` at every commit" in engineering
+    failed |= not upgraded
+    print(f"   C-001 upgraded: {upgraded}")
 sys.exit(failed)
 EOF
 ```
 
-Expected: nine `same` lines and exit 0. A `DIFF` is a parity defect: show the
+Expected: nine `same` lines, three `C-001 upgraded: True` and exit 0. A `DIFF` is a parity defect: show the
 two files with `diff`, fix the Rust side, and rerun from Task 1's tests.
 
 - [ ] **Step 3: Check and commit**
@@ -1269,3 +1271,18 @@ Pushing and opening the pull request are outward actions: report the three
 commits, the parity result and `just check`, and wait for the owner's go. Then
 push the branch and open one pull request titled
 `feat: write each repository's rule map with rust-gate rules`.
+
+## Deviations during execution
+
+- Task 3's first comparison replaced the C-001 default in the script's output,
+  but every repository already held that default in its page, and both tools
+  keep a cell a page holds. The comparison now leaves the C-001 row out and
+  checks it apart; it found the nine pages identical.
+- Keeping that cell would have kept the name of golden-rules.py in every rule
+  map after the script is gone. `render.rs` gained `SUPERSEDED`, the defaults
+  the organization gave before: a cell holding one takes the current default,
+  which `a_cell_holding_a_superseded_default_takes_the_current_one` proves. The
+  owner chose this on 2026-09-24.
+- A commit chain tested the status of `echo` rather than `just check`'s; the
+  commit it let through was amended once `just check` passed. Gate a commit on
+  the check's own status: `just check; rc=$?`, then commit only when `rc` is 0.

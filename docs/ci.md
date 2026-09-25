@@ -279,6 +279,14 @@ dotted keys, `clippy.own_lint = "deny"`, and removes none. Test code keeps
 allowances; an integration-test crate opens with `#![cfg(test)]` so Clippy
 reads all of it as test code.
 
+`rust-gate rules`, run at the root of a repository, writes its rule map, the
+organization's golden rules adapted to it (C-001), from the copy of the golden
+rules the release carries: `docs/standards/engineering.md`, `security.md` and
+`northstar.md`. A row, a section or a KPI the repository wrote is kept; a rule
+the organization holds everywhere gets its default; any other rule arrives as
+"Not mapped yet". `rust-gate rules --check` refuses a stale page or a row not
+mapped yet.
+
 `architecture.txt` lists every finding, then every finding an exception
 excuses, with its reason, then the files over 300 lines. `maestro-quality.toml`,
 at the root of the repository, declares layers, tightens the limits and takes
