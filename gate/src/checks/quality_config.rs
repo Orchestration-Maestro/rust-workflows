@@ -106,10 +106,9 @@ pub(crate) struct QualityConfig {
     pub(crate) limits: Limits,
     /// The words the repository means, merged into its `typos.toml`.
     pub(crate) typos: Vec<String>,
-    /// The inputs its `ci.yml` caller passes, each as its YAML value.
-    pub(crate) ci: Vec<(String, String)>,
-    /// The same inputs, each as the text a workflow renders it: what a run
-    /// of `ci.yml` that no workflow called takes instead of its inputs.
+    /// The inputs of `ci.yml` its `[ci]` table sets, each as the text a
+    /// workflow renders it: what a run of `ci.yml` that no workflow called
+    /// takes instead of its inputs.
     pub(crate) settings: Vec<(String, String)>,
     /// The benchmarks PRF-001 holds to their instruction counts.
     pub(crate) benches: Vec<String>,
@@ -163,14 +162,13 @@ pub(crate) fn read_config(workspace: &Path) -> Result<QualityConfig, Failure> {
         benches.push(bench.to_owned());
     }
     let listed = query(CI)?;
+    for line in listed.lines() {
+        check_ci_input(line)?;
+    }
     Ok(QualityConfig {
         limits,
         typos,
         benches,
-        ci: listed
-            .lines()
-            .map(parse_ci_input)
-            .collect::<Result<_, _>>()?,
         settings: listed
             .lines()
             .filter_map(|line| {
@@ -219,9 +217,9 @@ fn parse_limit(limits: &mut Limits, line: &str) -> Result<(), Failure> {
     Ok(())
 }
 
-/// One line of the `[ci]` listing: a known input and its value as YAML, a
-/// string quoted unless it is plain words.
-fn parse_ci_input(line: &str) -> Result<(String, String), Failure> {
+/// One line of the `[ci]` listing: a known input, a value `ci.yml` takes, and
+/// platforms that keep every desktop.
+fn check_ci_input(line: &str) -> Result<(), Failure> {
     let mut fields = line.splitn(3, '\t');
     let mut next = || fields.next().unwrap_or_default();
     let (key, kind, value) = (next(), next(), next());
@@ -235,29 +233,14 @@ fn parse_ci_input(line: &str) -> Result<(String, String), Failure> {
     if key == "platforms" {
         tests_every_desktop(value)?;
     }
-    let plain = value
-        .chars()
-        .all(|character| character.is_ascii_alphanumeric() || " ._-".contains(character))
-        && !value.is_empty();
-    let yaml = match kind {
-        "number" | "boolean" => value.to_owned(),
-        "string"
-            if plain && value.parse::<f64>().is_err() && !matches!(value, "true" | "false") =>
-        {
-            value.to_owned()
-        }
-        "string" => format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\"")),
-        _ => {
-            return Err(
-                format!("{FILE}: [ci] {key} must be a string, a number or a boolean").into(),
-            );
-        }
-    };
-    Ok((key.to_owned(), yaml))
+    if !matches!(kind, "string" | "number" | "boolean") {
+        return Err(format!("{FILE}: [ci] {key} must be a string, a number or a boolean").into());
+    }
+    Ok(())
 }
 
 /// The platforms every Rust repository tests besides Linux x64.
-pub(crate) const DESKTOPS: [&str; 2] = ["macos", "windows"];
+const DESKTOPS: [&str; 2] = ["macos", "windows"];
 
 /// Refuse a `[ci] platforms` value that leaves out one of [`DESKTOPS`]: a
 /// value may add a target, never drop one, and the refusal writes the fix.
@@ -336,39 +319,27 @@ fn parse_exception(line: &str) -> Result<Exception, Failure> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Limits, parse_ci_input, parse_exception, parse_layers, parse_limit};
+    use super::{Limits, check_ci_input, parse_exception, parse_layers, parse_limit};
 
     #[test]
-    fn a_ci_input_is_known_and_rendered_as_yaml() {
-        assert_eq!(
-            parse_ci_input("platforms\tstring\tmacos windows").unwrap(),
-            ("platforms".to_owned(), "macos windows".to_owned())
-        );
-        assert_eq!(
-            parse_ci_input("coverage-threshold\tnumber\t95").unwrap().1,
-            "95"
-        );
-        assert_eq!(
-            parse_ci_input("mutation-test\tboolean\tfalse").unwrap().1,
-            "false"
-        );
-        assert_eq!(
-            parse_ci_input("rust-version\tstring\t1.85").unwrap().1,
-            "\"1.85\""
-        );
-        assert_eq!(
-            parse_ci_input("artifact-key\tstring\ta: \"b\"").unwrap().1,
-            "\"a: \\\"b\\\"\""
-        );
+    fn a_ci_input_is_known_and_of_a_plain_type() {
+        for line in [
+            "platforms\tstring\tmacos windows",
+            "coverage-threshold\tnumber\t95",
+            "mutation-test\tboolean\tfalse",
+            "rust-version\tstring\t1.85",
+        ] {
+            assert!(check_ci_input(line).is_ok(), "{line}");
+        }
         // v2.0.0 runs every rule on every call; the switch that held them
         // back is gone.
-        assert!(parse_ci_input("quality-preview\tboolean\ttrue").is_err());
-        let unknown = parse_ci_input("colour\tstring\tred").unwrap_err();
+        assert!(check_ci_input("quality-preview\tboolean\ttrue").is_err());
+        let unknown = check_ci_input("colour\tstring\tred").unwrap_err();
         assert!(unknown.message.unwrap_or_default().starts_with(
             "maestro-quality.toml: [ci] sets `colour`, which ci.yml does not take; it takes \
              working-directory,"
         ));
-        let table = parse_ci_input("coverage-threshold\tobject\t{}").unwrap_err();
+        let table = check_ci_input("coverage-threshold\tobject\t{}").unwrap_err();
         assert_eq!(
             table.message.unwrap_or_default(),
             "maestro-quality.toml: [ci] coverage-threshold must be a string, a number or a \
@@ -378,19 +349,14 @@ mod tests {
 
     #[test]
     fn platforms_may_add_a_target_but_never_drop_macos_or_windows() {
-        assert_eq!(
-            parse_ci_input("platforms\tstring\twindows linux-arm macos")
-                .unwrap()
-                .1,
-            "windows linux-arm macos"
-        );
+        assert!(check_ci_input("platforms\tstring\twindows linux-arm macos").is_ok());
         for (value, fixed, missing) in [
             ("linux-arm", "macos windows linux-arm", "macos and windows"),
             ("windows", "macos windows", "macos"),
             ("macos", "windows macos", "windows"),
             ("", "macos windows", "macos and windows"),
         ] {
-            let refusal = parse_ci_input(&format!("platforms\tstring\t{value}")).unwrap_err();
+            let refusal = check_ci_input(&format!("platforms\tstring\t{value}")).unwrap_err();
             assert_eq!(
                 refusal.message.unwrap_or_default(),
                 format!(

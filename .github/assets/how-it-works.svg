@@ -134,20 +134,20 @@
   <text x="740" y="324" fill="#604427" font-size="8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" text-anchor="middle">verify-payload</text>
   <text x="740" y="340" fill="#604427" font-size="8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" text-anchor="middle">same revision</text>
 
-  <!-- upload-sarif, opt-in -->
+  <!-- ci.yml upload job, in the ruleset run -->
   <rect x="264" y="296" width="120" height="56" rx="6" fill="#f5f5f5"/>
   <rect x="264" y="296" width="120" height="56" rx="6" fill="rgba(38,27,8,0.02)" stroke="rgba(38,27,8,0.30)" stroke-width="1" stroke-dasharray="4,3"/>
-  <rect x="270" y="302" width="24" height="12" rx="2" fill="transparent" stroke="rgba(38,27,8,0.30)" stroke-width="0.8"/>
-  <text x="282" y="311" fill="#261b08" font-size="8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">WF</text>
-  <text x="324" y="330" fill="#261b08" font-size="11" font-weight="600" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" text-anchor="middle">upload-sarif</text>
+  <rect x="270" y="302" width="28" height="12" rx="2" fill="transparent" stroke="rgba(38,27,8,0.30)" stroke-width="0.8"/>
+  <text x="284" y="311" fill="#261b08" font-size="8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">JOB</text>
+  <text x="324" y="330" fill="#261b08" font-size="11" font-weight="600" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" text-anchor="middle">SARIF upload</text>
   <text x="324" y="344" fill="#604427" font-size="8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" text-anchor="middle">code scanning</text>
 
-  <!-- upload-coverage, opt-in -->
+  <!-- ci.yml coverage job, in the ruleset run -->
   <rect x="400" y="296" width="120" height="56" rx="6" fill="#f5f5f5"/>
   <rect x="400" y="296" width="120" height="56" rx="6" fill="rgba(38,27,8,0.02)" stroke="rgba(38,27,8,0.30)" stroke-width="1" stroke-dasharray="4,3"/>
-  <rect x="406" y="302" width="24" height="12" rx="2" fill="transparent" stroke="rgba(38,27,8,0.30)" stroke-width="0.8"/>
-  <text x="418" y="311" fill="#261b08" font-size="8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">WF</text>
-  <text x="460" y="330" fill="#261b08" font-size="11" font-weight="600" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" text-anchor="middle">upload-coverage</text>
+  <rect x="406" y="302" width="28" height="12" rx="2" fill="transparent" stroke="rgba(38,27,8,0.30)" stroke-width="0.8"/>
+  <text x="420" y="311" fill="#261b08" font-size="8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">JOB</text>
+  <text x="460" y="330" fill="#261b08" font-size="11" font-weight="600" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" text-anchor="middle">Codecov upload</text>
   <text x="460" y="344" fill="#604427" font-size="8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" text-anchor="middle">Codecov · OIDC</text>
 
   <!-- portability, opt-in -->

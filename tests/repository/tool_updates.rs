@@ -60,6 +60,18 @@ fn every_install_row_is_the_asset_mise_locked() {
     };
     for (name, asset, digest, _) in rows {
         let url = format!("https://github.com/{}", asset.replace("%2F", "/"));
+        // The Codecov CLI runs only in ci.yml's upload job, never locally, so
+        // mise does not lock it; update-tools checks its row against the
+        // digest GitHub records for the release asset.
+        if name == "codecov" {
+            assert!(
+                asset.starts_with("codecov/codecov-cli/releases/download/v")
+                    && asset.ends_with("/codecovcli_linux"),
+                "{asset}"
+            );
+            assert!(digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit()));
+            continue;
+        }
         if name == "mise" {
             let version = pinned("MISE_VERSION");
             assert_eq!(
@@ -95,14 +107,11 @@ fn mutants_pin() -> (String, String) {
     (version, sha256)
 }
 
-/// The Codecov CLI version upload-coverage.yml pins today.
+/// The Codecov CLI release ci.yml's upload job installs today.
 fn codecov_pin() -> String {
-    let text = fs::read_to_string(root().join(".github/workflows/upload-coverage.yml")).unwrap();
-    let line = text
-        .lines()
-        .find(|line| line.trim().starts_with("version: v"))
-        .unwrap();
-    line.trim().trim_start_matches("version: ").to_owned()
+    let rows = install_rows(&root());
+    let (_, asset, _, _) = rows.iter().find(|row| row.0 == "codecov").unwrap();
+    asset.split('/').nth(4).unwrap().to_owned()
 }
 
 /// The next major release after a version.
@@ -157,7 +166,14 @@ esac"#
 printf 'new cargo-mutants' > "$out""#
                 .to_owned(),
         ),
-        ("gh", format!("echo {codecov}")),
+        // The latest Codecov CLI and the digest GitHub records for its asset.
+        (
+            "gh",
+            format!(
+                r#"sum=$(printf 'new cargo-mutants' | sha256sum | cut -d' ' -f1)
+echo "{codecov} sha256:$sum""#
+            ),
+        ),
     ];
     for (name, body) in stubs {
         write_executable(
@@ -237,29 +253,30 @@ fn update_tools_moves_a_pin_everywhere_it_is_installed() {
     // Every other row is exactly as it was.
     let others = |rows: &[(String, String, String, Option<String>)]| -> Vec<_> {
         rows.iter()
-            .filter(|row| row.0 != "cargo-mutants")
+            .filter(|row| row.0 != "cargo-mutants" && row.0 != "codecov")
             .cloned()
             .collect()
     };
     assert_eq!(others(&before), others(&after));
-    let coverage = fs::read_to_string(dir.join(".github/workflows/upload-coverage.yml")).unwrap();
-    assert_eq!(coverage.matches("version: v99.0.0").count(), 2);
-    assert!(!coverage.contains(&used));
+    // The Codecov CLI's row moves too, at the digest of the bytes it serves.
+    let codecov: Vec<_> = after.iter().filter(|row| row.0 == "codecov").collect();
+    assert_eq!(codecov.len(), 1);
+    assert_eq!(
+        codecov[0].1,
+        "codecov/codecov-cli/releases/download/v99.0.0/codecovcli_linux"
+    );
+    assert_eq!(codecov[0].2, digest);
+    assert!(!codecov[0].1.contains(&format!("/{used}/")));
 }
 
 #[test]
 fn update_tools_changes_nothing_when_every_pin_is_current() {
     let dir = sandbox(&mutants_pin().0, &codecov_pin());
     let snapshot = |dir: &Path| -> Vec<String> {
-        [
-            "mise.toml",
-            "mise.lock",
-            ".github/workflows/ci.yml",
-            ".github/workflows/upload-coverage.yml",
-        ]
-        .iter()
-        .map(|file| fs::read_to_string(dir.join(file)).unwrap())
-        .collect()
+        ["mise.toml", "mise.lock", ".github/workflows/ci.yml"]
+            .iter()
+            .map(|file| fs::read_to_string(dir.join(file)).unwrap())
+            .collect()
     };
     let before = snapshot(&dir);
     assert_eq!(update(&dir).trim(), "");

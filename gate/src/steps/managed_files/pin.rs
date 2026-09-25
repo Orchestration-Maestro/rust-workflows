@@ -1,7 +1,8 @@
-//! The release a caller pins: a commit of rust-workflows and the version it
-//! was released as, read from the caller's `uses:` lines or from
-//! `RUST_WORKFLOWS_PIN`, and every other call to rust-workflows moved to it,
-//! under the name the repository answers to.
+//! The release a repository declares: a commit of rust-workflows and the
+//! version it was released as, read from `RUST_WORKFLOWS_PIN` or from the
+//! `uses:` lines of its workflows, or the version alone from its commit hooks;
+//! and every call to rust-workflows moved to it, under the name the repository
+//! answers to.
 
 use crate::checks::workflow_home::{HOME, NAMES, ORGANIZATION};
 
@@ -30,19 +31,6 @@ pub(super) struct Pin {
     pub(super) commit: String,
     /// The version without its `v`: `2.0.0`.
     pub(super) version: String,
-}
-
-impl Pin {
-    /// The `uses:` value that calls `workflow` at this pin, with the version
-    /// as the comment Dependabot and a reader both read.
-    pub(super) fn reference(&self, workflow: &str) -> String {
-        format!(
-            "{}workflows/{workflow}@{}  # v{}",
-            calls(HOME),
-            self.commit,
-            self.version
-        )
-    }
 }
 
 /// `text` with every call to rust-workflows, `<path>@<commit>  # v<version>`,
@@ -87,38 +75,70 @@ pub(super) fn repinned(text: &str, pin: &Pin) -> String {
     out
 }
 
+/// Whether `version` is a release version without its `v`: `2.0.0`.
+fn is_version(version: &str) -> bool {
+    version.split('.').count() == 3
+        && version
+            .split('.')
+            .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
+}
+
 /// The pin `text` names: a full commit hash, a space, and a version with or
 /// without its `v`.
 pub(super) fn parse_pin(text: &str) -> Option<Pin> {
     let (commit, version) = text.trim().split_once(' ')?;
     let version = version.trim().trim_start_matches('v');
     let hex = commit.len() == 40 && commit.bytes().all(|byte| byte.is_ascii_hexdigit());
-    let numbered = version.split('.').count() == 3
-        && version
-            .split('.')
-            .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()));
-    (hex && numbered).then(|| Pin {
+    (hex && is_version(version)).then(|| Pin {
         commit: commit.to_owned(),
         version: version.to_owned(),
     })
 }
 
+/// Every pin the `uses:` lines of `workflow` name, in line order.
+pub(super) fn workflow_pins(workflow: &str) -> Vec<Pin> {
+    workflow
+        .lines()
+        .filter_map(|line| {
+            let (start, prefix) = next_call(line)?;
+            let rest = line.get(start + prefix..)?.strip_prefix("workflows/")?;
+            let (_, pinned) = rest.split_once('@')?;
+            let (commit, version) = pinned.split_once("# ")?;
+            parse_pin(&format!("{} {}", commit.trim(), version.trim()))
+        })
+        .collect()
+}
+
 /// The pin the `uses:` lines of `caller` name, when every one names the same.
 pub(super) fn caller_pin(caller: &str) -> Option<Pin> {
-    let mut pins = caller.lines().filter_map(|line| {
-        let (start, prefix) = next_call(line)?;
-        let rest = line.get(start + prefix..)?.strip_prefix("workflows/")?;
-        let (_, pinned) = rest.split_once('@')?;
-        let (commit, version) = pinned.split_once("# ")?;
-        parse_pin(&format!("{} {}", commit.trim(), version.trim()))
-    });
+    let mut pins = workflow_pins(caller).into_iter();
     let first = pins.next()?;
     pins.all(|pin| pin == first).then_some(first)
 }
 
+/// The version of the gate the commit hooks in `hooks` install, from
+/// `cli:https://github.com/<organization>/<name>:v<version>:rust-gate`.
+pub(super) fn hook_version(hooks: &str) -> Option<String> {
+    NAMES.iter().find_map(|name| {
+        let prefix = format!("cli:https://github.com/{ORGANIZATION}/{name}:v");
+        let start = hooks.find(&prefix)? + prefix.len();
+        let rest = hooks.get(start..)?;
+        let version = rest.get(..rest.find(":rust-gate")?)?;
+        is_version(version).then(|| version.to_owned())
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Pin, caller_pin, parse_pin, repinned};
+    use super::{Pin, caller_pin, hook_version, parse_pin, repinned, workflow_pins};
+
+    /// The `uses:` value that calls `workflow` at `pin`, as sync writes it.
+    fn reference(pin: &Pin, workflow: &str) -> String {
+        format!(
+            "Orchestration-Maestro/rust-workflows/.github/workflows/{workflow}@{}  # v{}",
+            pin.commit, pin.version
+        )
+    }
 
     #[test]
     fn every_call_to_rust_workflows_moves_to_the_pin_and_nothing_else() {
@@ -162,7 +182,7 @@ mod tests {
                 "    uses: {}\n    uses: Orchestration-Maestro/rust-workflows/.github/actions/\
                  gate@{commit}  # v2.5.0\n    uses: Orchestration-Maestro/\
                  maestro-rust-workflows/.github/workflows/ci.yml@main\n",
-                pin.reference("ci.yml")
+                reference(&pin, "ci.yml")
             )
         );
     }
@@ -185,8 +205,8 @@ mod tests {
         };
         let caller = format!(
             "jobs:\n  rust:\n    uses: {}\n  sarif:\n    uses: {}\n",
-            pin.reference("ci.yml"),
-            pin.reference("upload-sarif.yml")
+            reference(&pin, "ci.yml"),
+            reference(&pin, "upload-sarif.yml")
         );
         assert_eq!(caller_pin(&caller), Some(pin));
         let mixed = caller.replacen(&"b".repeat(40), &"c".repeat(40), 1);
@@ -197,5 +217,36 @@ mod tests {
         let both = caller.replacen("/rust-workflows/", "/maestro-rust-workflows/", 1);
         assert_eq!(caller_pin(&both), caller_pin(&caller));
         assert!(caller_pin(&caller).is_some());
+    }
+
+    #[test]
+    fn every_pinned_workflow_call_is_read_in_line_order() {
+        let old = Pin {
+            commit: "a".repeat(40),
+            version: "2.0.0".to_owned(),
+        };
+        let new = Pin {
+            commit: "b".repeat(40),
+            version: "2.1.0".to_owned(),
+        };
+        let release = format!(
+            "jobs:\n  binaries:\n    uses: {}\n  attest:\n    uses: {}\n  gate:\n    uses: \
+             Orchestration-Maestro/rust-workflows/.github/workflows/ci.yml@main\n",
+            reference(&new, "publish-binaries.yml"),
+            reference(&old, "attest-binaries.yml")
+        );
+        assert_eq!(workflow_pins(&release), [new, old]);
+        assert!(workflow_pins("on: push\n").is_empty());
+    }
+
+    #[test]
+    fn the_commit_hooks_name_the_version_of_the_gate() {
+        let hooks = "          - \"cli:https://github.com/Orchestration-Maestro/rust-workflows:\
+                     v3.0.1:rust-gate\"\n";
+        assert_eq!(hook_version(hooks).as_deref(), Some("3.0.1"));
+        let renamed = hooks.replace("/rust-workflows:", "/maestro-rust-workflows:");
+        assert_eq!(hook_version(&renamed).as_deref(), Some("3.0.1"));
+        assert_eq!(hook_version(&hooks.replace("v3.0.1", "vmain")), None);
+        assert_eq!(hook_version("repos: []\n"), None);
     }
 }

@@ -70,7 +70,9 @@ The job's automatic `GITHUB_TOKEN` supplies those reads via `GH_TOKEN`. No PAT,
 new approval variable or OIDC exchange is introduced. Binary and evidence upload
 jobs additionally need `contents: write`; crate publication needs `contents: read`
 and its scoped crates.io token. Callers must grant the static ceiling even for a
-skipped nested live job; executed dry-run jobs remain read-only.
+skipped nested live job; executed dry-run jobs remain read-only. The same holds
+for the `security-events: write` and `id-token: write` of `ci.yml`'s uploads,
+which run only in the organization's ruleset run.
 
 ## Optional integrations
 

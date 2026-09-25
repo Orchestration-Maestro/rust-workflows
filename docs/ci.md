@@ -23,15 +23,14 @@ merge queue entry of the default branch. Each rule pins a commit of this
 repository; the run happens in the pull request's repository, and a failing run
 blocks the merge.
 
-A repository therefore needs no `ci.yml` caller. It keeps
-`maestro-quality.toml` and the root files its tools read, `rust-toolchain.toml`,
-`clippy.toml`, `deny.toml` and the others `rust-gate sync` writes. A run no
+A repository therefore holds no `ci.yml` caller. It keeps
+`maestro-quality.toml` and the files `rust-gate sync` writes. A run no
 workflow called takes its inputs from the `[ci]` table of `maestro-quality.toml`
 at the pull request's base commit, so a pull request cannot loosen its own gate;
 an input the table leaves out takes its default below, and `platforms` takes
-`macos windows`. The Clippy SARIF and Codecov uploads stay with a caller: they
-need `security-events: write` and `id-token: write`, which a ruleset run does
-not hold, and the check never depends on them. Inside this repository, only a
+`macos windows`. The same run uploads the Clippy and secret-scan SARIF to code
+scanning and the coverage to Codecov; see
+[uploads](#uploads-to-code-scanning-and-codecov). Inside this repository, only a
 caller runs `ci.yml` and nothing runs `hygiene.yml`.
 
 ### Migrating to the ruleset
@@ -43,6 +42,34 @@ refused; remove it, since `auto` and `enforce` both apply the organization's
 policy. A ruleset run tests macOS and Windows whatever `[ci]` says, and a
 `[ci] platforms` value that leaves either out is refused with the value to
 write. A caller that keeps calling `ci.yml` keeps its other inputs and defaults.
+
+### Migrating to the central uploads
+
+The next release is breaking in four ways.
+
+1. `ci.yml` uploads SARIF and coverage itself in the run the ruleset starts, so
+   each repository's caller, which `rust-gate sync` wrote for those uploads
+   alone, is retired: `sync` deletes a `.github/workflows/ci.yml` that still
+   opens with its header, the caller of `hygiene.yml` included, and
+   `managed-files` refuses it until then.
+2. `upload-sarif.yml` and `upload-coverage.yml` are gone. A caller pinned to an
+   older release keeps working at that commit.
+3. A workflow that calls `ci.yml`, or `publish-binaries.yml` or
+   `publish-crate.yml`, which call it, grants `security-events: write` and
+   `id-token: write` besides its other scopes, or GitHub fails the run at
+   startup. A release workflow's publisher job gains two lines:
+
+   ```yaml
+       permissions:
+         contents: write
+         actions: read
+         security-events: write  # ci.yml's skipped SARIF upload
+         id-token: write  # ci.yml's skipped Codecov login
+   ```
+
+4. With no caller, the release a repository declares is the one its other
+   workflows pin, or else the version its commit hooks install; see
+   [managed files](#managed-files).
 
 ## Inputs and outputs
 
@@ -63,7 +90,7 @@ committed `deny.toml` applies the same way to every pull request. See [runner se
 | `artifact-key` | string | `ci` | Invocation identity, 1 to 40 alphanumeric/underscore/hyphen characters, starting alphanumeric |
 | `license-policy` | string | `auto` | Kept for the repositories that set it: `auto` and `enforce` both apply the organization's licence and source policy; `off` is refused, since no repository opts out |
 | `mutation-test` | boolean | `true` | Run cargo-mutants and fail on surviving mutants; a pull request mutates its diff, a push or tag its own commit; set `false` when run time exceeds the job |
-| `sarif-reports` | boolean | `true` | Also emit Clippy and secret findings as SARIF, for `upload-sarif.yml` to show in code scanning |
+| `sarif-reports` | boolean | `true` | Also emit Clippy and secret findings as SARIF, which the organization's check uploads to code scanning |
 | `clippy-level` | string | `default` | `pedantic` or `nursery` also deny those Clippy groups |
 | `dependency-audit` | boolean | `true` | Require a recorded cargo-vet audit for every dependency, the organization's and five public audit sets imported (VET-001) |
 | `unsafe-policy` | string | `deny` | Refuses an `unsafe` block in any workspace member; `allow` leaves the decision to a project that needs it |
@@ -100,52 +127,50 @@ Clippy runs once: its JSON diagnostics and SARIF are saved before its exit
 status is propagated, including when warnings fail the gate.
 
 CodeQL adds taint tracking on top of Clippy. It is not a step of this workflow:
-uploading its results needs `security-events: write`, which would become a
-requirement on every caller. Organization administrators enable CodeQL default
-setup instead; see
+organization administrators enable CodeQL default setup, which runs it for every
+repository; see
 [platform requirements](platform-requirements.md#administrator-owned-setup).
 
-### Code scanning upload
+### Uploads to code scanning and Codecov
 
-`upload-sarif.yml` shows the run's Clippy and secret-scan SARIF in the
-repository's Security tab, under the categories `clippy` and `gitleaks`, next to
-CodeQL. It is a separate workflow for the same reason CodeQL is not a step here:
-only its job holds `security-events: write`. It downloads the
-`<artifact-name>-reports` artifact of the same run, so it runs after `ci.yml`,
-and it skips fork pull requests, whose token cannot write security events.
+When no workflow called `ci.yml`, in the run the organization's ruleset starts
+on a pull request, two jobs after the checks upload the same run's
+`<artifact-name>-reports` artifact. No repository holds a workflow for them.
 
-<!-- generated by just docs: inputs upload-sarif.yml default -->
+- `upload`, "Upload Clippy and secret-scan SARIF", shows the Clippy and
+  secret-scan SARIF in the Security tab under the categories `clippy` and
+  `gitleaks`, next to CodeQL. It holds `security-events: write`. A repository
+  that sets `sarif-reports = false` writes no SARIF, and the job uploads none.
+- `coverage`, "Upload coverage and test results to Codecov", sends
+  `coverage.lcov` and `tests.xml` to Codecov, which shows line coverage on each
+  pull request and flags flaky or failing tests. It logs in through OIDC with
+  `id-token: write`, so no Codecov token is stored, and checks out the tested
+  commit so Codecov can map report paths onto files.
 
-| Input | Default | Meaning |
-| --- | --- | --- |
-| `artifact-name` | required | The `artifact-name` output of `ci.yml` in the same run |
+Both skip fork pull requests, whose token can neither write security events
+nor log in to Codecov; their reports stay in the artifact. Both are skipped
+when a workflow calls `ci.yml`, but GitHub checks a called workflow's scopes
+when the run starts, a skipped job's included, so every caller grants
+`security-events: write` and `id-token: write`; the publishers grant them to
+their CI run, and their own callers to them.
 
-<!-- end generated -->
+A failed SARIF upload fails the run. The Codecov upload is advisory: the
+`coverage-threshold` and changed-line gates of the checks job decide whether
+coverage passes, and Codecov only reports, so an outage of Codecov fails no
+run. The Codecov action would run a CLI it downloads itself even when that
+CLI's signature check fails, once it tolerates errors; so the job installs the
+CLI from its GitHub release asset, verified by digest, and hands the action
+that binary.
 
-A run with `sarif-reports: false` writes no SARIF, and the upload then fails
-rather than report a clean scan it never made.
-
-### Codecov upload
-
-`upload-coverage.yml` sends the run's `coverage.lcov` and `tests.xml` to
-Codecov, which shows line coverage on each pull request and flags flaky or
-failing tests. It logs in through OIDC, so no Codecov token is stored; that login
-needs `id-token: write`, which is why it is a separate workflow like the SARIF
-upload. It downloads the same `<artifact-name>-reports` artifact, checks out the
-tested commit so Codecov can map report paths onto files, and skips fork pull
-requests, which get no OIDC token. The Codecov CLI version is pinned, and the
-action verifies its signature before running it.
-
-<!-- generated by just docs: inputs upload-coverage.yml default -->
-
-| Input | Default | Meaning |
-| --- | --- | --- |
-| `artifact-name` | required | The `artifact-name` output of `ci.yml` in the same run |
-
-<!-- end generated -->
-
-The coverage floor stays the `coverage-threshold` gate in `ci.yml`: Codecov
-reports, it does not decide whether the run passes.
+Organization rulesets run on pull requests only, so nothing uploads on a push
+to the default branch. Code scanning keeps comparing a pull request with the
+last analysis the retired callers recorded there under the same job and
+categories; it holds no finding, because a run with one fails and nothing
+merges. Codecov keeps its patch status; its project change and default-branch
+trend compare with the last report on the default branch, which ages, and its
+test analytics of the default branch stop. A central scheduled upload would
+restore them; it would need the organization's bot to hold `security_events`
+and a Codecov upload token for the organization.
 
 ### Every rule
 
@@ -288,13 +313,13 @@ organization's configuration at run time.
 | Repository | Managed files |
 | --- | --- |
 | Every one | `.editorconfig`, `.gitattributes`, `typos.toml`, and outside rust-workflows `.github/dependabot.yml` and `.pre-commit-config.yaml` |
-| Rust, a root `Cargo.toml` or `rust-toolchain.toml` | `rust-toolchain.toml`, the lint block of the root `Cargo.toml`, and the caller `.github/workflows/ci.yml` outside rust-workflows |
+| Rust, a root `Cargo.toml` or `rust-toolchain.toml` | `rust-toolchain.toml` and the lint block of the root `Cargo.toml` |
 
 Each stays for a reader outside the gate: editors and editorconfig-checker
 read `.editorconfig`; git reads `.gitattributes`; typos takes the words a
 repository means only from a file, and its hook runs without the gate; rustup
 and Cargo read `rust-toolchain.toml`; rustc, Clippy and editors read the lint
-block; GitHub reads `ci.yml` and `dependabot.yml`, and prek reads
+block; GitHub reads `dependabot.yml`, and prek reads
 `.pre-commit-config.yaml`.
 
 | Tool | The organization's configuration, at run time |
@@ -307,9 +332,10 @@ block; GitHub reads `ci.yml` and `dependabot.yml`, and prek reads
 | yamlfmt | `-formatter` with the indentation, comment padding and line endings |
 | rumdl | `--disable MD013,MD041` and the HTML elements MD033 allows; the hook leaves `CHANGELOG.md` to release-please |
 
-A repository still holding `.config/nextest.toml`, `.rumdl.toml`,
-`.taplo.toml`, `.yamlfmt.yml`, `clippy.toml`, `deny.toml` or `rustfmt.toml` as
-sync wrote them, header first, is refused until `rust-gate sync` deletes them;
+A repository still holding `.config/nextest.toml`, the retired caller
+`.github/workflows/ci.yml`, `.rumdl.toml`, `.taplo.toml`, `.yamlfmt.yml`,
+`clippy.toml`, `deny.toml` or `rustfmt.toml` as sync wrote them, header first,
+is refused until `rust-gate sync` deletes them;
 a file without the header is the repository's own and stays. rumdl's settings
 are the exception: at the root, a `.rumdl.toml`, a `.markdownlint` file or a
 `pyproject.toml` rumdl table would loosen every Markdown file, so
@@ -320,16 +346,20 @@ the repository wrote itself is refused by `licenses`: DEP-001 holds for every
 repository, and its exceptions live in `maestro-quality.toml`.
 
 Run in a repository's root, `rust-gate sync` writes them and `rust-gate
-sync --check` compares them. The caller pins the release its `uses:` lines
-already name; `RUST_WORKFLOWS_PIN='<commit> v<version>'` moves it. Every
-other call to rust-workflows, in `.github/workflows/` or the organization's
-workflow templates, moves with the caller and counts as managed: a release job
-pinned apart from CI would ship with a gate CI never ran, and Dependabot leaves
-every rust-workflows pin to `sync`. `rust-gate
-init` writes them for a repository with no caller yet, at the release
-`RUST_WORKFLOWS_PIN` names. What a repository may say goes in
-`maestro-quality.toml`: the words it means, `[typos] words = ["jaq"]`, and the
-inputs its caller passes, `[ci] platforms = "macos windows linux-arm"`, where
+sync --check` compares them, at the release the repository declares, the first
+found: `RUST_WORKFLOWS_PIN='<commit> v<version>'`, which moves it; the retired
+caller while it is there; the commit every other workflow that calls
+rust-workflows pins, in `.github/workflows/` or the organization's workflow
+templates, which must all pin the same one; or the version its commit hooks
+install. Workflows that pin different releases are refused, with the fix: set
+`RUST_WORKFLOWS_PIN` and run `sync`. Every call to rust-workflows moves to the
+declared release and counts as managed: a release job pinned apart from the
+check would ship with a gate the check never ran, and Dependabot leaves every
+rust-workflows pin to `sync`. `rust-gate init` writes them for a repository
+that declares no release yet, at the release `RUST_WORKFLOWS_PIN` names. What
+a repository may say goes in `maestro-quality.toml`: the words it means,
+`[typos] words = ["jaq"]`, and the inputs a ruleset run takes instead of a
+caller's, `[ci] platforms = "macos windows linux-arm"`, where
 `macos` and `windows` are never left out
 ([platform portability](#platform-portability)). DEP-001, the policy
 `licenses` renders, holds one version of each crate, no wildcard requirement,
@@ -355,7 +385,7 @@ change, yamlfmt, taplo, actionlint, zizmor, shellcheck, shfmt, rumdl, lychee
 offline and editorconfig-checker, each installed by prek through mise at the
 version rust-workflows' `mise.toml` pins; the commit message rules; and
 `rust-gate hygiene --local`, the gate built by Cargo from the release the
-caller pins. Each tool takes the organization's options on its command line,
+repository declares. Each tool takes the organization's options on its command line,
 as the table above lists. A Rust repository adds `cargo fmt`, `rust-gate
 architecture --local` and, before a push, `rust-gate clippy --local`, Clippy
 with the organization's lints and thresholds. A developer
@@ -474,7 +504,7 @@ README table row, an image's alternative text, or what the file says of itself.
 `rust-gate guide --check` refuses a stale guide.
 
 Both run as commit hooks in every repository but this one, `rust-gate-rules`
-and `rust-gate-guide`, at the release the caller pins: a stale page or guide
+and `rust-gate-guide`, at the release the repository declares: a stale page or guide
 is rewritten and the commit stops once, so the next one carries it. CI skips
 both, so a stale rule map or guide never fails a merge; the organization's
 daily drift check reports it. `rust-gate init` writes the rule map, and the
@@ -857,8 +887,7 @@ materials and the scorecard stay Linux x86_64.
 ```
 
 Every Rust repository of the organization tests Linux, macOS and Windows: a
-ruleset run and the caller `rust-gate sync` renders both test `macos` and
-`windows` when `[ci]` names no `platforms`. `maestro-quality.toml` may add a target, `[ci] platforms = "macos
+ruleset run tests `macos` and `windows` when `[ci]` names no `platforms`. `maestro-quality.toml` may add a target, `[ci] platforms = "macos
 windows linux-arm"`, but never drop either; a value that does is refused with
 the fix:
 

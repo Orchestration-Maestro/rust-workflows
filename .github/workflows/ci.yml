@@ -47,8 +47,8 @@ name: Rust CI
         default: true
       sarif-reports:
         description: >-
-          Also emit Clippy and secret findings as SARIF, for `upload-sarif.yml`
-          to show in code scanning
+          Also emit Clippy and secret findings as SARIF, which the
+          organization's check uploads to code scanning
         type: boolean
         default: true
       clippy-level:
@@ -428,6 +428,99 @@ jobs:
         run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
       - name: Build and test
         run: cargo test --locked --workspace
+  # The uploads run only when no workflow called this one: in a repository's
+  # own context, from the organization's ruleset. Every caller still grants
+  # their scopes, which GitHub checks at startup even for a skipped job. The
+  # job id `upload` keeps the code scanning configuration the retired callers
+  # recorded on each default branch, `.github/workflows/ci.yml:upload`.
+  upload:
+    name: Upload Clippy and secret-scan SARIF
+    needs:
+      - checks
+    # A fork pull request's token cannot write security events; its SARIF
+    # stays in the reports artifact.
+    if: ${{ inputs.artifact-key == '' && github.event_name != 'pull_request_target' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write  # upload SARIF to code scanning
+    steps:
+      - name: Download this run's reports
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: ${{ needs.checks.outputs.artifact-name }}-reports
+          path: reports
+      # A repository that sets `sarif-reports = false` writes none.
+      - name: Upload Clippy findings
+        if: ${{ hashFiles('reports/clippy.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd  # v4.38.1
+        with:
+          sarif_file: reports/clippy.sarif
+          category: clippy
+      - name: Upload secret-scan findings
+        if: ${{ hashFiles('reports/secrets.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd  # v4.38.1
+        with:
+          sarif_file: reports/secrets.sarif
+          category: gitleaks
+  # Advisory: the checks job holds coverage to its floors, so a Codecov
+  # outage fails no run. The CLI is a release asset verified by digest,
+  # never a download the action would run unverified once errors pass.
+  coverage:
+    name: Upload coverage and test results to Codecov
+    needs:
+      - checks
+    # A fork pull request gets no OIDC token; its reports stay in the reports
+    # artifact.
+    if: ${{ inputs.artifact-key == '' && github.event_name != 'pull_request_target' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write  # log in to Codecov with OIDC instead of a stored token
+    steps:
+      - name: Checkout the gate at this workflow's commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+      - name: Build the gate
+        uses: ./.github/actions/gate
+      # Codecov maps the report's absolute paths onto this checkout's files.
+      - name: Checkout consumer revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install the Codecov CLI
+        run: rust-gate install-tools
+        env:
+          TOOLS: codecov codecov/codecov-cli/releases/download/v11.3.1/codecovcli_linux ca1d64196d2d34771084afe76ea657d581bf628e31d993ff8e52ea09cc88a56d
+      - name: Download this run's reports
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: ${{ needs.checks.outputs.artifact-name }}-reports
+          path: reports
+      - name: Upload line coverage
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5  # v7.1.1
+        with:
+          files: reports/coverage.lcov
+          report_type: coverage
+          disable_search: true
+          use_oidc: true
+          fail_ci_if_error: false
+          binary: ${{ runner.temp }}/rust-tools/bin/codecov
+      - name: Upload test results
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5  # v7.1.1
+        with:
+          files: reports/tests.xml
+          report_type: test_results
+          disable_search: true
+          use_oidc: true
+          fail_ci_if_error: false
+          binary: ${{ runner.temp }}/rust-tools/bin/codecov
   gate:
     name: Required Rust CI
     needs:

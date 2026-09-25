@@ -6,7 +6,7 @@ use crate::harness::{Fixture, refused, succeeds, tool};
 use std::fs;
 use std::process::Output;
 
-/// The release the fixture's caller pins.
+/// The release `RUST_WORKFLOWS_PIN` names for the fixture.
 fn pin(letter: char, version: &str) -> String {
     format!(
         "RUST_WORKFLOWS_PIN='{} v{version}'",
@@ -41,7 +41,7 @@ fn init_writes_every_managed_file_and_the_check_finds_them_equal() {
     let fixture = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
     refused(
         &in_project(&fixture, "rust-gate sync"),
-        "no release to pin: .github/workflows/ci.yml names none; set RUST_WORKFLOWS_PIN to \
+        "no release to pin: no workflow or commit hook names one; set RUST_WORKFLOWS_PIN to \
          `<commit> v<version>`",
     );
     refused(
@@ -56,7 +56,6 @@ fn init_writes_every_managed_file_and_the_check_finds_them_equal() {
         ".editorconfig",
         ".gitattributes",
         ".github/dependabot.yml",
-        ".github/workflows/ci.yml",
         ".pre-commit-config.yaml",
         "rust-toolchain.toml",
         "typos.toml",
@@ -70,17 +69,17 @@ fn init_writes_every_managed_file_and_the_check_finds_them_equal() {
     for path in RETIRED {
         assert!(!fixture.root.join("project").join(path).exists(), "{path}");
     }
-    let caller = managed(&fixture, ".github/workflows/ci.yml");
-    let commit = "a".repeat(40);
-    assert!(caller.contains(&format!(
-        "uses: Orchestration-Maestro/rust-workflows/.github/workflows/ci.yml@{commit}  # v2.0.0"
-    )));
-    // Every Rust repository tests macOS and Windows, asked or not.
-    assert!(caller.contains("    with:\n      platforms: macos windows\n"));
+    // The organization's rulesets run ci.yml, so no caller is written; the
+    // commit hooks install the gate at the release.
+    assert!(!fixture.root.join("project/.github/workflows").exists());
+    assert!(
+        managed(&fixture, ".pre-commit-config.yaml")
+            .contains("/rust-workflows:v2.0.0:rust-gate\"\n")
+    );
     succeeds(&in_project(&fixture, "rust-gate sync --check"));
     refused(
         &in_project(&fixture, &format!("{} rust-gate init", pin('a', "2.0.0"))),
-        "init: the repository already has a caller; run rust-gate sync",
+        "init: the repository already declares a release; run rust-gate sync",
     );
     // What a repository's own hooks run over them leaves them as they are.
     let project = fixture.root.join("project");
@@ -92,7 +91,6 @@ fn init_writes_every_managed_file_and_the_check_finds_them_equal() {
             "indent=2,include_document_start=false,retain_line_breaks_single=true,\
              pad_line_comments=2,line_ending=lf",
             ".github/dependabot.yml",
-            ".github/workflows/ci.yml",
         ])
         .current_dir(&project)
         .output()
@@ -135,25 +133,19 @@ fn a_managed_file_changed_by_hand_is_refused_and_sync_writes_it_back() {
         "sync --check: 2 managed files differ from the organization's rendering (clippy.toml, \
          typos.toml); run rust-gate sync",
     );
-    // Without a pin, sync keeps the release the caller pins; with one, it
-    // moves every call to it.
+    // Without a pin, sync keeps the release the commit hooks install; with
+    // one, it moves them to it.
     succeeds(&in_project(&fixture, "rust-gate sync"));
     succeeds(&in_project(&fixture, "rust-gate sync --check"));
     assert!(!project.join("clippy.toml").exists());
     assert!(project.join("rustfmt.toml").exists());
-    assert_eq!(
-        managed(&fixture, ".github/workflows/ci.yml")
-            .matches(&"a".repeat(40))
-            .count(),
-        3
-    );
+    assert!(managed(&fixture, ".pre-commit-config.yaml").contains(":v2.0.0:rust-gate"));
     succeeds(&in_project(
         &fixture,
         &format!("{} rust-gate sync", pin('b', "2.1.0")),
     ));
-    let caller = managed(&fixture, ".github/workflows/ci.yml");
-    assert_eq!(caller.matches(&"b".repeat(40)).count(), 3);
-    assert!(caller.contains("  # v2.1.0\n"));
+    let hooks = managed(&fixture, ".pre-commit-config.yaml");
+    assert!(hooks.contains(":v2.1.0:rust-gate") && !hooks.contains(":v2.0.0:"));
     refused(
         &in_project(&fixture, "RUST_WORKFLOWS_PIN=v2 rust-gate sync"),
         "RUST_WORKFLOWS_PIN `v2` is not `<commit> v<version>`",
@@ -167,15 +159,11 @@ fn a_managed_file_changed_by_hand_is_refused_and_sync_writes_it_back() {
     .unwrap();
     refused(
         &in_project(&fixture, "rust-gate sync --check"),
-        "sync --check: 2 managed files differ from the organization's rendering \
-         (.github/workflows/ci.yml, typos.toml); run rust-gate sync",
+        "sync --check: 1 managed file differs from the organization's rendering \
+         (typos.toml); run rust-gate sync",
     );
     succeeds(&in_project(&fixture, "rust-gate sync"));
     assert!(managed(&fixture, "typos.toml").ends_with("jaq = \"jaq\"\n"));
-    assert!(
-        managed(&fixture, ".github/workflows/ci.yml")
-            .contains("    with:\n      platforms: macos windows\n      coverage-threshold: 95\n")
-    );
     fs::write(
         project.join("maestro-quality.toml"),
         "[typos]\nwords = [\"two words\"]\n",
@@ -226,10 +214,91 @@ fn platforms_that_drop_macos_or_windows_are_refused_with_the_fix() {
     )
     .unwrap();
     succeeds(&in_project(&fixture, "rust-gate sync"));
-    assert!(
-        managed(&fixture, ".github/workflows/ci.yml")
-            .contains("    with:\n      platforms: macos windows linux-arm\n  #")
+}
+
+#[test]
+fn the_retired_caller_goes_and_the_release_workflows_keep_one_pin() {
+    let mut fixture = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
+    succeeds(&in_project(
+        &fixture,
+        &format!("{} rust-gate init", pin('a', "2.0.0")),
+    ));
+    let project = fixture.root.join("project");
+    fixture.set("GITHUB_WORKSPACE", &project.display().to_string());
+    let call = |letter: char, version: &str| {
+        format!(
+            "    uses: Orchestration-Maestro/rust-workflows/.github/workflows/{}.yml@{}  # \
+             v{version}\n",
+            if letter == 'a' {
+                "ci"
+            } else {
+                "publish-binaries"
+            },
+            letter.to_string().repeat(40)
+        )
+    };
+    // The caller sync wrote before the organization's rulesets ran ci.yml, its
+    // uploads included, is refused until sync deletes it.
+    fs::create_dir_all(project.join(".github/workflows")).unwrap();
+    let caller = project.join(".github/workflows/ci.yml");
+    let generated = format!(
+        "# generated by rust-gate sync; do not edit\nname: CI\njobs:\n  rust:\n{}",
+        call('a', "2.0.0")
     );
+    fs::write(&caller, &generated).unwrap();
+    refused(
+        &fixture.run("ci", "managed-files"),
+        "managed files: 1 managed file differs from the organization's rendering \
+         (.github/workflows/ci.yml); run rust-gate sync",
+    );
+    succeeds(&in_project(&fixture, "rust-gate sync"));
+    assert!(!caller.exists());
+    succeeds(&fixture.run("ci", "managed-files"));
+    // One the repository wrote itself is not sync's to delete.
+    fs::write(&caller, "name: CI\n\"on\": push\n").unwrap();
+    succeeds(&in_project(&fixture, "rust-gate sync --check"));
+    fs::remove_file(&caller).unwrap();
+    // A release workflow pins a commit: the release the repository declares,
+    // which the commit hooks follow.
+    let release = project.join(".github/workflows/release.yml");
+    fs::write(
+        &release,
+        format!("jobs:\n  binaries:\n{}", call('b', "2.1.0")),
+    )
+    .unwrap();
+    refused(
+        &in_project(&fixture, "rust-gate sync --check"),
+        "sync --check: 1 managed file differs from the organization's rendering \
+         (.pre-commit-config.yaml); run rust-gate sync",
+    );
+    succeeds(&in_project(&fixture, "rust-gate sync"));
+    assert!(managed(&fixture, ".pre-commit-config.yaml").contains(":v2.1.0:rust-gate"));
+    // Two workflows that pin different releases are refused with the fix.
+    let nightly = project.join(".github/workflows/nightly.yml");
+    fs::write(&nightly, format!("jobs:\n  ci:\n{}", call('a', "2.0.0"))).unwrap();
+    refused(
+        &in_project(&fixture, "rust-gate sync"),
+        &format!(
+            "the workflows pin different releases of rust-workflows \
+             (.github/workflows/nightly.yml pins v2.0.0 at {}, .github/workflows/release.yml \
+             pins v2.1.0 at {}); set RUST_WORKFLOWS_PIN to `<commit> v<version>`, the release \
+             to keep, and run rust-gate sync",
+            "a".repeat(40),
+            "b".repeat(40)
+        ),
+    );
+    succeeds(&in_project(
+        &fixture,
+        &format!("{} rust-gate sync", pin('c', "2.2.0")),
+    ));
+    for workflow in [&release, &nightly] {
+        let text = fs::read_to_string(workflow).unwrap();
+        assert!(
+            text.contains(&format!("@{}  # v2.2.0\n", "c".repeat(40))),
+            "{text}"
+        );
+    }
+    succeeds(&in_project(&fixture, "rust-gate sync --check"));
 }
 
 #[test]
@@ -309,6 +378,7 @@ fn the_home_may_change_the_files_it_is_the_source_of() {
          (.gitattributes); run rust-gate sync",
     );
     // The home of the workflows: its ci.yml is called, not a caller.
+    fs::create_dir_all(project.join(".github/workflows")).unwrap();
     fs::write(
         project.join(".github/workflows/ci.yml"),
         "name: CI\non:\n  workflow_call:\n",
