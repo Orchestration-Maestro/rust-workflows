@@ -239,6 +239,7 @@ proofs = [
   "init_writes_every_managed_file_and_the_check_finds_them_equal",
   "a_managed_file_changed_by_hand_is_refused_and_sync_writes_it_back",
   "the_managed_files_step_refuses_a_difference_in_ci",
+  "the_home_may_change_the_files_it_is_the_source_of",
 ]
 
 [[gate]]
