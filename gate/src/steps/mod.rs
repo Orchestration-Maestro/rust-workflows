@@ -35,6 +35,7 @@ mod release_build;
 mod report_duplicates;
 mod report_sizes;
 mod require_every_check;
+mod rule_map;
 mod secret_scan;
 mod stage_payload;
 mod unsafe_audit;

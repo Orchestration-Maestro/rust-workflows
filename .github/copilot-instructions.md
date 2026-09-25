@@ -78,9 +78,11 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   └── security.md                         # Security requirements and how they are enforced
 │   ├── superpowers/                            # Designs written and approved before a change is built
 │   │   ├── plans/                              # One implementation plan per approved design, task by task
+│   │   │   ├── 2026-09-24-guide-and-rule-map-1-rules.md  # Plan 1 of the rule map in rust-gate: rust-gate rules and rules --check
 │   │   │   ├── 2026-09-24-org-quality-gate-1-architecture.md  # Plan 1 of 2: the module structure rules, and this repository held to them
 │   │   │   └── 2026-09-24-org-quality-gate-2-complete.md  # Plan 2 of 2: every remaining rule, the generated files, the release and the repositories
 │   │   └── specs/                              # One approved design per change, named by date and topic
+│   │       ├── 2026-09-24-guide-and-rule-map-design.md  # The Copilot guide and rule map, moved into rust-gate and written by a commit hook
 │   │       └── 2026-09-24-org-quality-gate-design.md  # The quality gate every organization repository inherits, and how
 │   ├── README.md                               # Complete workflow contracts and usage examples
 │   ├── ci.md                                   # Every CI input, output, gate and report
@@ -140,6 +142,11 @@ generated SBOM output and local download markers are intentionally excluded.
 │       ├── deny.toml                           # Licence allowlist, dependency bans and source policy
 │       └── rust-toolchain.toml                 # Exact stable compiler pin for tests
 ├── gate/                                       # The gate: one binary the workflows build at the pinned commit
+│   ├── golden-rules/                           # The golden rules this release carries, copied from .github
+│   │   ├── commit.txt                          # The .github commit the golden rules were copied from
+│   │   ├── engineering.md                      # Copy of the engineering rules; never edited here
+│   │   ├── northstar.md                        # Copy of the Northstar; never edited here
+│   │   └── security.md                         # Copy of the security rules; never edited here
 │   ├── src/                                    # The three layers: runner, checks, steps
 │   │   ├── checks/                             # What the steps share, built on the runner and never on a step
 │   │   │   ├── cargo_metadata.rs               # The jaq programs several steps read over Cargo's records
@@ -197,6 +204,12 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   │   ├── mod.rs                      # The step's door: its two modules and its declaration
 │   │   │   │   ├── scorecard.rs                # A run's scorecard as a value: its controls, and the JSON, Markdown and badge of them
 │   │   │   │   └── step.rs                     # rust-gate scorecard: what ran, as JSON, Markdown and a self-contained badge
+│   │   │   ├── rule_map/                       # rust-gate rules: a repository's rule map, the golden rules adapted to it
+│   │   │   │   ├── golden.rs                   # The embedded golden rules: their rules, pillars and motto
+│   │   │   │   ├── mod.rs                      # The step's door: its four modules and its declarations
+│   │   │   │   ├── page.rs                     # What a repository wrote, read back; paragraphs wrapped at 80
+│   │   │   │   ├── render.rs                   # The three pages: kept rows, organization defaults, not mapped
+│   │   │   │   └── step.rs                     # rust-gate rules: the pages written where they differ
 │   │   │   ├── api_compatibility.rs            # rust-gate api: cargo-semver-checks against the base branch unless the title declares a break
 │   │   │   ├── attest_binaries.rs              # rust-gate attest-binaries: validate, extract the SBOM, verify, record the outcome
 │   │   │   ├── binary_hardening.rs             # rust-gate hardening: reproducible, PIE, RELRO, no executable stack, auditable
@@ -263,6 +276,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── release_payload.rs                  # ci.yml: release build, payload, bills of materials, and the example gate
 │   │   ├── release_payload_refusals.rs         # The release payload's refusals: lockfile drift, unhardened or irreproducible binaries, malformed staging
 │   │   ├── repository_hygiene.rs               # ci.yml: HYG-001 to HYG-005 and shell width, each refused by name
+│   │   ├── rule_map.rs                         # rules and rules --check: written, kept, refused when stale or unmapped
 │   │   ├── scorecard_and_required_status.rs    # ci.yml: the scorecard, the required status and mutation testing
 │   │   ├── scorecard_states.rs                 # ci.yml: selection, applicability and execution reported separately
 │   │   ├── source_rules.rs                     # ci.yml: SIZE, NAME, DOC, LIB, TST and WSP, each refused by name, and the limits a repository tightens
