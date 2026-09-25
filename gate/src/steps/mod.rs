@@ -15,6 +15,7 @@ mod dependency_policy;
 mod feature_combinations;
 mod format_lint_test;
 mod fuzz_regression;
+mod gate_rules;
 mod hygiene;
 mod hygiene_workflow;
 mod install_toolchain;

@@ -152,6 +152,8 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── cargo_metadata.rs               # The jaq programs several steps read over Cargo's records
 │   │   │   ├── checkout_paths.rs               # Canonical forms, containment in the checkout, symlinks, Rust sources
 │   │   │   ├── findings.rs                     # A rule's finding as one report line, and the exceptions that excuse some
+│   │   │   ├── gate_rules.rs                   # The gate's one list of rules, and the exceptions it allows
+│   │   │   ├── gate_rules.tsv                  # Every rule: ID, short name, exception or none, what it holds
 │   │   │   ├── inputs.rs                       # The ci.yml inputs with a shape of their own: policies, threshold and key, typed
 │   │   │   ├── lint_policy.rs                  # LNT-001: the organization's lints and clippy.toml, written and compared
 │   │   │   ├── manifests.rs                    # What Cargo says beyond module trees: packages, the workspace, what members inherit
@@ -221,6 +223,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── feature_combinations.rs         # rust-gate features: cargo hack builds each declared feature, not only the default set
 │   │   │   ├── format_lint_test.rs             # rust-gate quality: fmt, Clippy, tests, doc tests, strict rustdoc
 │   │   │   ├── fuzz_regression.rs              # rust-gate fuzz: inputs, nightly toolchain with cargo-fuzz, corpus replay and exploration
+│   │   │   ├── gate_rules.rs                   # rust-gate gate-rules: the list of rules, one a line
 │   │   │   ├── hygiene_workflow.rs             # rust-gate hygiene prepare: the checkout and reports directory of hygiene.yml
 │   │   │   ├── install_toolchain.rs            # rust-gate install-tools: what it refuses, honours, and ci.yml installs
 │   │   │   ├── install_tools.rs                # rust-gate install-tools: official release assets, digests verified before extraction
@@ -313,6 +316,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── evidence_receipt.rs                 # The evidence receipt: produced only when every upstream result succeeded
 │   │   ├── executable_stubs.rs                 # Stand-in executables written outside the test process, so none is refused as Text file busy
 │   │   ├── gate_action.rs                      # The gate action: one pin at every call site, and a commit that ships it
+│   │   ├── gate_rules.rs                       # Every rule the gate names is listed, and has its row in docs/ci.md
 │   │   ├── generated_documents.rs              # Every generated table and the diagram's count are what just docs writes
 │   │   ├── metadata_and_inventory.rs           # Repository files, hook, editor and release policies, the Copilot inventory
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else

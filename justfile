@@ -288,6 +288,13 @@ _tables:
             [[ "$group" == "$1" ]] || continue
             printf '| %s | %s | %s |\n' "${tick}${name}${tick}" "$does" "$language"
           done < <(grep '^# tool: ' mise.toml) ;;
+        gate-rules)
+          printf '%s\n' '| Rule | Name | What it holds | Exception |' '| --- | --- | --- | --- |'
+          while IFS=$'\t' read -r name group language does; do
+            [[ -n "$name" && "$name" != \#* ]] || continue
+            if [[ "$language" == exception ]]; then language=yes; else language=no; fi
+            printf '| %s | %s | %s | %s |\n' "$name" "$group" "$does" "$language"
+          done < gate/src/checks/gate_rules.tsv ;;
         *)
           echo "unknown generated table: ${kind}" >&2; return 1 ;;
       esac
