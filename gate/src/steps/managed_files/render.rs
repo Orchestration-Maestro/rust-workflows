@@ -13,18 +13,20 @@
 //! as everywhere else.
 
 use super::hooks::commit_hooks;
-use super::pin::Pin;
 use crate::checks::lint_policy::with_lint_block;
 use crate::checks::organization_config::HEADER;
-use crate::checks::quality_config::{DESKTOPS, QualityConfig};
+use crate::checks::quality_config::QualityConfig;
 use crate::checks::workflow_home::{NAMES, ORGANIZATION};
 use std::fmt::Write as _;
 
-/// The files `rust-gate sync` wrote before the gate passed their tools the
-/// organization's configuration at run time: sync deletes each one that
-/// still opens with the header, and the check refuses it until then.
-pub(super) const RETIRED: [&str; 7] = [
+/// The files `rust-gate sync` wrote before and writes no more: the caller of
+/// `ci.yml` or `hygiene.yml`, which the organization's rulesets run in its
+/// place, uploads included, and the settings the gate now passes their tools at
+/// run time. Sync deletes each one that still opens with the header, and the
+/// check refuses it until then.
+pub(super) const RETIRED: [&str; 8] = [
     ".config/nextest.toml",
+    ".github/workflows/ci.yml",
     ".rumdl.toml",
     ".taplo.toml",
     ".yamlfmt.yml",
@@ -62,15 +64,15 @@ const WEEKLY: &str = concat!(
 pub(super) struct Repository {
     /// Whether it builds Rust: a root `Cargo.toml` or `rust-toolchain.toml`.
     pub(super) rust: bool,
-    /// Whether it is the home of the reusable workflows, whose `ci.yml`,
-    /// Dependabot settings and hooks are its own.
+    /// Whether it is the home of the reusable workflows, whose Dependabot
+    /// settings and hooks are its own.
     pub(super) home: bool,
     /// The root manifest and whether it is a workspace root, when there is one.
     pub(super) manifest: Option<(String, bool)>,
     /// What its `maestro-quality.toml` says.
     pub(super) config: QualityConfig,
-    /// The release its caller pins, when one is known.
-    pub(super) pin: Option<Pin>,
+    /// The version of the release it declares, when one is known.
+    pub(super) version: Option<String>,
 }
 
 /// Every managed file of `repository` and its content, in path order.
@@ -82,18 +84,12 @@ pub(super) fn managed_files(repository: &Repository) -> Result<Vec<(String, Stri
                 .iter()
                 .map(|(path, text)| (*path, (*text).to_owned())),
         );
-        let pin = repository.pin.as_ref().ok_or(
-            "no release to pin: .github/workflows/ci.yml names none; set RUST_WORKFLOWS_PIN to \
+        let version = repository.version.as_deref().ok_or(
+            "no release to pin: no workflow or commit hook names one; set RUST_WORKFLOWS_PIN to \
              `<commit> v<version>`",
         )?;
-        let workflow = if repository.rust {
-            caller(pin, &repository.config.ci)
-        } else {
-            hygiene_caller(pin)
-        };
         files.push((".github/dependabot.yml", dependabot(repository.rust)));
-        files.push((".github/workflows/ci.yml", workflow));
-        let hooks = commit_hooks(HEADER, repository.rust, &pin.version);
+        let hooks = commit_hooks(HEADER, repository.rust, version);
         files.push((".pre-commit-config.yaml", hooks));
     }
     if repository.rust && !repository.home {
@@ -162,99 +158,8 @@ fn dependabot(rust: bool) -> String {
     text
 }
 
-/// The caller of a repository without Rust: the hygiene workflow at `pin`.
-fn hygiene_caller(pin: &Pin) -> String {
-    format!(
-        concat!(
-            "{header}name: CI\n",
-            "\"on\":\n",
-            "  push:\n",
-            "    branches: [main]\n",
-            "  pull_request:\n",
-            "permissions:\n",
-            "  contents: read\n",
-            "jobs:\n",
-            "  # Keep the job id `hygiene`: the hygiene-required ruleset requires the\n",
-            "  # check \"hygiene / Required hygiene\" before any merge to the default branch.\n",
-            "  hygiene:\n",
-            "    uses: {reference}\n",
-            "    permissions:\n",
-            "      contents: read\n",
-        ),
-        header = HEADER,
-        reference = pin.reference("hygiene.yml"),
-    )
-}
-
-/// The caller of the reusable workflows: the gate at `pin` with the inputs
-/// `maestro-quality.toml` passes, then the uploads of its reports. Every Rust
-/// repository tests macOS and Windows: without `platforms`, it passes those.
-fn caller(pin: &Pin, inputs: &[(String, String)]) -> String {
-    let mut with = String::from("    with:\n");
-    if !inputs.iter().any(|(key, _)| key == "platforms") {
-        let _ = writeln!(with, "      platforms: {}", DESKTOPS.join(" "));
-    }
-    for (key, value) in inputs {
-        let _ = writeln!(with, "      {key}: {value}");
-    }
-    let upload = |job: &str, workflow: &str, scope: &str| {
-        format!(
-            concat!(
-                "  {job}:\n",
-                "    needs: rust\n",
-                "    uses: {reference}\n",
-                "    permissions:\n",
-                "      contents: read\n",
-                "      {scope}\n",
-                "    with:\n",
-                "      artifact-name: ${{{{ needs.rust.outputs.artifact-name }}}}\n",
-            ),
-            job = job,
-            reference = pin.reference(workflow),
-            scope = scope,
-        )
-    };
-    format!(
-        concat!(
-            "{header}name: CI\n",
-            "\"on\":\n",
-            "  push:\n",
-            "    branches: [main]\n",
-            "  pull_request:\n",
-            "permissions:\n",
-            "  contents: read\n",
-            "jobs:\n",
-            "  # Keep the job id `rust`: the rust-ci-required ruleset requires the check\n",
-            "  # \"rust / Required Rust CI\" before any merge to the default branch.\n",
-            "  rust:\n",
-            "    uses: {reference}\n",
-            "    permissions:\n",
-            "      contents: read\n",
-            "{with}",
-            "  # Clippy and secret-scan findings into the Security tab.\n",
-            "{sarif}",
-            "  # Coverage and test results into Codecov, logged in through OIDC.\n",
-            "{coverage}",
-        ),
-        header = HEADER,
-        reference = pin.reference("ci.yml"),
-        with = with,
-        sarif = upload(
-            "sarif",
-            "upload-sarif.yml",
-            "security-events: write  # upload SARIF to code scanning"
-        ),
-        coverage = upload(
-            "coverage",
-            "upload-coverage.yml",
-            "id-token: write  # log in to Codecov without a stored token"
-        ),
-    )
-}
-
 #[cfg(test)]
 mod tests {
-    use super::super::pin::parse_pin;
     use super::{Repository, managed_files};
     use crate::checks::organization_config::HEADER;
     use crate::checks::quality_config::QualityConfig;
@@ -266,7 +171,7 @@ mod tests {
             home: false,
             manifest: Some(("[package]\nname = \"a\"\n".to_owned(), false)),
             config,
-            pin: parse_pin(&format!("{} v2.0.0", "a".repeat(40))),
+            version: Some("2.0.0".to_owned()),
         }
     }
 
@@ -280,7 +185,6 @@ mod tests {
                 ".editorconfig",
                 ".gitattributes",
                 ".github/dependabot.yml",
-                ".github/workflows/ci.yml",
                 ".pre-commit-config.yaml",
                 "Cargo.toml",
                 "rust-toolchain.toml",
@@ -301,7 +205,7 @@ mod tests {
     fn the_home_is_not_compared_with_the_files_it_is_the_source_of() {
         let mut home = repository(QualityConfig::default());
         home.home = true;
-        home.pin = None;
+        home.version = None;
         let files = managed_files(&home).unwrap();
         let paths: Vec<&str> = files.iter().map(|(path, _)| path.as_str()).collect();
         assert_eq!(paths, ["Cargo.toml", "typos.toml"]);
@@ -324,41 +228,21 @@ mod tests {
     }
 
     #[test]
-    fn the_caller_pins_one_release_and_passes_the_declared_inputs() {
-        let config = QualityConfig {
-            ci: vec![("platforms".to_owned(), "macos windows".to_owned())],
-            typos: vec!["jaq".to_owned()],
-            ..QualityConfig::default()
-        };
-        let files = managed_files(&repository(config)).unwrap();
-        let text = |wanted: &str| {
+    fn the_hooks_install_the_declared_release_and_no_caller_is_rendered() {
+        let files = managed_files(&repository(QualityConfig::default())).unwrap();
+        assert!(
             files
                 .iter()
-                .find(|(path, _)| path == wanted)
-                .map(|(_, text)| text.clone())
-                .unwrap()
-        };
-        let caller = text(".github/workflows/ci.yml");
-        let commit = "a".repeat(40);
-        assert!(caller.contains(&format!(
-            "    uses: Orchestration-Maestro/rust-workflows/.github/workflows/ci.yml@{commit}  \
-             # v2.0.0\n    permissions:\n      contents: read\n    with:\n      platforms: \
-             macos windows\n"
-        )));
-        assert_eq!(caller.matches(&commit).count(), 3);
-        assert!(
-            text("typos.toml").ends_with("[default.extend-words]\nFND = \"FND\"\njaq = \"jaq\"\n")
+                .all(|(path, _)| !path.starts_with(".github/workflows/"))
         );
-        // Without `platforms`, the caller still tests macOS and Windows.
-        let bare = managed_files(&repository(QualityConfig::default())).unwrap();
-        assert!(bare.iter().any(|(path, text)| {
-            path == ".github/workflows/ci.yml"
-                && text.contains(
-                    "      contents: read\n    with:\n      platforms: macos windows\n  #",
-                )
-        }));
+        let hooks = files
+            .iter()
+            .find(|(path, _)| path == ".pre-commit-config.yaml")
+            .map(|(_, text)| text.as_str())
+            .unwrap();
+        assert!(hooks.contains("/rust-workflows:v2.0.0:rust-gate\"\n"));
         let mut unpinned = repository(QualityConfig::default());
-        unpinned.pin = None;
+        unpinned.version = None;
         assert!(
             managed_files(&unpinned)
                 .unwrap_err()

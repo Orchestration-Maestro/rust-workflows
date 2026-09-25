@@ -129,11 +129,11 @@ proofs = ["clippy_denies_leftover_scaffolding_at_every_level"]
 name = "SARIF reports"
 kind = "default"
 switch = "`sarif-reports: false`"
-fails = "A Clippy or secret-scan SARIF report that is missing or empty; `upload-sarif.yml` shows the findings in code scanning"
+fails = "A Clippy or secret-scan SARIF report that is missing or empty; the organization's check shows the findings in code scanning"
 standard = "SST-003"
 proofs = [
   "sarif_reports_are_written_only_when_asked_and_never_empty",
-  "sarif_reports_are_on_by_default_and_upload_in_their_own_workflow",
+  "sarif_reports_upload_from_the_organizations_check_alone",
 ]
 
 [[gate]]

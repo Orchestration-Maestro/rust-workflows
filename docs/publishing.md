@@ -46,6 +46,10 @@ Every live publisher requires all of the following:
    environment API, plus `contents: write` for binary/evidence uploads or
    `contents: read` for crate publication. Only conditional live upload jobs
    request a write scope; dry-run jobs execute with read-only permissions.
+   Both application publishers also take `security-events: write` and
+   `id-token: write`: the CI run they call holds the
+   [uploads](ci.md#uploads-to-code-scanning-and-codecov), which a called run
+   skips but GitHub checks at startup.
 
 Required reviewers are available because every repository in the organization
 is public; on GitHub Team a private repository could not meet this boundary.

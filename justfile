@@ -118,7 +118,7 @@ update-tools:
     set -euo pipefail
     # mise.toml first, mise.lock through mise, then each workflow install row
     # from the lock with the digest of the bytes the new asset serves, and the
-    # Codecov CLI version. One line per move; no output means all current.
+    # Codecov CLI row. One line per move; no output means all current.
     declare -A was=() now=() asset=() digest=()
     version='^[0-9A-Za-z][0-9A-Za-z.+-]*$'
     while read -r name current; do
@@ -185,13 +185,28 @@ update-tools:
         rm "$moved"
       done
     fi
-    coverage=.github/workflows/upload-coverage.yml
-    used="$(grep -oE 'version: v[0-9][0-9.]*$' "$coverage" | head -1)"
-    used="${used#version: }"
-    cli="$(gh api repos/codecov/codecov-cli/releases/latest --jq .tag_name)"
+    # The Codecov CLI runs only in ci.yml's upload job, so mise does not lock
+    # it: its row moves to the latest release, at the digest GitHub records.
+    ci=.github/workflows/ci.yml
+    cli_asset='codecov codecov/codecov-cli/releases/download/'
+    used="$(grep -oE "${cli_asset}v[0-9][0-9.]*/" "$ci" | head -1)"
+    used="${used#"$cli_asset"}"
+    used="${used%/}"
+    read -r cli recorded < <(gh api repos/codecov/codecov-cli/releases/latest --jq \
+      '.tag_name + " " + (.assets[] | select(.name == "codecovcli_linux") | .digest)')
     [[ "$cli" =~ ^v[0-9]+(\.[0-9]+)*$ ]] || { echo "codecov-cli: no release tag" >&2; exit 1; }
     if [[ "$cli" != "$used" ]]; then
-      sed -i "s/version: ${used}\$/version: ${cli}/" "$coverage"
+      cli_download="$(mktemp)"
+      curl --fail --silent --show-error --location --retry 4 --retry-all-errors \
+        -o "$cli_download" \
+        "https://github.com/codecov/codecov-cli/releases/download/${cli}/codecovcli_linux"
+      sum="$(sha256sum "$cli_download" | cut -d' ' -f1)"
+      rm "$cli_download"
+      [[ "$recorded" == "sha256:${sum}" ]] || {
+        echo "codecov-cli: the download differs from the release's digest" >&2; exit 1;
+      }
+      from="${cli_asset}${used}/codecovcli_linux [0-9a-f]{64}"
+      sed -i -E "s#${from}#${cli_asset}${cli}/codecovcli_linux ${sum}#" "$ci"
       echo "codecov-cli ${used} -> ${cli}"
     fi
 

@@ -30,7 +30,16 @@
 
 ## ⚡ Quick start
 
-Add one file to your Rust repository:
+A Rust repository of the organization adds no workflow: the organization's
+ruleset runs `ci.yml` on every pull request, and the same run uploads Clippy
+and secret-scan findings to the repository's Security tab and coverage and test
+results to Codecov; see [uploads](docs/ci.md#uploads-to-code-scanning-and-codecov).
+Codecov needs its GitHub App installed on the organization; the upload logs in
+through OIDC, so there is no Codecov token to store.
+
+A workflow may still call `ci.yml`, a publisher's does. The uploads are skipped
+then, but GitHub checks their scopes when the run starts, so the caller grants
+them:
 
 ```yaml
 # .github/workflows/ci.yml
@@ -43,33 +52,9 @@ jobs:
     uses: Orchestration-Maestro/rust-workflows/.github/workflows/ci.yml@<reviewed-sha>
     permissions:
       contents: read
+      security-events: write  # ci.yml's SARIF upload, skipped when called
+      id-token: write  # ci.yml's Codecov login, skipped when called
 ```
-
-To see Clippy and secret-scan findings in the repository's Security tab, and
-coverage and test results in Codecov, add two jobs; each alone holds its write
-scope:
-
-```yaml
-  sarif:
-    needs: rust
-    uses: Orchestration-Maestro/rust-workflows/.github/workflows/upload-sarif.yml@<reviewed-sha>
-    permissions:
-      contents: read
-      security-events: write
-    with:
-      artifact-name: ${{ needs.rust.outputs.artifact-name }}
-  coverage:
-    needs: rust
-    uses: Orchestration-Maestro/rust-workflows/.github/workflows/upload-coverage.yml@<reviewed-sha>
-    permissions:
-      contents: read
-      id-token: write
-    with:
-      artifact-name: ${{ needs.rust.outputs.artifact-name }}
-```
-
-Codecov needs its GitHub App installed on the organization; the upload logs in
-through OIDC, so there is no Codecov token to store.
 
 That is the whole adoption. Every run enforces formatting, Clippy, tests,
 rustdoc, 90% line coverage, advisories, a secret scan, the declared MSRV,
@@ -109,7 +94,7 @@ workflows.
 ## 🔄 How it works
 
 <p align="center">
-  <img src=".github/assets/how-it-works.svg" alt="A consumer repository calls the reusable Rust CI on every commit or pull request. Publishing runs that same CI with one job in front of it: a preflight job authorises the boundary before any build, the same revision runs CI, a staging job re-verifies the exact artifact, and the publishing job runs only once the dry run is turned off. Signing and evidence upload are opt-in workflows because they hold elevated scopes. There is no route into publication that skips CI." width="100% From the same run, opt-in jobs upload SARIF findings to code scanning and coverage to Codecov, and test on macOS, Windows and Linux arm64." />
+  <img src=".github/assets/how-it-works.svg" alt="A consumer repository calls the reusable Rust CI on every commit or pull request. Publishing runs that same CI with one job in front of it: a preflight job authorises the boundary before any build, the same revision runs CI, a staging job re-verifies the exact artifact, and the publishing job runs only once the dry run is turned off. Signing and evidence upload are opt-in workflows because they hold elevated scopes. There is no route into publication that skips CI." width="100% From the same run, the ruleset's run uploads SARIF findings to code scanning and coverage to Codecov, and tests on macOS, Windows and Linux arm64." />
 </p>
 
 1. The organization's `rust-ci` ruleset runs `ci.yml` at a reviewed commit on
@@ -125,9 +110,9 @@ workflows.
    dependencies, public API compatibility, mutation testing and the
    reproducible release build. Successful checks produce release binaries or
    packages, SBOMs, source-revision metadata and checksums. From the same run,
-   opt-in jobs send the SARIF findings to code scanning and the coverage and
-   test results to Codecov, and test the project on macOS, Windows and Linux
-   arm64.
+   the ruleset's run sends the SARIF findings to code scanning and the coverage
+   and test results to Codecov, and every run tests the project on macOS,
+   Windows and Linux arm64 as `platforms` names them.
 3. Publishing runs that same CI after preflight. A live run requires a
    protected release tag and API-verified required reviewers on the `release`
    environment, restricted to `v*` tags. Dry-run needs neither approval nor
@@ -153,8 +138,6 @@ workflows.
 | [`publish-crate.yml`](.github/workflows/publish-crate.yml) | Same-revision CI and selected-package verification; explicit public crates.io publication only |
 | [`publish-evidence.yml`](.github/workflows/publish-evidence.yml) | Dry-run-first archive of release reports; live assets only on protected-tag GitHub Releases |
 | [`unsafe-audit.yml`](.github/workflows/unsafe-audit.yml) | Opt-in Miri run detecting undefined behaviour; nightly-only, so kept outside the stable-only policy |
-| [`upload-coverage.yml`](.github/workflows/upload-coverage.yml) | The same run's LCOV coverage and JUnit test results into Codecov, through OIDC; isolated so only its job needs `id-token: write`, and skipped for fork pull requests |
-| [`upload-sarif.yml`](.github/workflows/upload-sarif.yml) | Clippy and secret-scan SARIF from the same run into code scanning; isolated so only its job needs `security-events: write`, and skipped for fork pull requests |
 
 <!-- end generated -->
 
@@ -272,7 +255,7 @@ Each is one input to switch off, documented in [docs/ci.md](docs/ci.md).
 | Mutation testing | `mutation-test: false` | A surviving or timed-out mutant in the change: a pull request mutates its diff, a push or tag its own commit | North Star, Quality | `mutation_testing_scopes_a_pull_request_to_its_diff`, `mutation_testing_scopes_a_push_to_its_own_commit`, `example_gate_replays_ci_step_bodies_against_every_fixture` |
 | Unused dependencies | `unused-dependencies: false` | A declared dependency no source file uses | SCH-010 | `unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does` |
 | `unsafe` ban | `unsafe-policy: allow` | An `unsafe` block in your crates; dependencies are unaffected | SST-001 | `clippy_denies_leftover_scaffolding_at_every_level` |
-| SARIF reports | `sarif-reports: false` | A Clippy or secret-scan SARIF report that is missing or empty; `upload-sarif.yml` shows the findings in code scanning | SST-003 | `sarif_reports_are_written_only_when_asked_and_never_empty`, `sarif_reports_are_on_by_default_and_upload_in_their_own_workflow` |
+| SARIF reports | `sarif-reports: false` | A Clippy or secret-scan SARIF report that is missing or empty; the organization's check shows the findings in code scanning | SST-003 | `sarif_reports_are_written_only_when_asked_and_never_empty`, `sarif_reports_upload_from_the_organizations_check_alone` |
 | Public API compatibility | `api-compatibility: false` | A pull request that breaks a library's public API without `!` after the type in its title; not applicable to a push, a project without a library or Rust older than 1.93 | North Star, Quality | `an_undeclared_break_fails_the_pull_request`, `a_declared_break_and_what_has_no_api_are_not_checked` |
 | Recorded dependency audits | `dependency-audit: false` | A dependency neither audited nor exempted, or a ledger without one of the six imports VET-001 requires | SCH-007, VET-001 | `unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does` |
 
@@ -376,6 +359,8 @@ Call it after publication, granting the scopes only in that job:
     permissions:
       contents: write
       actions: read
+      security-events: write  # ci.yml's skipped SARIF upload
+      id-token: write  # ci.yml's skipped Codecov login
     with:
       dry-run: false
   attest:
@@ -428,6 +413,8 @@ jobs:
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
+      security-events: write  # ci.yml's skipped SARIF upload
+      id-token: write  # ci.yml's skipped Codecov login
     with:
       working-directory: examples/workspace
 ```
@@ -461,6 +448,8 @@ jobs:
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
+      security-events: write  # ci.yml's skipped SARIF upload
+      id-token: write  # ci.yml's skipped Codecov login
     with:
       working-directory: examples/workspace
       rust-version: ${{ matrix.rust-version }}

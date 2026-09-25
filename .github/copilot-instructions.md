@@ -45,7 +45,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   ├── workflows/                              # Callable workflows and this repository own CI
 │   │   ├── attest-binaries.yml                 # Isolated signing job; re-verifies before it signs
 │   │   ├── ci-internal.yml                     # Repository quality, the consumer matrix and both dry-run publishers on every pull request
-│   │   ├── ci.yml                              # The reusable Rust CI a consumer calls
+│   │   ├── ci.yml                              # The Rust CI a ruleset runs, uploads included, or a workflow calls
 │   │   ├── dependabot-auto-merge.yml           # Queues Dependabot patch and minor updates to merge on the organization's bot token
 │   │   ├── docs-sync.yml                       # On a pull request from this repository, the bot commits the tables just docs regenerated
 │   │   ├── fuzz.yml                            # Bounded fuzz regression on a nightly toolchain
@@ -56,9 +56,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── release-please.yml                  # Release pull request and tag on a GitHub App token, skipped until the app is set up
 │   │   ├── scorecard.yml                       # Weekly OpenSSF Scorecard of this repository, published for the badge and shown in code scanning
 │   │   ├── tool-updates.yml                    # Weekly pull request moving every pinned tool to its latest release, on the bot token
-│   │   ├── unsafe-audit.yml                    # Undefined-behaviour audit under Miri
-│   │   ├── upload-coverage.yml                 # Line coverage and test results into Codecov, the one job with id-token: write
-│   │   └── upload-sarif.yml                    # Clippy and secret-scan SARIF into code scanning, the one job with security-events: write
+│   │   └── unsafe-audit.yml                    # Undefined-behaviour audit under Miri
 │   ├── CODEOWNERS                              # Required reviewers for every change
 │   ├── PULL_REQUEST_TEMPLATE.md                # Review checklist and release-impact prompt
 │   ├── actionlint.yml                          # Uses the built-in GitHub-hosted runner labels

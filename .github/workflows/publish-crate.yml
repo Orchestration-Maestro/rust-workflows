@@ -162,6 +162,8 @@ jobs:
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
+      security-events: write  # static ceiling for ci.yml's skipped SARIF upload
+      id-token: write  # static ceiling for ci.yml's skipped Codecov login
     with:
       working-directory: ${{ inputs.working-directory }}
       artifact-key: ${{ inputs.artifact-key }}

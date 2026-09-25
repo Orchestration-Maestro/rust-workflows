@@ -90,6 +90,8 @@ jobs:
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
+      security-events: write  # static ceiling for ci.yml's skipped SARIF upload
+      id-token: write  # static ceiling for ci.yml's skipped Codecov login
     with:
       working-directory: examples/${{ matrix.example }}
       artifact-key: matrix-ci
@@ -108,6 +110,8 @@ jobs:
       # Static ceiling for the skipped live job; executed dry-run jobs stay read-only.
       contents: write  # static ceiling for the skipped live release upload
       actions: read  # inspect release environment reviewers and tag policies
+      security-events: write  # static ceiling for ci.yml's skipped SARIF upload
+      id-token: write  # static ceiling for ci.yml's skipped Codecov login
     with:
       working-directory: examples/${{ matrix.example }}
       artifact-key: matrix-binaries
@@ -126,6 +130,8 @@ jobs:
     permissions:
       contents: read
       actions: read  # inspect release environment reviewers and tag policies
+      security-events: write  # static ceiling for ci.yml's skipped SARIF upload
+      id-token: write  # static ceiling for ci.yml's skipped Codecov login
     with:
       working-directory: examples/${{ matrix.example }}
       package: ${{ matrix.package }}
@@ -137,40 +143,12 @@ jobs:
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
+      security-events: write  # static ceiling for ci.yml's skipped SARIF upload
+      id-token: write  # static ceiling for ci.yml's skipped Codecov login
     with:
       working-directory: examples/binary
       artifact-key: portability
       platforms: macos windows linux-arm
-  # upload-sarif.yml and upload-coverage.yml end to end: one CI run, then its
-  # SARIF into code scanning and its coverage and test results into Codecov.
-  reports-ci:
-    name: Reports source run
-    uses: ./.github/workflows/ci.yml
-    permissions:
-      contents: read
-    with:
-      working-directory: examples/workspace
-      artifact-key: reports
-  sarif-upload:
-    name: SARIF upload
-    needs:
-      - reports-ci
-    uses: ./.github/workflows/upload-sarif.yml
-    permissions:
-      contents: read
-      security-events: write  # the upload workflow's one write scope
-    with:
-      artifact-name: ${{ needs.reports-ci.outputs.artifact-name }}
-  coverage-upload:
-    name: Coverage upload
-    needs:
-      - reports-ci
-    uses: ./.github/workflows/upload-coverage.yml
-    permissions:
-      contents: read
-      id-token: write  # the upload workflow's OIDC login to Codecov
-    with:
-      artifact-name: ${{ needs.reports-ci.outputs.artifact-name }}
   required:
     name: Required consumer tests
     needs:

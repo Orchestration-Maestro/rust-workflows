@@ -73,7 +73,9 @@ expect it to print; its last lines are the SPEED reading and the verdict.
    `rust-gate` command.
 3. `ci.yml` validates its inputs, runs quality, coverage and security gates, then
    builds and packages a release payload with both SBOM formats and checksums.
-   Its final required gate controls the exposed artifact outputs.
+   Its final required gate controls the exposed artifact outputs. In the run a
+   ruleset starts, two jobs upload its SARIF to code scanning and its coverage
+   to Codecov; a caller skips them but still grants their two scopes.
 4. Both publishers rerun CI for that same revision and default to dry-run.
    `publish-binaries.yml` verifies the artifact and uploads live assets only to
    an existing GitHub Release. `publish-crate.yml` verifies the selected

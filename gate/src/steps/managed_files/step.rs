@@ -1,12 +1,13 @@
 //! The steps: `sync` writes every managed file, deletes each retired one it
-//! wrote before, and moves every other call to rust-workflows to the caller's
-//! release; `sync --check` and the `managed-files` step of `ci.yml` refuse any
-//! difference, a retired file still present included, and Markdown settings
-//! at the root, which rumdl would read over the organization's; `init` writes
-//! them for a repository whose caller pins no release yet, with its rule map
-//! and, in a git repository, its Copilot guide.
+//! wrote before, the caller of `ci.yml` included, and moves every call to
+//! rust-workflows to the release the repository declares; `sync --check` and
+//! the `managed-files` step of `ci.yml` refuse any difference, a retired file
+//! still present included, and Markdown settings at the root, which rumdl
+//! would read over the organization's; `init` writes them for a repository
+//! that declares no release yet, with its rule map and, in a git repository,
+//! its Copilot guide.
 
-use super::pin::{Pin, caller_pin, parse_pin, repinned};
+use super::pin::{Pin, caller_pin, hook_version, parse_pin, repinned, workflow_pins};
 use super::render::{RETIRED, Repository, managed_files};
 use crate::checks::organization_config::is_generated;
 use crate::checks::quality_config::read_config;
@@ -47,7 +48,7 @@ pub(crate) const STEPS: &[Step] = &[
     Step {
         workflow: "local",
         id: "init",
-        summary: "The managed files of a repository whose caller pins no release yet",
+        summary: "The managed files of a repository that declares no release yet",
         inputs: &["RUST_WORKFLOWS_PIN"],
         tools: &["jaq", "rust-gate"],
         reports: &[],
@@ -55,8 +56,12 @@ pub(crate) const STEPS: &[Step] = &[
     },
 ];
 
-/// The caller every repository but the home of the workflows holds.
+/// The caller of `ci.yml` or `hygiene.yml` every repository but the home of
+/// the workflows held, until the organization's rulesets ran them instead.
 const CALLER: &str = ".github/workflows/ci.yml";
+
+/// The commit hooks, whose gate hook names the release's version.
+const HOOKS: &str = ".pre-commit-config.yaml";
 
 /// Whether a manifest is a workspace root: it holds a `[workspace]` table.
 const IS_WORKSPACE: &str = "has(\"workspace\")";
@@ -112,12 +117,12 @@ fn check() -> Outcome {
     refuse_root_markdown("sync --check", &root)
 }
 
-/// Run `init`: the managed files of a repository with no caller yet, at the
-/// release `RUST_WORKFLOWS_PIN` names.
+/// Run `init`: the managed files of a repository that declares no release
+/// yet, at the release `RUST_WORKFLOWS_PIN` names.
 fn init() -> Outcome {
     let root = canonical(Path::new("."))?;
-    if root.join(CALLER).is_file() {
-        return Err("init: the repository already has a caller; run rust-gate sync".into());
+    if declared_version(&root)?.is_some() {
+        return Err("init: the repository already declares a release; run rust-gate sync".into());
     }
     let pin = optional("RUST_WORKFLOWS_PIN")?;
     if pin.is_empty() {
@@ -181,8 +186,8 @@ fn refuse_root_markdown(context: &str, root: &Path) -> Outcome {
 }
 
 /// Write every managed file of the repository at `root`, the release `pin`
-/// names or, without one, the release its caller pins, and delete each
-/// retired one sync wrote.
+/// names or, without one, the release it declares, and delete each retired
+/// one sync wrote.
 fn write_all(root: &Path, pin: Option<&str>) -> Outcome {
     for (path, text) in rendered(root, pin)? {
         let file = root.join(&path);
@@ -221,17 +226,76 @@ fn leftovers(root: &Path) -> Vec<String> {
         .collect()
 }
 
+/// The release the repository at `root` pins, the first found: `pin`, from
+/// `RUST_WORKFLOWS_PIN`; the retired caller while it is there; then every
+/// other workflow that calls rust-workflows at a commit, which must all name
+/// the same one.
+fn declared_pin(root: &Path, pin: Option<&str>) -> Result<Option<Pin>, Failure> {
+    if let Some(text) = pin {
+        let parsed = parse_pin(text)
+            .ok_or_else(|| format!("RUST_WORKFLOWS_PIN `{text}` is not `<commit> v<version>`"))?;
+        return Ok(Some(parsed));
+    }
+    let caller = fs::read_to_string(root.join(CALLER)).ok();
+    if let Some(pin) = caller.as_deref().and_then(caller_pin) {
+        return Ok(Some(pin));
+    }
+    let mut named: Vec<(String, Pin)> = Vec::new();
+    for (path, text) in workflows(root) {
+        for pin in workflow_pins(&text) {
+            if !named
+                .iter()
+                .any(|(seen, known)| *seen == path && *known == pin)
+            {
+                named.push((path.clone(), pin));
+            }
+        }
+    }
+    let Some((_, first)) = named.first() else {
+        return Ok(None);
+    };
+    if named.iter().all(|(_, pin)| pin == first) {
+        return Ok(named.into_iter().next().map(|(_, pin)| pin));
+    }
+    named.sort_by(|left, right| left.0.cmp(&right.0));
+    let listed: Vec<String> = named
+        .iter()
+        .map(|(path, pin)| format!("{path} pins v{} at {}", pin.version, pin.commit))
+        .collect();
+    Err(Failure::from(format!(
+        "the workflows pin different releases of rust-workflows ({}); set RUST_WORKFLOWS_PIN to \
+         `<commit> v<version>`, the release to keep, and run rust-gate sync",
+        listed.join(", ")
+    )))
+}
+
+/// The version of the release the repository at `root` declares: its pin's,
+/// or, when no workflow pins one, the one its commit hooks install.
+fn declared_version(root: &Path) -> Result<Option<String>, Failure> {
+    Ok(match declared_pin(root, None)? {
+        Some(pin) => Some(pin.version),
+        None => hooks_version(root),
+    })
+}
+
+/// The version of the gate the commit hooks of the repository at `root`
+/// install.
+fn hooks_version(root: &Path) -> Option<String> {
+    fs::read_to_string(root.join(HOOKS))
+        .ok()
+        .as_deref()
+        .and_then(hook_version)
+}
+
 /// Every managed file of the repository at `root`, rendered.
 fn rendered(root: &Path, pin: Option<&str>) -> Result<Vec<(String, String)>, Failure> {
-    let pin =
-        match pin {
-            Some(text) => Some(parse_pin(text).ok_or_else(|| {
-                format!("RUST_WORKFLOWS_PIN `{text}` is not `<commit> v<version>`")
-            })?),
-            None => fs::read_to_string(root.join(CALLER))
-                .ok()
-                .and_then(|caller| caller_pin(&caller)),
-        };
+    let home = is_workflow_home(root);
+    let pin = if home { None } else { declared_pin(root, pin)? };
+    let version = match &pin {
+        Some(pin) => Some(pin.version.clone()),
+        None if home => None,
+        None => hooks_version(root),
+    };
     let manifest_path = root.join("Cargo.toml");
     let manifest = match fs::read_to_string(&manifest_path) {
         Ok(text) => {
@@ -243,17 +307,16 @@ fn rendered(root: &Path, pin: Option<&str>) -> Result<Vec<(String, String)>, Fai
         }
         Err(_) => None,
     };
-    let home = is_workflow_home(root);
-    let others = match (&pin, home) {
-        (Some(pin), false) => repinned_workflows(root, pin),
-        _ => Vec::new(),
-    };
+    let others = pin
+        .as_ref()
+        .map(|pin| repinned_workflows(root, pin))
+        .unwrap_or_default();
     let repository = Repository {
         rust: manifest.is_some() || root.join("rust-toolchain.toml").is_file(),
         home,
         manifest,
         config: read_config(root)?,
-        pin,
+        version,
     };
     let mut files = managed_files(&repository)?;
     files.extend(others);
@@ -265,10 +328,9 @@ fn rendered(root: &Path, pin: Option<&str>) -> Result<Vec<(String, String)>, Fai
 /// and the organization's workflow templates in `.github`.
 const WORKFLOW_DIRECTORIES: [&str; 2] = [".github/workflows", "workflow-templates"];
 
-/// Every other workflow of the repository at `root` that calls
-/// rust-workflows, each call moved to `pin`: a release pinned in `ci.yml` and
-/// an older one in `release.yml` would test one gate and release with another.
-fn repinned_workflows(root: &Path, pin: &Pin) -> Vec<(String, String)> {
+/// Every workflow of the repository at `root` but the retired caller, which
+/// sync deletes, and its text.
+fn workflows(root: &Path) -> Vec<(String, String)> {
     let mut found = Vec::new();
     for directory in WORKFLOW_DIRECTORIES {
         let Ok(entries) = fs::read_dir(root.join(directory)) else {
@@ -276,14 +338,25 @@ fn repinned_workflows(root: &Path, pin: &Pin) -> Vec<(String, String)> {
         };
         for entry in entries.flatten() {
             let path = format!("{directory}/{}", entry.file_name().to_string_lossy());
-            let text = fs::read_to_string(entry.path()).unwrap_or_default();
-            let moved = repinned(&text, pin);
-            if path != CALLER && moved != text {
-                found.push((path, moved));
+            if path != CALLER {
+                found.push((path, fs::read_to_string(entry.path()).unwrap_or_default()));
             }
         }
     }
     found
+}
+
+/// Every workflow of the repository at `root` that calls rust-workflows,
+/// each call moved to `pin`: a release pinned in one workflow and an older one
+/// in `release.yml` would release with a gate the check never ran.
+fn repinned_workflows(root: &Path, pin: &Pin) -> Vec<(String, String)> {
+    workflows(root)
+        .into_iter()
+        .filter_map(|(path, text)| {
+            let moved = repinned(&text, pin);
+            (moved != text).then_some((path, moved))
+        })
+        .collect()
 }
 
 /// `path` resolved, or a refusal naming it.
@@ -293,11 +366,65 @@ fn canonical(path: &Path) -> Result<PathBuf, Failure> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CALLER, Pin, refuse, repinned_workflows};
+    use super::{CALLER, HOOKS, Pin, declared_pin, declared_version, refuse, repinned_workflows};
     use std::{env, fs, process};
 
     #[test]
-    fn every_workflow_but_the_caller_moves_to_the_caller_release() {
+    fn a_release_is_found_in_the_declared_order_and_pins_must_agree() {
+        let root = env::temp_dir().join(format!("declared-release-{}", process::id()));
+        fs::remove_dir_all(&root).ok();
+        fs::create_dir_all(root.join(".github/workflows")).unwrap();
+        assert_eq!(declared_version(&root).unwrap(), None);
+        let hooks = "- \"cli:https://github.com/Orchestration-Maestro/rust-workflows:v2.0.0:\
+                     rust-gate\"\n";
+        fs::write(root.join(HOOKS), hooks).unwrap();
+        assert_eq!(declared_pin(&root, None).unwrap(), None);
+        assert_eq!(declared_version(&root).unwrap().as_deref(), Some("2.0.0"));
+        let call = |letter: &str, version: &str| {
+            format!(
+                "uses: Orchestration-Maestro/rust-workflows/.github/workflows/ci.yml@{}  \
+                 # v{version}\n",
+                letter.repeat(40)
+            )
+        };
+        let release = root.join(".github/workflows/release.yml");
+        fs::write(&release, call("b", "2.1.0")).unwrap();
+        let pin = |letter: &str, version: &str| Pin {
+            commit: letter.repeat(40),
+            version: version.to_owned(),
+        };
+        assert_eq!(declared_pin(&root, None).unwrap(), Some(pin("b", "2.1.0")));
+        assert_eq!(declared_version(&root).unwrap().as_deref(), Some("2.1.0"));
+        fs::write(root.join(CALLER), call("c", "2.2.0")).unwrap();
+        assert_eq!(declared_pin(&root, None).unwrap(), Some(pin("c", "2.2.0")));
+        let given = format!("{} v2.3.0", "d".repeat(40));
+        assert_eq!(
+            declared_pin(&root, Some(&given)).unwrap(),
+            Some(pin("d", "2.3.0"))
+        );
+        fs::remove_file(root.join(CALLER)).unwrap();
+        fs::write(
+            root.join(".github/workflows/nightly.yml"),
+            call("a", "2.0.0"),
+        )
+        .unwrap();
+        let refusal = declared_pin(&root, None).unwrap_err();
+        assert_eq!(
+            refusal.message.unwrap_or_default(),
+            format!(
+                "the workflows pin different releases of rust-workflows \
+                 (.github/workflows/nightly.yml pins v2.0.0 at {}, .github/workflows/release.yml \
+                 pins v2.1.0 at {}); set RUST_WORKFLOWS_PIN to `<commit> v<version>`, the \
+                 release to keep, and run rust-gate sync",
+                "a".repeat(40),
+                "b".repeat(40)
+            )
+        );
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn every_workflow_but_the_retired_caller_moves_to_the_pin() {
         let root = env::temp_dir().join(format!("repinned-workflows-{}", process::id()));
         fs::remove_dir_all(&root).ok();
         fs::create_dir_all(root.join(".github/workflows")).unwrap();

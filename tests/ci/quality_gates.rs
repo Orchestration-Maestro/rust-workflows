@@ -1,7 +1,7 @@
 //! `ci.yml`: the lint, documentation, coverage and analysis gates, each proven
 //! to fail when its tool does.
 
-use crate::harness::{Fixture, refused, root, succeeds, workflow};
+use crate::harness::{Fixture, refused, root, succeeds, tool_rows, workflow};
 use serde_json::{Value, json};
 use std::fs;
 
@@ -110,30 +110,31 @@ printf '{}' > "$out""#,
     );
 }
 
+/// Where ci.yml's uploads run: only when no workflow called it, from the
+/// organization's ruleset in a repository's own context, and never for a fork
+/// pull request, whose token can neither write security events nor log in to
+/// Codecov; its reports stay in the artifact.
+const UPLOADS_RUN: &str = "${{ inputs.artifact-key == '' && \
+     github.event_name != 'pull_request_target' && (!github.event.pull_request || \
+     github.event.pull_request.head.repo.full_name == github.repository) }}";
+
 #[test]
-fn sarif_reports_are_on_by_default_and_upload_in_their_own_workflow() {
-    // Every run writes SARIF. Showing it in code scanning needs
-    // security-events: write, which only the separate upload workflow asks
-    // for, so an ordinary CI caller keeps a read-only token. A fork pull
-    // request's token cannot write security events, so the upload skips it.
+fn sarif_reports_upload_from_the_organizations_check_alone() {
+    // Every run writes SARIF, and the organization's check shows it in code
+    // scanning. The job id `upload` and the categories keep the configuration
+    // the retired callers recorded on every default branch, so a pull
+    // request still compares against it.
     let ci = workflow("ci");
     assert_eq!(
         ci["on"]["workflow_call"]["inputs"]["sarif-reports"]["default"],
         true
     );
-    let upload = workflow("upload-sarif");
-    let input = &upload["on"]["workflow_call"]["inputs"]["artifact-name"];
-    assert_eq!(input["required"], true);
-    let job = &upload["jobs"]["upload"];
+    let job = &ci["jobs"]["upload"];
+    assert_eq!(job["needs"], json!(["checks"]));
+    assert_eq!(job["if"], UPLOADS_RUN);
     assert_eq!(
         job["permissions"],
         json!({"contents": "read", "security-events": "write"})
-    );
-    assert_eq!(
-        job["if"],
-        "${{ github.event_name != 'pull_request_target' && \
-         (!github.event.pull_request || \
-         github.event.pull_request.head.repo.full_name == github.repository) }}"
     );
     let steps = job["steps"].as_array().unwrap();
     assert!(
@@ -144,15 +145,16 @@ fn sarif_reports_are_on_by_default_and_upload_in_their_own_workflow() {
     );
     assert_eq!(
         steps[0]["with"]["name"],
-        "${{ inputs.artifact-name }}-reports"
+        "${{ needs.checks.outputs.artifact-name }}-reports"
     );
-    let uploads: Vec<(&str, &str, &str)> = steps[1..]
+    let uploads: Vec<(&str, &str, &str, &str)> = steps[1..]
         .iter()
         .map(|step| {
             (
                 step["uses"].as_str().unwrap().split('@').next().unwrap(),
                 step["with"]["sarif_file"].as_str().unwrap(),
                 step["with"]["category"].as_str().unwrap(),
+                step["if"].as_str().unwrap(),
             )
         })
         .collect();
@@ -160,72 +162,118 @@ fn sarif_reports_are_on_by_default_and_upload_in_their_own_workflow() {
     assert_eq!(
         uploads,
         [
-            (action, "reports/clippy.sarif", "clippy"),
-            (action, "reports/secrets.sarif", "gitleaks"),
+            (
+                action,
+                "reports/clippy.sarif",
+                "clippy",
+                "${{ hashFiles('reports/clippy.sarif') != '' }}"
+            ),
+            (
+                action,
+                "reports/secrets.sarif",
+                "gitleaks",
+                "${{ hashFiles('reports/secrets.sarif') != '' }}"
+            ),
         ]
     );
 }
 
 #[test]
-fn coverage_and_test_results_upload_to_codecov_in_their_own_workflow() {
-    // Codecov takes the run's LCOV and JUnit reports. Only the upload
-    // workflow asks for id-token: write, the OIDC login that replaces a stored
-    // Codecov token, so an ordinary CI caller keeps a read-only token. A fork
-    // pull request gets no OIDC token, so the upload skips it; its reports
-    // stay in the artifact.
-    let upload = workflow("upload-coverage");
-    let input = &upload["on"]["workflow_call"]["inputs"]["artifact-name"];
-    assert_eq!(input["required"], true);
-    let job = &upload["jobs"]["upload"];
+fn codecov_uploads_run_a_verified_cli_and_never_block() {
+    // Codecov takes the run's LCOV and JUnit reports through OIDC, which
+    // replaces a stored token. The checks job holds coverage to its floors,
+    // so the upload is advisory and a Codecov outage fails nothing. The
+    // action runs a CLI it downloads itself even when its signature check
+    // fails once errors pass, so it always gets the one this job installed
+    // from a release asset verified by digest.
+    let ci = workflow("ci");
+    let job = &ci["jobs"]["coverage"];
+    assert_eq!(job["needs"], json!(["checks"]));
+    assert_eq!(job["if"], UPLOADS_RUN);
     assert_eq!(
         job["permissions"],
         json!({"contents": "read", "id-token": "write"})
     );
-    assert_eq!(job["if"], workflow("upload-sarif")["jobs"]["upload"]["if"]);
     let steps = job["steps"].as_array().unwrap();
+    let uses = |step: &Value, action: &str| {
+        step["uses"]
+            .as_str()
+            .is_some_and(|uses| uses.starts_with(&format!("{action}@")))
+    };
+    let first_upload = steps
+        .iter()
+        .position(|step| uses(step, "codecov/codecov-action"))
+        .unwrap();
+    let installed: Vec<_> = steps[..first_upload].iter().flat_map(tool_rows).collect();
+    assert_eq!(installed.len(), 1);
+    assert_eq!(installed[0].name, "codecov");
+    let asset = &installed[0].asset;
+    assert!(
+        asset.starts_with("codecov/codecov-cli/releases/download/v")
+            && asset.ends_with("/codecovcli_linux"),
+        "{asset}"
+    );
+    assert_eq!(installed[0].digest.len(), 64);
     // Codecov maps the report's paths onto the files of this checkout.
-    assert!(
-        steps[0]["uses"]
-            .as_str()
-            .unwrap()
-            .starts_with("actions/checkout@")
-    );
-    assert_eq!(steps[0]["with"]["persist-credentials"], false);
-    assert!(
-        steps[1]["uses"]
-            .as_str()
-            .unwrap()
-            .starts_with("actions/download-artifact@")
-    );
-    assert_eq!(
-        steps[1]["with"]["name"],
-        "${{ inputs.artifact-name }}-reports"
-    );
-    let uploads: Vec<(&str, &str, &str)> = steps[2..]
+    assert!(steps[..first_upload].iter().any(|step| {
+        uses(step, "actions/checkout")
+            && step["with"]["ref"] == "${{ github.sha }}"
+            && step["with"]["persist-credentials"] == false
+    }));
+    let uploads: Vec<(&str, &str)> = steps[first_upload..]
         .iter()
         .map(|step| {
+            assert!(uses(step, "codecov/codecov-action"));
             let with = &step["with"];
-            // Exactly the named file, through OIDC, with a pinned CLI, and a
-            // failed upload fails the job rather than vanish.
+            assert_eq!(with["binary"], "${{ runner.temp }}/rust-tools/bin/codecov");
+            assert!(with.get("version").is_none());
             assert_eq!(with["use_oidc"], true);
             assert_eq!(with["disable_search"], true);
-            assert_eq!(with["fail_ci_if_error"], true);
-            let cli = with["version"].as_str().unwrap();
-            assert!(cli.starts_with('v') && cli != "latest", "{cli}");
+            assert_eq!(with["fail_ci_if_error"], false);
             (
-                step["uses"].as_str().unwrap().split('@').next().unwrap(),
                 with["files"].as_str().unwrap(),
                 with["report_type"].as_str().unwrap(),
             )
         })
         .collect();
-    let action = "codecov/codecov-action";
     assert_eq!(
         uploads,
         [
-            (action, "reports/coverage.lcov", "coverage"),
-            (action, "reports/tests.xml", "test_results"),
+            ("reports/coverage.lcov", "coverage"),
+            ("reports/tests.xml", "test_results"),
         ]
+    );
+}
+
+#[test]
+fn every_caller_of_ci_grants_the_scopes_its_uploads_ask() {
+    // GitHub checks a called workflow's scopes when the run starts, a job its
+    // `if` skips included, so a caller of ci.yml that withholds the uploads'
+    // scopes fails before any job runs; a publisher calls ci.yml, so its
+    // callers grant them too.
+    let mut callers = 0;
+    for entry in fs::read_dir(root().join(".github/workflows")).unwrap() {
+        let path = entry.unwrap().path();
+        let name = path.file_stem().unwrap().to_string_lossy().into_owned();
+        let data = workflow(&name);
+        for (id, job) in data["jobs"].as_object().unwrap() {
+            let called = job["uses"].as_str().unwrap_or_default();
+            if ["ci", "publish-binaries", "publish-crate"]
+                .iter()
+                .any(|workflow| called == format!("./.github/workflows/{workflow}.yml"))
+            {
+                assert_eq!(
+                    job["permissions"]["security-events"], "write",
+                    "{name}/{id}"
+                );
+                assert_eq!(job["permissions"]["id-token"], "write", "{name}/{id}");
+                callers += 1;
+            }
+        }
+    }
+    assert!(
+        callers >= 6,
+        "only {callers} callers of ci.yml were checked"
     );
 }
 
