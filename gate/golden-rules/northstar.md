@@ -5,7 +5,8 @@
 
 Speed, quality, maintainability and security are not a trade-off. Automation is
 what lets one repository have all four at once. A Northstar is never reached: it
-is the direction every repository in the organization steers by, and the
+is the impossible objective we set ourselves so we keep surpassing ourselves.
+Every repository in the organization steers by it, and the
 [engineering](engineering.md) and [security](security.md) rules are how it
 holds that course.
 
