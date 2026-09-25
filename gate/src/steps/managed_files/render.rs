@@ -168,11 +168,13 @@ fn deny(config: &QualityConfig) -> String {
 const ORGANIZATION_WORDS: [&str; 1] = ["FND"];
 
 /// `typos.toml`: the words the repository means, each allowed as written: the
-/// organization's first, then its own, each once.
+/// organization's first, then its own, each once. The header stays as it was,
+/// so a repository that already listed `FND` renders the same bytes under the
+/// gate its CI pins and under this one.
 fn typos(words: &[String]) -> String {
     let mut text = format!(
-        "{HEADER}# The words this repository means: the organization's, which every rule map \
-         cites,\n# then its [typos] words in maestro-quality.toml.\n\n[default.extend-words]\n"
+        "{HEADER}# The words this repository means, from [typos] words in maestro-quality.toml.\n\n\
+         [default.extend-words]\n"
     );
     let own = words
         .iter()

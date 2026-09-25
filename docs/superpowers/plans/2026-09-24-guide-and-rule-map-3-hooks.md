@@ -174,3 +174,12 @@ fn adapted(root: &Path) -> Outcome {
   undoes the other. The spec's phase 4 carried the golden rules through an
   event; `.github`'s sync already carries them with a pull request that merges
   itself, so that part of phase 4 is done.
+- Hosted CI builds the gate at the commit the workflows pin
+  (`.github/actions/gate@<commit>`), not at the pull request's, so a managed
+  file this repository holds must render the same under both. The first push
+  reworded `typos.toml`'s header and failed every consumer run's managed-files
+  step; the header is back as it was, and `FND` still comes first. The
+  rendered `.pre-commit-config.yaml` gains the two hooks, which the pinned gate
+  does not render, so a `ci: pin the gate` pull request moves that pin to this
+  change's commit before the release; otherwise every synced repository's CI
+  would find its hooks file different from the pinned gate's rendering.
