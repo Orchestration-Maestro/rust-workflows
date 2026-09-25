@@ -5,14 +5,25 @@
 //! repository may add lints below the markers and tighten a threshold; it may
 //! remove, lower or loosen none.
 //!
-//! Left out on purpose: `module_name_repetitions` and `similar_names`, too
-//! many false positives; `redundant_pub_crate`, which contradicts
-//! `unreachable_pub`; `arithmetic_side_effects`, `exhaustive_enums`,
-//! `exhaustive_structs`, `missing_docs_in_private_items`,
-//! `missing_assert_message`, `tests_outside_test_module` and the `shadow_*`
-//! lints, each a house style rather than a defect; `print_stdout`, which LIB-001
-//! holds for libraries only; and `unsafe_code`, which the `quality` step denies
-//! or not per `unsafe-policy`.
+//! Naming, NAME's share of the list: `nonstandard_style` holds the case of
+//! every name, `PascalCase` types, `snake_case` functions and modules,
+//! `SCREAMING_SNAKE_CASE` constants; `allow_attributes` refuses an `#[allow]`
+//! that would lift it. `same_name_method` refuses an inherent method named like
+//! a trait's. The Rust API Guidelines' naming conventions are already denied
+//! through `clippy::all` and `clippy::pedantic`: `wrong_self_convention` for
+//! `as_`, `to_` and `into_`, `new_ret_no_self`, `should_implement_trait`,
+//! `enum_variant_names`, `iter_not_returning_iterator` and `struct_field_names`
+//! among them.
+//!
+//! Left out on purpose: `module_name_repetitions` and `similar_names`, too many
+//! false positives; `redundant_pub_crate`, which contradicts `unreachable_pub`;
+//! `arithmetic_side_effects`, `exhaustive_enums`, `exhaustive_structs`,
+//! `missing_docs_in_private_items`, `missing_assert_message`,
+//! `tests_outside_test_module` and the `shadow_*` lints, each a house style
+//! rather than a defect; `renamed_function_params`, which demands a trait's
+//! parameter names, such as the `f` of `fmt` that `min_ident_chars` refuses;
+//! `print_stdout`, which LIB-001 holds for libraries only; and `unsafe_code`,
+//! which the `quality` step denies or not per `unsafe-policy`.
 
 use crate::runner::{Cmd, Failure};
 use std::fmt::Write as _;
@@ -33,6 +44,7 @@ const GROUPS: &[&str] = &[
     "clippy::pedantic",
     "clippy::cargo",
     "rust::rust_2018_idioms",
+    "rust::nonstandard_style",
 ];
 
 /// Single lints, each denied.
@@ -57,6 +69,7 @@ const DENIED: &[&str] = &[
     "clippy::undocumented_unsafe_blocks",
     "clippy::cognitive_complexity",
     "clippy::excessive_nesting",
+    "clippy::same_name_method",
     "rust::missing_docs",
     "rust::unreachable_pub",
     "rust::missing_debug_implementations",

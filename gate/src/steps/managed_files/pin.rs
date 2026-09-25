@@ -1,12 +1,38 @@
 //! The release a caller pins: a commit of rust-workflows and the version it
 //! was released as, read from the caller's `uses:` lines or from
-//! `RUST_WORKFLOWS_PIN`, and every other call to rust-workflows moved to it.
+//! `RUST_WORKFLOWS_PIN`, and every other call to rust-workflows moved to it,
+//! under the name the repository answers to.
 
-/// Where every reusable workflow of the organization lives.
-const WORKFLOWS: &str = "Orchestration-Maestro/rust-workflows/.github/workflows/";
+/// The organization on GitHub.
+const ORGANIZATION: &str = "Orchestration-Maestro";
 
-/// What every call to rust-workflows, a workflow or an action, starts with.
-const CALLS: &str = "Orchestration-Maestro/rust-workflows/.github/";
+/// The repository that holds every reusable workflow and action of the
+/// organization, as a rendered call names it. It flips to
+/// `maestro-rust-workflows` when the repository is renamed: GitHub Actions
+/// follows no rename, so every call must carry the new name.
+const HOME: &str = "rust-workflows";
+
+/// Every name a call to the home repository may carry: its name before the
+/// rename and after. A pinned call under either moves to [`HOME`].
+const NAMES: [&str; 2] = ["rust-workflows", "maestro-rust-workflows"];
+
+/// What every call to the repository named `name`, a workflow or an action,
+/// starts with.
+fn calls(name: &str) -> String {
+    format!("{ORGANIZATION}/{name}/.github/")
+}
+
+/// The earliest call to the home repository in `text`: where it starts and
+/// how long its `calls` prefix is.
+fn next_call(text: &str) -> Option<(usize, usize)> {
+    NAMES
+        .iter()
+        .filter_map(|name| {
+            let prefix = calls(name);
+            text.find(&prefix).map(|start| (start, prefix.len()))
+        })
+        .min()
+}
 
 /// A commit of rust-workflows and the version it was released as.
 #[derive(Debug, PartialEq, Eq)]
@@ -21,16 +47,22 @@ impl Pin {
     /// The `uses:` value that calls `workflow` at this pin, with the version
     /// as the comment Dependabot and a reader both read.
     pub(super) fn reference(&self, workflow: &str) -> String {
-        format!("{WORKFLOWS}{workflow}@{}  # v{}", self.commit, self.version)
+        format!(
+            "{}workflows/{workflow}@{}  # v{}",
+            calls(HOME),
+            self.commit,
+            self.version
+        )
     }
 }
 
 /// `text` with every call to rust-workflows, `<path>@<commit>  # v<version>`,
-/// moved to `pin`: `rust-gate sync` owns every such pin, and Dependabot none.
+/// moved to `pin` and to the name [`HOME`]: `rust-gate sync` owns every such
+/// pin, and Dependabot none. A call without a pin keeps its name.
 pub(super) fn repinned(text: &str, pin: &Pin) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
-    while let Some(start) = rest.find(CALLS) {
+    while let Some((start, prefix)) = next_call(rest) {
         let (before, call) = rest.split_at(start);
         out.push_str(before);
         let path_end = call
@@ -51,11 +83,12 @@ pub(super) fn repinned(text: &str, pin: &Pin) -> String {
                 .then_some((at, consumed))
         });
         let Some((at, consumed)) = old else {
-            out.push_str(CALLS);
-            rest = call.get(CALLS.len()..).unwrap_or_default();
+            out.push_str(call.get(..prefix).unwrap_or_default());
+            rest = call.get(prefix..).unwrap_or_default();
             continue;
         };
-        out.push_str(call.get(..=at).unwrap_or_default());
+        out.push_str(&calls(HOME));
+        out.push_str(call.get(prefix..=at).unwrap_or_default());
         out.push_str(&pin.commit);
         out.push_str("  # v");
         out.push_str(&pin.version);
@@ -84,7 +117,8 @@ pub(super) fn parse_pin(text: &str) -> Option<Pin> {
 /// The pin the `uses:` lines of `caller` name, when every one names the same.
 pub(super) fn caller_pin(caller: &str) -> Option<Pin> {
     let mut pins = caller.lines().filter_map(|line| {
-        let rest = line.split_once(WORKFLOWS)?.1;
+        let (start, prefix) = next_call(line)?;
+        let rest = line.get(start + prefix..)?.strip_prefix("workflows/")?;
         let (_, pinned) = rest.split_once('@')?;
         let (commit, version) = pinned.split_once("# ")?;
         parse_pin(&format!("{} {}", commit.trim(), version.trim()))
@@ -120,6 +154,31 @@ mod tests {
     }
 
     #[test]
+    fn a_call_under_the_new_name_moves_to_the_rendered_name() {
+        let pin = Pin {
+            commit: "b".repeat(40),
+            version: "2.5.0".to_owned(),
+        };
+        let old = "a".repeat(40);
+        let text = format!(
+            "    uses: Orchestration-Maestro/maestro-rust-workflows/.github/workflows/ci.yml@\
+             {old}  # v2.4.0\n    uses: Orchestration-Maestro/rust-workflows/.github/actions/\
+             gate@{old} # v2.4.0\n    uses: Orchestration-Maestro/maestro-rust-workflows/\
+             .github/workflows/ci.yml@main\n"
+        );
+        let commit = "b".repeat(40);
+        assert_eq!(
+            repinned(&text, &pin),
+            format!(
+                "    uses: {}\n    uses: Orchestration-Maestro/rust-workflows/.github/actions/\
+                 gate@{commit}  # v2.5.0\n    uses: Orchestration-Maestro/\
+                 maestro-rust-workflows/.github/workflows/ci.yml@main\n",
+                pin.reference("ci.yml")
+            )
+        );
+    }
+
+    #[test]
     fn a_pin_is_a_full_commit_and_a_version() {
         let commit = "a".repeat(40);
         let pin = parse_pin(&format!("{commit} v2.0.0")).unwrap();
@@ -144,5 +203,10 @@ mod tests {
         let mixed = caller.replacen(&"b".repeat(40), &"c".repeat(40), 1);
         assert_eq!(caller_pin(&mixed), None);
         assert_eq!(caller_pin("name: CI\n"), None);
+        let renamed = caller.replace("/rust-workflows/", "/maestro-rust-workflows/");
+        assert_eq!(caller_pin(&renamed), caller_pin(&caller));
+        let both = caller.replacen("/rust-workflows/", "/maestro-rust-workflows/", 1);
+        assert_eq!(caller_pin(&both), caller_pin(&caller));
+        assert!(caller_pin(&caller).is_some());
     }
 }

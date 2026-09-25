@@ -1,6 +1,7 @@
-//! NAME-001 and NAME-002: a package is named in lowercase kebab-case, and a
-//! publishable one carries the organization's `maestro-` prefix; a test
-//! states its claim in four words at least, and a test module in two.
+//! NAME-001, NAME-002 and NAME-003: a package is named in lowercase
+//! kebab-case, and a publishable one carries the organization's `maestro-`
+//! prefix; a test states its claim in four words at least, and a test module
+//! in two; a feature is named in lowercase kebab-case after what it adds.
 
 use crate::checks::findings::{Finding, relative};
 use crate::checks::manifests::Package;
@@ -11,6 +12,10 @@ use std::path::Path;
 
 /// The suffixes that say a test ran without saying what it proved.
 const EMPTY_SUFFIXES: &[&str] = &["_works", "_ok", "_test"];
+
+/// The prefixes the Rust API Guidelines (C-FEATURE) keep out of a feature's
+/// name: a feature names what it adds, not that it is one.
+const FEATURE_PREFIXES: &[&str] = &["use-", "with-", "enable-", "has-", "feature-"];
 
 /// NAME-001 over every package.
 pub(super) fn packages(packages: &[Package], workspace: &Path) -> Vec<Finding> {
@@ -29,6 +34,34 @@ pub(super) fn packages(packages: &[Package], workspace: &Path) -> Vec<Finding> {
                  or set publish = false"
             );
             found.push(Finding::new("NAME-001", file, 0, message));
+        }
+    }
+    found
+}
+
+/// NAME-003 over every feature every package declares.
+pub(super) fn features(packages: &[Package], workspace: &Path) -> Vec<Finding> {
+    let mut found = Vec::new();
+    for package in packages {
+        let file = relative(workspace, &package.manifest);
+        for feature in &package.features {
+            let message = if !lowercase_kebab(feature) {
+                format!(
+                    "feature `{feature}` is not lowercase kebab-case; rename it `{}`",
+                    feature.to_ascii_lowercase().replace('_', "-")
+                )
+            } else if let Some(prefix) = FEATURE_PREFIXES
+                .iter()
+                .find(|prefix| feature.starts_with(*prefix))
+            {
+                format!(
+                    "feature `{feature}` starts with {prefix}; name what it adds: `{}`",
+                    feature.strip_prefix(*prefix).unwrap_or_default()
+                )
+            } else {
+                continue;
+            };
+            found.push(Finding::new("NAME-003", file.clone(), 0, message));
         }
     }
     found
@@ -97,25 +130,28 @@ fn words(name: &str) -> Option<usize> {
 
 /// Whether a package name is lowercase kebab-case without a Rust suffix.
 fn kebab(name: &str) -> bool {
-    let parts: Vec<&str> = name.split('-').collect();
+    lowercase_kebab(name) && !name.ends_with("-rs") && !name.ends_with("-rust")
+}
+
+/// Whether a name is lowercase kebab-case: lowercase words and digits joined
+/// by single hyphens, a letter first.
+fn lowercase_kebab(name: &str) -> bool {
     name.starts_with(|character: char| character.is_ascii_lowercase())
-        && parts.iter().all(|part| {
+        && name.split('-').all(|part| {
             !part.is_empty()
                 && part
                     .bytes()
                     .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
         })
-        && !name.ends_with("-rs")
-        && !name.ends_with("-rust")
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Package, packages, tests};
+    use super::{Package, features, packages, tests};
     use crate::checks::module_tree::sample;
     use std::path::{Path, PathBuf};
 
-    /// A package named `name`, publishable or not.
+    /// A package named `name`, publishable or not, without features.
     fn package(name: &str, publishable: bool) -> Package {
         Package {
             name: name.to_owned(),
@@ -126,7 +162,50 @@ mod tests {
             library: true,
             binary: false,
             plain_tests: Vec::new(),
+            features: Vec::new(),
         }
+    }
+
+    #[test]
+    fn features_are_kebab_case_and_name_what_they_add() {
+        let mut declared = package("maestro-core", true);
+        declared.features = [
+            "default",
+            "serve",
+            "tls-2",
+            "native_windows",
+            "Serve",
+            "use-tls",
+            "with-cache",
+            "enable-metrics",
+            "has-gpu",
+            "feature-fast",
+        ]
+        .map(str::to_owned)
+        .to_vec();
+        let found: Vec<String> = features(&[declared], Path::new("/w"))
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        assert_eq!(
+            found,
+            [
+                "NAME-003 Cargo.toml: feature `native_windows` is not lowercase kebab-case; \
+                 rename it `native-windows`",
+                "NAME-003 Cargo.toml: feature `Serve` is not lowercase kebab-case; rename it \
+                 `serve`",
+                "NAME-003 Cargo.toml: feature `use-tls` starts with use-; name what it adds: \
+                 `tls`",
+                "NAME-003 Cargo.toml: feature `with-cache` starts with with-; name what it \
+                 adds: `cache`",
+                "NAME-003 Cargo.toml: feature `enable-metrics` starts with enable-; name what \
+                 it adds: `metrics`",
+                "NAME-003 Cargo.toml: feature `has-gpu` starts with has-; name what it adds: \
+                 `gpu`",
+                "NAME-003 Cargo.toml: feature `feature-fast` starts with feature-; name what \
+                 it adds: `fast`",
+            ]
+        );
     }
 
     #[test]

@@ -306,3 +306,15 @@ Rulings taken while executing, newest last.
     organization's page renders it at every release through the sync. A test
     refuses a rule ID the gate's code names that the list lacks, and a row of
     `docs/ci.md` that names one; COV-001, which no table named, now has its row.
+27. Naming, Rust: LNT-001 denies rustc's `nonstandard_style`, so the case of
+    every name is the gate's, and Clippy's `same_name_method`; the Rust API
+    Guidelines' naming conventions already came with `all` and `pedantic`.
+    `renamed_function_params` stays out: it demands the `f` of `fmt`, which
+    `min_ident_chars` refuses. NAME-003 refuses a feature that is not
+    lowercase kebab-case or starts with `use-`, `with-`, `enable-`, `has-` or
+    `feature-`; NAME-004 refuses, in the code a `maestro-` package ships, an
+    environment variable read by name that neither starts with `MAESTRO_` nor
+    is the platform's, and takes an exception for one another tool owns. The
+    repository becomes `maestro-rust-workflows` at a later cutover: `sync`
+    reads and moves a pinned call under either name to the one constant
+    `HOME` renders, `rust-workflows` until the rename flips it.

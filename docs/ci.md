@@ -142,6 +142,8 @@ rule is checked.
 | SIZE-003 | Short lines | At most 100 columns, strings and comments included | no |
 | NAME-001 | Package names | Lowercase kebab-case; a publishable crate starts with `maestro-` | no |
 | NAME-002 | Test names | A test says what it proves in four words or more, with no `test_` prefix | no |
+| NAME-003 | Feature names | Lowercase kebab-case, naming what the feature adds, never `use-` or `with-` | no |
+| NAME-004 | Environment variable names | A `maestro-` package reads only `MAESTRO_` variables and the platform's | yes |
 | DOC-001 | Every file says why | Every Rust file opens with a `//!` comment | no |
 | LNT-001 | The organization's lints | Every crate denies the organization's lint list; `clippy.toml` is no looser | no |
 | LIB-001 | Libraries do not print | No print macro in a library | no |
@@ -308,6 +310,8 @@ and refuses each finding by its identifier, file and line:
 | SIZE-003 | A line over 100 columns, strings and comments included |
 | NAME-001 | A package name that is not lowercase kebab-case, or a publishable one without the `maestro-` prefix |
 | NAME-002 | A test module named in fewer than two words, a test in fewer than four, a `test_` prefix or a `_works`, `_ok` or `_test` suffix |
+| NAME-003 | A feature a manifest declares that is not lowercase kebab-case, or that starts with `use-`, `with-`, `enable-`, `has-` or `feature-` (Rust API Guidelines C-FEATURE); a feature Cargo makes of an optional dependency takes the dependency's name and is not judged |
+| NAME-004 | In the code a `maestro-` package ships, test and bench targets and test items left out, an environment variable read by name through `env::var`, `env::var_os`, `env!` or `option_env!` that neither starts with `MAESTRO_` nor is the platform's: `CARGO_`, `RUST`, `GITHUB_`, `RUNNER_`, `XDG_` and `LC_` variables, `HOME`, `PATH`, `TMPDIR` and the other names the gate lists |
 | DOC-001 | A file that does not open with a `//!` comment |
 | LIB-001 | A print macro in a library |
 | LIB-002 | A library-only package that depends on `anyhow`, `eyre` or `color-eyre` |
@@ -323,7 +327,11 @@ The organization's lints are one list the gate holds: Clippy's `all`,
 module layout (`self_named_module_files`), short paths and real names
 (`absolute_paths`, `min_ident_chars`), the size lints SIZE-001 reads, and
 rustc's `missing_docs`, `unreachable_pub` and `unused_qualifications` among
-others. `rust-gate lints --write`, run where the root `Cargo.toml` is, writes
+others. The case of every name, `PascalCase` types, `snake_case` functions and
+`SCREAMING_SNAKE_CASE` constants, is rustc's `nonstandard_style`, denied with
+the rest; `same_name_method` refuses an inherent method named like a trait's,
+and the Rust API Guidelines' naming conventions, `as_`, `to_` and `into_`
+among them, come with `all` and `pedantic`. `rust-gate lints --write`, run where the root `Cargo.toml` is, writes
 them between two markers; a repository adds its own lints below the block as
 dotted keys, `clippy.own_lint = "deny"`, and removes none. Test code keeps
 `unwrap`, `expect`, `panic`, indexing and printing through the `clippy.toml`
@@ -356,8 +364,9 @@ foundations' prefix its rule map cites.
 `architecture.txt` lists every finding, then every finding an exception
 excuses, with its reason, then the files over 300 lines. `maestro-quality.toml`,
 at the root of the repository, declares layers, tightens the limits and takes
-exceptions; among these rules only ARC-005 and TST-001 take one, and an
-exception that excuses nothing is itself refused:
+exceptions; among these rules only ARC-005, TST-001 and NAME-004 take one, and
+an exception that excuses nothing is itself refused. A NAME-004 exception names
+the file and the variable, for one another tool owns:
 
 ```toml
 [limits]
@@ -373,6 +382,12 @@ rule = "ARC-005"
 path = "gate/src/runner/mod.rs"
 item = "enter"
 reason = "the step registry is the only thing that can run a step"
+
+[[exception]]
+rule = "NAME-004"
+path = "src/server.rs"
+item = "LLAMA_ARG_MODEL"
+reason = "llama.cpp reads this variable; the name is its own"
 ```
 
 The rules still to come are in the organization quality gate design,

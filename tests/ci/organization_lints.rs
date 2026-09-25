@@ -45,9 +45,9 @@ fn a_manifest_without_the_organization_lints_is_refused_until_written() {
     );
     assert!(
         report(&fixture).starts_with(
-            "LNT-001 project/Cargo.toml: 32 of the organization's lints are not denied \
+            "LNT-001 project/Cargo.toml: 34 of the organization's lints are not denied \
              (clippy::all, clippy::pedantic, clippy::cargo, rust::rust_2018_idioms, \
-             clippy::allow_attributes,"
+             rust::nonstandard_style, clippy::allow_attributes,"
         ),
         "{}",
         report(&fixture)

@@ -62,11 +62,11 @@ mod tests {
     }
 
     #[test]
-    fn six_rules_take_an_exception_and_no_other() {
+    fn seven_rules_take_an_exception_and_no_other() {
         assert_eq!(
             excepted(),
             [
-                "ARC-005", "TST-001", "DUP-001", "HYG-003", "DEP-001", "PRF-001"
+                "ARC-005", "NAME-004", "TST-001", "DUP-001", "HYG-003", "DEP-001", "PRF-001"
             ]
         );
     }

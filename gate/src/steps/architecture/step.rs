@@ -24,8 +24,8 @@ pub(crate) const STEPS: &[Step] = &[Step {
 /// The rules this step runs: the exceptions it judges are theirs.
 const RULES: &[&str] = &[
     "ARC-001", "ARC-002", "ARC-003", "ARC-004", "ARC-005", "ARC-006", "ARC-007", "SIZE-002",
-    "SIZE-003", "NAME-001", "NAME-002", "DOC-001", "LIB-001", "LIB-002", "TST-001", "TST-003",
-    "WSP-001", "WSP-002", "LNT-001",
+    "SIZE-003", "NAME-001", "NAME-002", "NAME-003", "NAME-004", "DOC-001", "LIB-001", "LIB-002",
+    "TST-001", "TST-003", "WSP-001", "WSP-002", "LNT-001",
 ];
 
 /// Run the step.
@@ -68,6 +68,8 @@ fn findings(
     found.extend(sizes);
     found.extend(super::names::packages(&packages, workspace));
     found.extend(super::names::tests(&trees, workspace));
+    found.extend(super::names::features(&packages, workspace));
+    found.extend(super::variables::findings(&trees, workspace));
     found.extend(super::sources::module_comments(&trees, workspace));
     found.extend(super::sources::library_prints(&trees, workspace));
     found.extend(super::packages::findings(

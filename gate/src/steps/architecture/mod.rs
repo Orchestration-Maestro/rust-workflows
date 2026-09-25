@@ -13,5 +13,6 @@ mod seams;
 mod sizes;
 mod sources;
 mod step;
+mod variables;
 
 pub(super) use step::STEPS;

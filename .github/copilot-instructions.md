@@ -185,13 +185,14 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   │   ├── layers.rs                   # ARC-004: imports run only to the layers on the right
 │   │   │   │   ├── lints.rs                    # LNT-001: the lints denied in the root manifest, clippy.toml no looser
 │   │   │   │   ├── mod.rs                      # The step's door: its modules and its declaration
-│   │   │   │   ├── names.rs                    # NAME-001 and NAME-002: package names and test names
+│   │   │   │   ├── names.rs                    # NAME-001, NAME-002 and NAME-003: package, test and feature names
 │   │   │   │   ├── packages.rs                 # LIB-002, TST-003, WSP-001 and WSP-002, read from the manifests
 │   │   │   │   ├── roots.rs                    # ARC-006 and ARC-007: thin binary roots, and the module tree is the file tree
 │   │   │   │   ├── seams.rs                    # ARC-005: a seam a door offers serves two callers
 │   │   │   │   ├── sizes.rs                    # SIZE-002 and SIZE-003: lines of code per file and columns per line
 │   │   │   │   ├── sources.rs                  # DOC-001, LIB-001 and TST-001: module comments, library prints, waits in tests
-│   │   │   │   └── step.rs                     # The step: module trees, the rules, the exceptions and the report
+│   │   │   │   ├── step.rs                     # The step: module trees, the rules, the exceptions and the report
+│   │   │   │   └── variables.rs                # NAME-004: a maestro- package reads MAESTRO_ variables and the platform's
 │   │   │   ├── copilot_guide/                  # rust-gate guide: a repository's Copilot guide, written from its tracked files
 │   │   │   │   ├── describe.rs                 # What a file is for, from what it says of itself
 │   │   │   │   ├── mod.rs                      # The step's door: its five modules and its declarations
