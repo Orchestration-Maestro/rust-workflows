@@ -48,6 +48,7 @@ const REGISTRY: &[&[Step]] = &[
     super::unsafe_audit::STEPS,
     super::hygiene_workflow::STEPS,
     super::write_lints::STEPS,
+    super::rule_map::STEPS,
     super::local_runs::STEPS,
 ];
 
