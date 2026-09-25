@@ -4,6 +4,7 @@
 
 use crate::harness::{Fixture, refused, succeeds};
 use std::fs;
+use std::os::unix::fs::symlink;
 
 /// The report the step wrote.
 fn report(fixture: &Fixture) -> String {
@@ -207,6 +208,42 @@ fn layers_declared_for_a_root_no_target_has_are_refused() {
         "ARC-004 maestro-quality.toml: declares layers for project/src/gone.rs, which is no \
          target's root\n"
     );
+}
+
+#[test]
+fn the_verdict_is_the_same_through_a_symbolic_link_to_the_checkout() {
+    // A checkout reached through a symbolic link, the way a temporary
+    // directory often is, is still the same checkout: its layers and its
+    // exceptions name the same files, and nothing is found that a direct path
+    // does not find.
+    let fixture = Fixture::with_sources(&[
+        (
+            "src/main.rs",
+            "//! Binary.\nmod runner;\nmod steps;\nfn main() { steps::go(); }\n",
+        ),
+        (
+            "src/steps.rs",
+            "//! Steps.\npub(crate) fn go() { crate::runner::run(); }\n",
+        ),
+        ("src/runner.rs", "//! Runner.\npub(crate) fn run() {}\n"),
+    ]);
+    fs::remove_file(fixture.root.join("project/src/lib.rs")).unwrap();
+    fs::write(
+        fixture.root.join("maestro-quality.toml"),
+        "[[crate]]\nroot = \"project/src/main.rs\"\nlayers = [\"steps\", \"runner\"]\n",
+    )
+    .unwrap();
+    succeeds(&fixture.run("ci", "architecture"));
+    let direct = report(&fixture);
+    let link = fixture.root.with_extension("linked");
+    symlink(&fixture.root, &link).unwrap();
+    let mut linked = fixture;
+    linked.set("GITHUB_WORKSPACE", &link.display().to_string());
+    linked.set("PROJECT", &link.join("project").display().to_string());
+    let output = linked.run("ci", "architecture");
+    fs::remove_file(&link).unwrap();
+    succeeds(&output);
+    assert_eq!(report(&linked), direct);
 }
 
 #[test]
