@@ -2,7 +2,9 @@
 //! `.pre-commit-config.yaml`: prek's own checks, each tool through prek's
 //! `mise` language at the version this repository's `mise.toml` pins, the
 //! commit message rules, and for Rust the formatter, the gate's source rules at
-//! the pinned release and Clippy before a push. A developer needs prek and
+//! the pinned release and Clippy before a push. At the same release, the gate
+//! keeps the rule map and the Copilot guide current: a hook rewrites either when
+//! it is stale, so the next commit carries it. A developer needs prek and
 //! rustup, nothing else.
 
 use std::fmt::Write as _;
@@ -250,6 +252,13 @@ pub(super) fn commit_hooks(header: &str, rust: bool, version: &str) -> String {
         "      - id: rust-gate-hygiene\n        name: Repository hygiene\n        entry: rust-gate \
          hygiene --local\n        always_run: true\n{gate}"
     );
+    let _ = write!(
+        text,
+        "      - id: rust-gate-rules\n        name: Rule map from the golden rules\n        \
+         entry: rust-gate rules\n        always_run: true\n{gate}      - id: \
+         rust-gate-guide\n        name: Copilot guide from the tracked files\n        entry: \
+         rust-gate guide\n        always_run: true\n{gate}"
+    );
     text
 }
 
@@ -275,9 +284,20 @@ mod tests {
              \"aqua:koalaman/shellcheck@0.11.0\"]\n"
         ));
         assert!(rust.contains("rust-workflows:v2.0.0:rust-gate\"\n"));
-        assert_eq!(rust.matches("language: rust\n").count(), 2);
-        assert!(rust.contains("        stages: [pre-push]\n"));
         let other = commit_hooks("# h\n", false, "2.0.0");
+        assert_eq!(rust.matches("language: rust\n").count(), 4);
+        assert_eq!(other.matches("language: rust\n").count(), 3);
+        for (id, entry) in [
+            ("rust-gate-rules", "rust-gate rules"),
+            ("rust-gate-guide", "rust-gate guide"),
+        ] {
+            let hook = format!("      - id: {id}\n        name: ");
+            assert!(rust.contains(&hook) && other.contains(&hook), "{id}");
+            assert!(other.contains(&format!(
+                "        entry: {entry}\n        always_run: true\n"
+            )));
+        }
+        assert!(rust.contains("        stages: [pre-push]\n"));
         assert!(!other.contains("id: rustfmt") && !other.contains("id: rust-gate-architecture"));
         assert!(other.contains("id: rust-gate-hygiene"));
     }

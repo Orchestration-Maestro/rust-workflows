@@ -345,6 +345,14 @@ is kept, so a person can improve any of them; a new file is explained by its
 README table row, an image's alternative text, or what the file says of itself.
 `rust-gate guide --check` refuses a stale guide.
 
+Both run as commit hooks in every repository but this one, `rust-gate-rules`
+and `rust-gate-guide`, at the release the caller pins: a stale page or guide
+is rewritten and the commit stops once, so the next one carries it. CI skips
+both, so a stale rule map or guide never fails a merge; the organization's
+daily drift check reports it. `rust-gate init` writes the rule map, and the
+guide in a git repository. Every repository's `typos.toml` allows `FND`, the
+foundations' prefix its rule map cites.
+
 `architecture.txt` lists every finding, then every finding an exception
 excuses, with its reason, then the files over 300 lines. `maestro-quality.toml`,
 at the root of the repository, declares layers, tightens the limits and takes

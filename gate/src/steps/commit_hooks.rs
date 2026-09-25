@@ -20,8 +20,11 @@ pub(crate) const STEPS: &[Step] = &[Step {
     run,
 }];
 
-/// The hooks CI runs as steps of their own.
-const SKIPPED: &str = "rustfmt,clippy,rust-gate-architecture,rust-gate-hygiene";
+/// The hooks CI runs as steps of their own, and the two that rewrite the rule
+/// map and the Copilot guide: CI never fails on a stale one, which the daily
+/// drift check reports instead.
+const SKIPPED: &str =
+    "rustfmt,clippy,rust-gate-architecture,rust-gate-hygiene,rust-gate-rules,rust-gate-guide";
 
 /// Run the step.
 fn run() -> Outcome {

@@ -11,6 +11,8 @@ fn the_rendered_hooks_run_in_a_fresh_clone_with_only_prek_and_rustup() {
     // Every hook downloads its tool, so this runs under CHECK_NETWORK=1. The
     // gate's own hooks install the release a caller pins, which does not
     // exist before the release; they are skipped here and run in `just check`.
+    // `rust-gate init` writes the rule map and the guide the other hooks read;
+    // the guide links to AGENTS.md, which every repository keeps.
     if !env::var("CHECK_NETWORK").is_ok_and(|value| value == "1") {
         return;
     }
@@ -21,6 +23,7 @@ fn the_rendered_hooks_run_in_a_fresh_clone_with_only_prek_and_rustup() {
         concat!(
             "cd project && rm -r Cargo.toml Cargo.lock src rust-toolchain.toml && git init -q ",
             "&& printf '# Probe\\n' > README.md && printf 'MIT\\n' > LICENSE && ",
+            "printf '# Agents\\n' > AGENTS.md && ",
             "RUST_WORKFLOWS_PIN='{} v2.0.0' rust-gate init && git add -A",
         ),
         "a".repeat(40)
@@ -41,7 +44,10 @@ fn the_rendered_hooks_run_in_a_fresh_clone_with_only_prek_and_rustup() {
             "PATH",
             format!("{}:{}:/usr/bin:/bin", prek.display(), cargo.display()),
         )
-        .env("SKIP", "rust-gate-architecture,rust-gate-hygiene")
+        .env(
+            "SKIP",
+            "rust-gate-architecture,rust-gate-hygiene,rust-gate-rules,rust-gate-guide",
+        )
         .current_dir(&repository)
         .output()
         .unwrap();
