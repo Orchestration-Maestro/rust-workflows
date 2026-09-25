@@ -1,0 +1,39 @@
+# The rules the gate refuses, one a line, family by family: the ID, the short
+# name, whether maestro-quality.toml may excuse a finding (exception or none),
+# and what the rule holds, in one line. Four fields, separated by tabs. A rule
+# joins the gate by joining this list; `rust-gate gate-rules` prints it, `just
+# docs` indexes it in docs/ci.md and the organization's page renders it.
+ARC-001	No import cycle	none	No import cycle between the files of one crate
+ARC-002	Doors only declare	none	A `mod.rs` or library root holds only `mod` and `use` declarations
+ARC-003	Enter through the door	none	No path from outside walks past a name its door re-exports
+ARC-004	Declared layers	none	No import against the layers a target declares
+ARC-005	No one-caller seam	exception	A door offers nothing that a single outside module alone uses
+ARC-006	Thin binary roots	none	A binary root holds declarations and a `fn main` of 25 lines at most
+ARC-007	Plain module tree	none	No `#[path]` attribute and no `include!` of Rust source
+SIZE-001	Small functions	none	At most 100 lines, complexity 15, five arguments and four levels of nesting
+SIZE-002	Small files	none	At most 500 lines of code; past 300 it is reported
+SIZE-003	Short lines	none	At most 100 columns, strings and comments included
+NAME-001	Package names	none	Lowercase kebab-case; a publishable crate starts with `maestro-`
+NAME-002	Test names	none	A test says what it proves in four words or more, with no `test_` prefix
+DOC-001	Every file says why	none	Every Rust file opens with a `//!` comment
+LNT-001	The organization's lints	none	Every crate denies the organization's lint list; `clippy.toml` is no looser
+LIB-001	Libraries do not print	none	No print macro in a library
+LIB-002	Typed library errors	none	A library depends on no `anyhow`, `eyre` or `color-eyre`
+TST-001	No sleeping tests	exception	A test waits on a fake clock or a synchronisation primitive, never on `sleep`
+TST-003	One integration-test crate	none	Integration tests build as one crate
+TST-004	No retried tests	none	Nothing is retried: a flaky test fails
+WSP-001	Inherited workspace settings	none	Members inherit lints, edition, MSRV, licence and dependencies
+WSP-002	Current editions	none	Edition 2024, resolver 3 and a committed `Cargo.lock`
+DUP-001	Rule of three	exception	Three functions of one shape fail; extract what they share
+HYG-001	Linked markers	none	A `TODO` or `FIXME` names its issue
+HYG-002	No pending snapshot	none	No `*.snap.new` or `*.pending-snap` committed
+HYG-003	No large file	exception	No file over 500 KB
+HYG-004	Sound files	none	Shebangs match the executable bit; no case clash, no broken symlink
+HYG-005	Required files	none	A `README.md` and a `LICENSE`, and a `CHANGELOG.md` beside release-please
+COV-001	Coverage floor	none	At least 90 % of lines covered
+COV-002	Covered changes	none	A pull request's new lines covered: 95 % for `feat` and `fix`, 90 % otherwise
+PRL-001	Features come with tests	none	A `feat` or `fix` that changes product code touches a test
+PRL-002	Reviewable size	none	A pull request past 400 changed lines is reported
+DEP-001	One version, reviewed licences	exception	One version per crate, crates.io only, no yanked or unmaintained crate
+VET-001	Audited dependencies	none	Every dependency has a cargo-vet audit, from six imported audit sets
+PRF-001	Performance budget	exception	A declared benchmark rises by 5 % of its instructions at most

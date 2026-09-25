@@ -299,3 +299,10 @@ Rulings taken while executing, newest last.
     `sync --check` refuses one left behind. release-please, on creating a
     Release, sends `rust-workflows-release` to `.github`, whose quality-sync
     workflow starts on it; the daily run stays as the net.
+26. The gate's rules are one list, `gate/src/checks/gate_rules.tsv`: the ID,
+    a short name, whether an exception is allowed, and one line. The gate
+    embeds it, takes its allowed exceptions from it and prints it with
+    `rust-gate gate-rules`; `just docs` indexes it in `docs/ci.md`; the
+    organization's page renders it at every release through the sync. A test
+    refuses a rule ID the gate's code names that the list lacks, and a row of
+    `docs/ci.md` that names one; COV-001, which no table named, now has its row.

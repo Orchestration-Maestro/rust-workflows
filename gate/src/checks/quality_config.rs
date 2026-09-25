@@ -4,17 +4,13 @@
 //! its `ci.yml` passes. Read through the pinned jaq, which
 //! reads TOML, so the gate stays standard-library only.
 
+use crate::checks::gate_rules::excepted;
 use crate::runner::{Cmd, Failure};
 use std::collections::BTreeSet;
 use std::path::Path;
 
 /// The file, at the root of the repository.
 pub(crate) const FILE: &str = "maestro-quality.toml";
-
-/// The rules that take an exception; every other rule has none.
-const EXCEPTED: &[&str] = &[
-    "ARC-005", "DUP-001", "HYG-003", "TST-001", "DEP-001", "PRF-001",
-];
 
 /// The tables the file may hold.
 const TABLES: &[&str] = &["ci", "crate", "exception", "limits", "performance", "typos"];
@@ -278,10 +274,11 @@ fn parse_exception(line: &str) -> Result<Exception, Failure> {
     let mut fields = line.split('\t').map(str::to_owned);
     let mut next = || fields.next().unwrap_or_default();
     let (rule, path, item, reason) = (next(), next(), next(), next());
-    if !EXCEPTED.contains(&rule.as_str()) {
+    let excepted = excepted();
+    if !excepted.contains(&rule.as_str()) {
         return Err(format!(
             "{FILE}: {rule} takes no exception; only {} do",
-            EXCEPTED.join(", ")
+            excepted.join(", ")
         )
         .into());
     }
@@ -410,7 +407,7 @@ mod tests {
                 .as_deref(),
             Some(
                 "maestro-quality.toml: ARC-001 takes no exception; \
-                 only ARC-005, DUP-001, HYG-003, TST-001, DEP-001, PRF-001 do"
+                 only ARC-005, TST-001, DUP-001, HYG-003, DEP-001, PRF-001 do"
             )
         );
         assert_eq!(

@@ -50,6 +50,9 @@ fn sandbox() -> PathBuf {
     copy_tree(&root().join(".github/assets"), &dir.join(".github/assets"));
     let scorecard = "gate/src/steps/quality_scorecard";
     copy_tree(&root().join(scorecard), &dir.join(scorecard));
+    let rules = "gate/src/checks/gate_rules.tsv";
+    fs::create_dir_all(dir.join("gate/src/checks")).unwrap();
+    fs::copy(root().join(rules), dir.join(rules)).unwrap();
     dir
 }
 
