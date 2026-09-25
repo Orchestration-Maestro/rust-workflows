@@ -5,6 +5,7 @@
 //! measured by their lines of code, doc comments not counted. The step exits
 //! zero whatever it finds: the report is information for the consumer.
 
+use crate::checks::cargo_metadata::tsv_fields;
 use crate::checks::checkout_paths::rust_sources;
 use crate::checks::organization_config::clippy_directory;
 use crate::runner::{Cmd, Failure, Job, Outcome, Step, input, summary, write};
@@ -127,8 +128,8 @@ fn findings(messages: &Path) -> Result<Vec<Finding>, Failure> {
     let rows = Cmd::new("jaq -r").arg(FINDINGS).arg(messages).capture()?;
     let mut findings = Vec::new();
     for row in rows.lines() {
-        let fields: Vec<&str> = row.split('\t').collect();
-        if let [lint, value, limit, location] = fields[..] {
+        let fields = tsv_fields(row);
+        if let [lint, value, limit, location] = fields.as_slice() {
             let value = value.parse().unwrap_or(0);
             let limit = limit.parse().unwrap_or(0);
             findings.push((lint.to_owned(), value, limit, location.to_owned()));
