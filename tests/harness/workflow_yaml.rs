@@ -66,20 +66,6 @@ pub(crate) fn action(name: &str) -> Value {
     yaml(root().join(format!(".github/actions/{name}/action.yml")))
 }
 
-/// Where the workflows call this repository's own actions from. A reusable
-/// workflow runs in the consumer's checkout, so this is the one way every
-/// workflow gets the same gate binary.
-const HELPER_ACTION_PREFIX: &str = "Orchestration-Maestro/rust-workflows/.github/actions/";
-
-/// The `(name, pin)` of a `uses:` reference to one of this repository's own
-/// actions, if it is one.
-pub(crate) fn helper_action(reference: &str) -> Option<(String, String)> {
-    let (name, pin) = reference
-        .strip_prefix(HELPER_ACTION_PREFIX)?
-        .split_once('@')?;
-    Some((name.to_owned(), pin.to_owned()))
-}
-
 /// One line of a `rust-gate install-tools` table: the executable's name, its
 /// GitHub release asset path, the digest, and the member inside an archive.
 pub(crate) struct ToolRow {

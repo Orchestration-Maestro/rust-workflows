@@ -108,6 +108,9 @@ pub(crate) struct QualityConfig {
     pub(crate) typos: Vec<String>,
     /// The inputs its `ci.yml` caller passes, each as its YAML value.
     pub(crate) ci: Vec<(String, String)>,
+    /// The same inputs, each as the text a workflow renders it: what a run
+    /// of `ci.yml` that no workflow called takes instead of its inputs.
+    pub(crate) settings: Vec<(String, String)>,
     /// The benchmarks PRF-001 holds to their instruction counts.
     pub(crate) benches: Vec<String>,
 }
@@ -159,14 +162,23 @@ pub(crate) fn read_config(workspace: &Path) -> Result<QualityConfig, Failure> {
         }
         benches.push(bench.to_owned());
     }
+    let listed = query(CI)?;
     Ok(QualityConfig {
         limits,
         typos,
         benches,
-        ci: query(CI)?
+        ci: listed
             .lines()
             .map(parse_ci_input)
             .collect::<Result<_, _>>()?,
+        settings: listed
+            .lines()
+            .filter_map(|line| {
+                let (key, rest) = line.split_once('\t')?;
+                let (_, value) = rest.split_once('\t')?;
+                Some((key.to_owned(), value.to_owned()))
+            })
+            .collect(),
         layers: query(CRATES)?
             .lines()
             .map(parse_layers)
@@ -220,6 +232,9 @@ fn parse_ci_input(line: &str) -> Result<(String, String), Failure> {
         )
         .into());
     }
+    if key == "platforms" {
+        tests_every_desktop(value)?;
+    }
     let plain = value
         .chars()
         .all(|character| character.is_ascii_alphanumeric() || " ._-".contains(character))
@@ -239,6 +254,30 @@ fn parse_ci_input(line: &str) -> Result<(String, String), Failure> {
         }
     };
     Ok((key.to_owned(), yaml))
+}
+
+/// The platforms every Rust repository tests besides Linux x64.
+pub(crate) const DESKTOPS: [&str; 2] = ["macos", "windows"];
+
+/// Refuse a `[ci] platforms` value that leaves out one of [`DESKTOPS`]: a
+/// value may add a target, never drop one, and the refusal writes the fix.
+fn tests_every_desktop(value: &str) -> Result<(), Failure> {
+    let named: Vec<&str> = value.split_whitespace().collect();
+    let missing: Vec<&str> = DESKTOPS
+        .into_iter()
+        .filter(|desktop| !named.contains(desktop))
+        .collect();
+    if missing.is_empty() {
+        return Ok(());
+    }
+    let fixed: Vec<&str> = missing.iter().chain(&named).copied().collect();
+    Err(format!(
+        "{FILE}: [ci] platforms `{value}` drops {}, which every Rust repository tests: set it \
+         to `{}`",
+        missing.join(" and "),
+        fixed.join(" ")
+    )
+    .into())
 }
 
 /// One line of the layers listing.
@@ -329,11 +368,37 @@ mod tests {
             "maestro-quality.toml: [ci] sets `colour`, which ci.yml does not take; it takes \
              working-directory,"
         ));
-        let table = parse_ci_input("platforms\tobject\t{}").unwrap_err();
+        let table = parse_ci_input("coverage-threshold\tobject\t{}").unwrap_err();
         assert_eq!(
             table.message.unwrap_or_default(),
-            "maestro-quality.toml: [ci] platforms must be a string, a number or a boolean"
+            "maestro-quality.toml: [ci] coverage-threshold must be a string, a number or a \
+             boolean"
         );
+    }
+
+    #[test]
+    fn platforms_may_add_a_target_but_never_drop_macos_or_windows() {
+        assert_eq!(
+            parse_ci_input("platforms\tstring\twindows linux-arm macos")
+                .unwrap()
+                .1,
+            "windows linux-arm macos"
+        );
+        for (value, fixed, missing) in [
+            ("linux-arm", "macos windows linux-arm", "macos and windows"),
+            ("windows", "macos windows", "macos"),
+            ("macos", "windows macos", "windows"),
+            ("", "macos windows", "macos and windows"),
+        ] {
+            let refusal = parse_ci_input(&format!("platforms\tstring\t{value}")).unwrap_err();
+            assert_eq!(
+                refusal.message.unwrap_or_default(),
+                format!(
+                    "maestro-quality.toml: [ci] platforms `{value}` drops {missing}, which \
+                     every Rust repository tests: set it to `{fixed}`"
+                )
+            );
+        }
     }
 
     #[test]

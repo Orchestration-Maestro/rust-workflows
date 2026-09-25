@@ -225,7 +225,13 @@ fn mutation_testing_scopes_a_push_to_its_own_commit() {
             .unwrap()
             .contains("changes in the last commit")
     );
-    let checkout = &workflow("ci")["jobs"]["checks"]["steps"][0];
+    let ci = workflow("ci");
+    let checkout = ci["jobs"]["checks"]["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|step| step["with"]["ref"] == "${{ github.sha }}")
+        .unwrap();
     assert_eq!(checkout["with"]["fetch-depth"], 2, "{checkout}");
 
     // A repository's first commit has no parent: everything in it is new.

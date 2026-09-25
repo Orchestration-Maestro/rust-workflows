@@ -1,0 +1,110 @@
+//! `ci.yml` as an organization ruleset runs it: no workflow called it, so
+//! `validate` takes its inputs from the `[ci]` table of the base commit.
+
+use crate::harness::{Fixture, refused, succeeds, workflow};
+use serde_json::Value;
+use std::fs;
+
+/// A run no workflow called, the one an organization ruleset starts, whose
+/// base commit, the checkout's first parent, holds `base` as its
+/// `maestro-quality.toml`, or none when `base` is empty.
+fn uncalled(base: &str) -> Fixture {
+    let mut fixture = Fixture::new();
+    fixture.set("CALLED", "false");
+    fixture.set("BASE_CONFIG", base);
+    fixture.stub(
+        "git",
+        r#"case "$*" in
+  *' ls-tree --name-only HEAD^1 -- maestro-quality.toml') [[ -z "$BASE_CONFIG" ]] || echo x ;;
+  *' show HEAD^1:maestro-quality.toml') printf '%s' "$BASE_CONFIG" ;;
+  *) exit 88 ;;
+esac"#,
+    );
+    fixture
+}
+
+#[test]
+fn a_run_no_workflow_called_takes_the_ci_table_of_the_base_commit() {
+    let fixture = uncalled(concat!(
+        "[ci]\nworking-directory = \"project\"\ncoverage-threshold = 95\n",
+        "mutation-test = false\nplatforms = \"macos windows linux-arm\"\n",
+    ));
+    // The pull request's own file loosens nothing: the base commit's rules hold.
+    fs::write(
+        fixture.root.join("maestro-quality.toml"),
+        "[ci]\nworking-directory = \"project\"\nunsafe-policy = \"allow\"\n",
+    )
+    .unwrap();
+    succeeds(&fixture.run("ci", "validate"));
+    let environment = fs::read_to_string(fixture.root.join("environment")).unwrap();
+    for line in [
+        "COVERAGE=95",
+        "MUTATION_TEST=false",
+        "UNSAFE_POLICY=deny",
+        "DEPENDENCY_AUDIT=true",
+    ] {
+        assert!(
+            environment.lines().any(|set| set == line),
+            "{line}: {environment}"
+        );
+    }
+    let written = fs::read_to_string(fixture.root.join("output")).unwrap();
+    for line in [
+        r#"platforms=["macos-15","windows-2025","ubuntu-24.04-arm"]"#,
+        "directory=project",
+    ] {
+        assert!(written.lines().any(|set| set == line), "{line}: {written}");
+    }
+}
+
+#[test]
+fn without_a_ci_table_the_run_takes_every_input_default_and_three_platforms() {
+    let mut fixture = uncalled("");
+    let project = fixture.root.join("project").display().to_string();
+    fixture.set("GITHUB_WORKSPACE", &project);
+    succeeds(&fixture.run("ci", "validate"));
+    let inputs = &workflow("ci")["on"]["workflow_call"]["inputs"];
+    let environment = fs::read_to_string(fixture.root.join("environment")).unwrap();
+    for (input, variable) in [
+        ("coverage-threshold", "COVERAGE"),
+        ("license-policy", "LICENSE_POLICY"),
+        ("mutation-test", "MUTATION_TEST"),
+        ("api-compatibility", "API_COMPATIBILITY"),
+        ("sarif-reports", "SARIF_REPORTS"),
+        ("unsafe-policy", "UNSAFE_POLICY"),
+        ("dependency-audit", "DEPENDENCY_AUDIT"),
+        ("clippy-level", "CLIPPY_LEVEL"),
+        ("unused-dependencies", "UNUSED_DEPENDENCIES"),
+    ] {
+        let default = match &inputs[input]["default"] {
+            Value::String(text) => text.clone(),
+            other => other.to_string(),
+        };
+        let line = format!("{variable}={default}");
+        assert!(
+            environment.lines().any(|set| set == line),
+            "{line}: {environment}"
+        );
+    }
+    // Linux, macOS and Windows for every Rust repository, and the compiler
+    // the project pins.
+    let written = fs::read_to_string(fixture.root.join("output")).unwrap();
+    for line in [
+        r#"platforms=["macos-15","windows-2025"]"#,
+        "directory=.",
+        "toolchain=1.98.1",
+    ] {
+        assert!(written.lines().any(|set| set == line), "{line}: {written}");
+    }
+}
+
+#[test]
+fn a_ci_table_that_drops_macos_or_windows_is_refused_with_the_fix() {
+    let fixture = uncalled("[ci]\nplatforms = \"linux-arm\"\n");
+    refused(
+        &fixture.run("ci", "validate"),
+        "maestro-quality.toml: [ci] platforms `linux-arm` drops macos and windows, which every \
+         Rust repository tests: set it to `macos windows linux-arm`",
+    );
+    assert!(!fixture.root.join("output").exists());
+}

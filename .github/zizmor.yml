@@ -14,7 +14,15 @@ rules:
     # GitHub's `$/` self-repository form for in-repository workflows and actions.
     # actionlint 1.7.7 rejects it as a reference without a ref, so the
     # workspace-relative `./` form stays until actionlint learns the syntax.
+    # The gate action is `./` on purpose: the step before it checks out this
+    # repository at the workflow's own commit, `job.workflow_sha`.
     ignore:
+      - attest-binaries.yml
       - ci-internal.yml
+      - ci.yml
+      - fuzz.yml
+      - hygiene.yml
       - publish-binaries.yml
       - publish-crate.yml
+      - publish-evidence.yml
+      - unsafe-audit.yml

@@ -1,11 +1,13 @@
 //! `rust-gate validate`: every `ci.yml` input checked before any side effect,
 //! then the resolved project, toolchain and gate selectors exported to the
-//! rest of the job.
+//! rest of the job. A run no workflow called, the one an organization ruleset
+//! starts, takes the same values from `maestro-quality.toml` instead.
 
 use crate::checks::checkout_paths::{canonical, committed_file, inside, project_directory};
 use crate::checks::inputs::{
     LicensePolicy, artifact_key, clippy_level, coverage_threshold, license_policy, unsafe_policy,
 };
+use crate::checks::quality_config::{FILE, read_config};
 use crate::checks::rust_versions::{channel_value, is_exact_stable, parse};
 use crate::runner::{Cmd, Failure, Outcome, Step, export, flag, input, optional, output};
 use std::fs;
@@ -19,6 +21,7 @@ pub(crate) const STEPS: &[Step] = &[Step {
     inputs: &[
         "API_COMPATIBILITY",
         "ARTIFACT_KEY",
+        "CALLED",
         "CLIPPY_LEVEL",
         "COVERAGE",
         "DEPENDENCY_AUDIT",
@@ -35,7 +38,7 @@ pub(crate) const STEPS: &[Step] = &[Step {
         "UNSAFE_POLICY",
         "UNUSED_DEPENDENCIES",
     ],
-    tools: &["sha256sum"],
+    tools: &["git", "jaq", "rust-gate", "sha256sum"],
     reports: &[],
     run,
 }];
@@ -43,9 +46,31 @@ pub(crate) const STEPS: &[Step] = &[Step {
 /// The floor: any exact stable release from here up is accepted.
 const MSRV: (u64, u64, u64) = (1, 85, 0);
 
+/// Each `ci.yml` input, the variable this step reads it from, and the
+/// input's default: what a run no workflow called takes when `[ci]` leaves
+/// the input out. Every Rust repository tests macOS and Windows.
+const SETTINGS: &[(&str, &str, &str)] = &[
+    ("working-directory", "DIRECTORY", "."),
+    ("rust-version", "REQUESTED_TOOLCHAIN", ""),
+    ("coverage-threshold", "COVERAGE", "90"),
+    ("artifact-key", "ARTIFACT_KEY", "ci"),
+    ("license-policy", "LICENSE_POLICY", "auto"),
+    ("mutation-test", "MUTATION_TEST", "true"),
+    ("sarif-reports", "SARIF_REPORTS", "true"),
+    ("clippy-level", "CLIPPY_LEVEL", "default"),
+    ("dependency-audit", "DEPENDENCY_AUDIT", "true"),
+    ("unsafe-policy", "UNSAFE_POLICY", "deny"),
+    ("unused-dependencies", "UNUSED_DEPENDENCIES", "true"),
+    ("platforms", "PLATFORMS", "macos windows"),
+    ("api-compatibility", "API_COMPATIBILITY", "true"),
+];
+
 /// Run the step: the checks in the order a consumer sees them fail, then
 /// the resolved values exported to the rest of the job.
 fn run() -> Outcome {
+    if !flag("CALLED")? {
+        return from_settings();
+    }
     let root = canonical(Path::new(&input("GITHUB_WORKSPACE")?))?;
     let project = project_directory()?;
     for name in ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"] {
@@ -55,6 +80,13 @@ fn run() -> Outcome {
     coverage_threshold()?;
     let artifact_key = artifact_key()?;
     let license_policy = license_policy()?;
+    if license_policy == LicensePolicy::Off {
+        return Err(
+            "license-policy=off is refused: the organization's licence policy always \
+                    applies, and no repository opts out"
+                .into(),
+        );
+    }
     let unsafe_policy = unsafe_policy()?;
     let clippy_level = clippy_level()?;
     let unused_dependencies = flag("UNUSED_DEPENDENCIES")?.to_string();
@@ -63,11 +95,13 @@ fn run() -> Outcome {
     let sarif_reports = flag("SARIF_REPORTS")?.to_string();
     let dependency_audit = flag("DEPENDENCY_AUDIT")?.to_string();
     let runners = platform_runners()?;
-    let deny_config = deny_configuration(&project, &root, license_policy)?;
+    let deny_config = deny_configuration(&project, &root)?;
+    let directory = relative_directory(&project, &root)?;
     output(
         "artifact-name",
-        &artifact_name(&project, &root, &artifact_key, &toolchain)?,
+        &artifact_name(&directory, &artifact_key, &toolchain)?,
     )?;
+    output("directory", &directory)?;
     output("platforms", &runners)?;
     output("toolchain", &toolchain)?;
     let temp = input("RUNNER_TEMP")?;
@@ -77,6 +111,7 @@ fn run() -> Outcome {
         ("REPORTS", &format!("{temp}/rust-reports")),
         ("CARGO_TARGET_DIR", &format!("{temp}/rust-target")),
         ("CARGO_BUILD_TARGET", "x86_64-unknown-linux-gnu"),
+        ("COVERAGE", &input("COVERAGE")?),
         ("LICENSE_POLICY", license_policy.as_str()),
         ("DENY_CONFIG", &deny_config),
         ("MUTATION_TEST", &mutation_test),
@@ -87,6 +122,39 @@ fn run() -> Outcome {
         ("CLIPPY_LEVEL", clippy_level.as_str()),
         ("UNUSED_DEPENDENCIES", &unused_dependencies),
     ])
+}
+
+/// A run no workflow called: this step again, with the `[ci]` table of the
+/// base commit's `maestro-quality.toml` in place of the inputs, so a pull
+/// request cannot loosen its own gate. The checkout holds the merge commit
+/// and its first parent, the base branch or the merge queue's base.
+fn from_settings() -> Outcome {
+    let root = canonical(Path::new(&input("GITHUB_WORKSPACE")?))?;
+    let base = Path::new(&input("RUNNER_TEMP")?).join("ci-settings");
+    fs::create_dir_all(&base).map_err(|error| format!("{}: {error}", base.display()))?;
+    let listed = Cmd::new("git -C")
+        .arg(&root)
+        .args(["ls-tree", "--name-only", "HEAD^1", "--", FILE])
+        .capture()?;
+    if !listed.trim().is_empty() {
+        let text = Cmd::new("git -C")
+            .arg(&root)
+            .arg("show")
+            .arg(format!("HEAD^1:{FILE}"))
+            .capture()?;
+        fs::write(base.join(FILE), text).map_err(|error| format!("{FILE}: {error}"))?;
+    }
+    let config = read_config(&base)?;
+    let mut validate = Cmd::new("rust-gate validate").env("CALLED", "true");
+    for (key, variable, default) in SETTINGS {
+        let value = config
+            .settings
+            .iter()
+            .find(|(set, _)| set == key)
+            .map_or(*default, |(_, value)| value.as_str());
+        validate = validate.env(variable, value);
+    }
+    validate.run()
 }
 
 /// The compiler this run uses: the exact stable version the project pins,
@@ -145,12 +213,9 @@ fn platform_runners() -> Result<String, Failure> {
 }
 
 /// The consumer's `deny.toml` as a path when one is committed inside the
-/// checkout and empty otherwise; `enforce` requires one.
-fn deny_configuration(
-    project: &Path,
-    root: &Path,
-    policy: LicensePolicy,
-) -> Result<String, Failure> {
+/// checkout and empty otherwise. `auto` and `enforce` both apply the
+/// organization's policy, so neither requires one.
+fn deny_configuration(project: &Path, root: &Path) -> Result<String, Failure> {
     let mut deny_config = project.join("deny.toml");
     if deny_config.exists() {
         deny_config = canonical(&deny_config)?;
@@ -161,26 +226,23 @@ fn deny_configuration(
     if deny_config.is_file() {
         return Ok(deny_config.display().to_string());
     }
-    if policy == LicensePolicy::Enforce {
-        return Err("license-policy=enforce requires a committed deny.toml".into());
-    }
     Ok(String::new())
+}
+
+/// The project relative to the checkout, `.` for the checkout itself: the
+/// working directory the portability job runs in.
+fn relative_directory(project: &Path, root: &Path) -> Result<String, Failure> {
+    match project.strip_prefix(root) {
+        Ok(rest) if rest.as_os_str().is_empty() => Ok(".".to_owned()),
+        Ok(rest) => Ok(rest.display().to_string()),
+        Err(_) => Err("working-directory escapes checkout".into()),
+    }
 }
 
 /// The artifact name: the working directory, key and toolchain hashed into
 /// one identity, then the revision, run and attempt, so two matrix cases can
 /// never share a name.
-fn artifact_name(
-    project: &Path,
-    root: &Path,
-    artifact_key: &str,
-    toolchain: &str,
-) -> Result<String, Failure> {
-    let relative = match project.strip_prefix(root) {
-        Ok(rest) if rest.as_os_str().is_empty() => ".".to_owned(),
-        Ok(rest) => rest.display().to_string(),
-        Err(_) => return Err("working-directory escapes checkout".into()),
-    };
+fn artifact_name(relative: &str, artifact_key: &str, toolchain: &str) -> Result<String, Failure> {
     let identity = Cmd::new("sha256sum")
         .stdin_bytes(format!("{relative}:{artifact_key}:{toolchain}").as_bytes())
         .capture()?;

@@ -102,7 +102,7 @@ metadata. YAML formatting is defined in `.yamlfmt.yml`; run `yamlfmt` to fix it.
 ## The gate
 
 Every step body is a subcommand of `rust-gate`, a standard-library-only crate
-in `gate/` that the `gate` action builds from the pinned commit: `ci.yml` steps
+in `gate/` that the `gate` action builds from the workflow's own commit: `ci.yml` steps
 are `rust-gate <id>`, the other workflows `rust-gate <workflow> <step>`, and
 the two steps several workflows share are `rust-gate install-tools` and
 `rust-gate verify-payload`. [docs/rust-gate.md](docs/rust-gate.md) holds the
@@ -150,25 +150,16 @@ the organization's bot commit whatever `just docs` rewrote. A contract test neve
 the step in a fixture and reads what it wrote, what it declares and the trace
 of every command it ran.
 
-## The gate action and its pin
+## The gate action and the workflow's own commit
 
-`.github/actions/gate` builds `rust-gate` from this repository at the commit
-the workflows pin, as the first step of every job that runs a step body. The
-workflows call it as `Orchestration-Maestro/rust-workflows/.github/actions/gate@<sha>`,
-and every call site pins the same commit of this repository; a test refuses
-two different pins, and a pinned commit that does not contain the action file.
-
-A gate change ships in two pull requests, because the default branch takes only
-squash merges and a pin must name a commit on it:
-
-1. Merge the gate change. Its pins still name the previous gate commit, so its
-   own CI runs the previous gate.
-2. Open a second pull request that replaces every pin with the first one's
-   squash commit, then run `just check`: the pin test requires that commit to
-   contain the action. Never invent a SHA or substitute a branch or tag.
-
-Consumers pin a release, so cut one after the second merge: its `ci.yml` is the
-one that calls the new gate.
+Every job that runs a step body first checks out this repository at
+`${{ job.workflow_sha }}`, the commit of the workflow it runs, then builds
+`rust-gate` through `./.github/actions/gate`, and only then checks out the
+consumer, which replaces that tree
+(`every_job_builds_the_gate_from_the_workflows_own_commit`). A consumer's
+pinned release, an organization ruleset's pinned commit and a pull request here
+each run the gate of their own commit, so a gate change is one pull request and
+a release; nothing is repinned.
 
 ## Strict coding standard
 
@@ -178,7 +169,7 @@ one that calls the new gate.
    Step logic is a `rust-gate` subcommand, one per step, in the
    standard-library-only crate under `gate/`: a reusable workflow cannot read
    this repository's files at run time, so the `gate` action builds the binary
-   from the pinned commit first, and the contract tests execute the exact
+   from the workflow's own commit first, and the contract tests execute the exact
    command. A `run:` body is that one command and nothing else; inputs reach
    it through `env`.
 2. Use rustfmt, Rust 2024, declared MSRV, forbidden unsafe code and Clippy
@@ -190,8 +181,8 @@ one that calls the new gate.
    including binary process output. Commit generated Cargo lockfiles. Do not
    enable all features implicitly.
 3. Pin external actions to verified 40-character SHAs with version comments;
-   this repository's `gate` action is pinned the same way, as "The gate action
-   and its pin" describes. Pin tools/download checksums, keep the Just recipes and the action's
+   this repository's `gate` action is built from the workflow's own commit, as
+   "The gate action and the workflow's own commit" describes. Pin tools/download checksums, keep the Just recipes and the action's
    build step under Bash `set -euo pipefail`, and pass expressions through
    `env`. Validate paths/names/registry/ref boundaries;
    never use `eval`, unchecked downloads, scanner error suppression or broad

@@ -75,6 +75,8 @@ impl Fixture {
             env: BTreeMap::new(),
         };
         for (key, value) in [
+            // A caller's run; a run no workflow called reads `[ci]` instead.
+            ("CALLED", "true"),
             ("DIRECTORY", "project"),
             ("RUSTUP_TOOLCHAIN", "1.98.1"),
             // What `install-tools` and `verify-payload` read.

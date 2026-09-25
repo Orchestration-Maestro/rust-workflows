@@ -68,6 +68,8 @@ fn init_writes_every_managed_file_and_the_check_finds_them_equal() {
     assert!(caller.contains(&format!(
         "uses: Orchestration-Maestro/rust-workflows/.github/workflows/ci.yml@{commit}  # v2.0.0"
     )));
+    // Every Rust repository tests macOS and Windows, asked or not.
+    assert!(caller.contains("    with:\n      platforms: macos windows\n"));
     succeeds(&in_project(&fixture, "rust-gate sync --check"));
     refused(
         &in_project(&fixture, &format!("{} rust-gate init", pin('a', "2.0.0"))),
@@ -195,6 +197,37 @@ fn a_managed_file_changed_by_hand_is_refused_and_sync_writes_it_back() {
         &in_project(&fixture, "rust-gate sync --check"),
         "sync --check: 1 managed file differs from the organization's rendering (Cargo.toml); \
          run rust-gate sync",
+    );
+}
+
+#[test]
+fn platforms_that_drop_macos_or_windows_are_refused_with_the_fix() {
+    let fixture = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
+    succeeds(&in_project(
+        &fixture,
+        &format!("{} rust-gate init", pin('a', "2.0.0")),
+    ));
+    let project = fixture.root.join("project");
+    // A value may add a target, never drop macOS or Windows.
+    fs::write(
+        project.join("maestro-quality.toml"),
+        "[ci]\nplatforms = \"linux-arm\"\n",
+    )
+    .unwrap();
+    refused(
+        &in_project(&fixture, "rust-gate sync"),
+        "maestro-quality.toml: [ci] platforms `linux-arm` drops macos and windows, which every \
+         Rust repository tests: set it to `macos windows linux-arm`",
+    );
+    fs::write(
+        project.join("maestro-quality.toml"),
+        "[ci]\nplatforms = \"macos windows linux-arm\"\n",
+    )
+    .unwrap();
+    succeeds(&in_project(&fixture, "rust-gate sync"));
+    assert!(
+        managed(&fixture, ".github/workflows/ci.yml")
+            .contains("    with:\n      platforms: macos windows linux-arm\n  #")
     );
 }
 

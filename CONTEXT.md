@@ -45,7 +45,7 @@ wording: a test that only greps for a string proves nothing about what the step 
 **Step body**: What a step runs: one `rust-gate` command, its inputs arriving as
 environment variables. A reusable workflow runs in the caller's checkout and
 cannot read this repository, so the gate action builds the binary from this
-repository's pinned commit first; the contract tests run that exact command, and
+repository at the workflow's own commit first; the contract tests run that exact command, and
 the local gate runs the same commands against the example fixtures.
 
 **rust-gate**: The standard-library-only binary in `gate/` that holds every step
@@ -54,9 +54,9 @@ body as a subcommand: `rust-gate <id>` for a `ci.yml` step, `rust-gate <workflow
 two steps several workflows share.
 
 **Gate action**: The composite action under `.github/actions/gate` that builds
-`rust-gate` from the pinned commit of this repository and puts it on the PATH,
-called by commit SHA since no other sharing mechanism exists. One pin covers
-every call site.
+`rust-gate` and puts it on the PATH. Every job checks this repository out at
+`job.workflow_sha`, the commit of the workflow it runs, and calls the action
+from that checkout, so no pin names it.
 
 **Example gate**: The ignored test in `tests/` that replays `ci.yml`'s own step
 bodies, read by id, against every fixture with the pinned toolbelt and the owned

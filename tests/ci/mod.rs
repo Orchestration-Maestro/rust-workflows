@@ -21,6 +21,7 @@ mod release_payload;
 mod release_payload_refusals;
 mod repository_hygiene;
 mod rule_map;
+mod ruleset_settings;
 mod scorecard_and_required_status;
 mod scorecard_states;
 mod source_rules;

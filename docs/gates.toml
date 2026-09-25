@@ -149,11 +149,11 @@ proofs = [
 
 [[gate]]
 name = "Dependency policy"
-kind = "default"
-switch = "`license-policy: off`"
-fails = "Violations of your `deny.toml`, or the default source/version policy; licence checks apply only with a consumer policy or `LICENSE_ALLOWLIST`. `off` skips the whole gate"
+kind = "always"
+fails = "Violations of your `deny.toml`, or the default source/version policy; licence checks apply only with a consumer policy or `LICENSE_ALLOWLIST`. No repository opts out: `license-policy: off` is refused"
 standard = "SCH-010"
 proofs = [
+  "ci_validates_the_licence_and_unsafe_policies_before_any_work",
   "the_organization_allowlist_adds_licences_and_a_committed_policy_wins",
   "the_dependency_policy_holds_by_default_and_licences_only_with_a_list",
 ]

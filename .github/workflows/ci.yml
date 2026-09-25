@@ -1,6 +1,11 @@
 name: Rust CI
 # Contract: Locked Rust checks, 90% line coverage, security scans, SBOMs and release artifacts
 'on':
+  # The organization's rust-ci ruleset requires this file on every pull
+  # request of a Rust repository, in that repository's context: a run no
+  # workflow called takes its inputs from `[ci]` in maestro-quality.toml.
+  pull_request:
+  merge_group:
   workflow_call:
     inputs:
       working-directory:
@@ -28,10 +33,9 @@ name: Rust CI
         default: ci
       license-policy:
         description: >-
-          `auto` applies a consumer `deny.toml` when present, else the default
-          source and version policy plus the `LICENSE_ALLOWLIST` organization
-          allowlist when set; `enforce` requires a consumer file; `off` skips
-          the gate
+          Kept for the repositories that set it: `auto` and `enforce` both
+          apply the organization's licence and source policy; `off` is
+          refused, since no repository opts out
         type: string
         default: auto
       mutation-test:
@@ -112,8 +116,9 @@ jobs:
   checks:
     name: Rust CI checks
     # Forks run too: CI takes no secret and a read-only token, and the
-    # organization holds external contributors' runs for approval.
-    if: ${{ github.event_name != 'pull_request_target' }}
+    # organization holds external contributors' runs for approval. Inside
+    # this repository, only a caller runs it: its root holds no Cargo package.
+    if: ${{ github.event_name != 'pull_request_target' && (inputs.artifact-key != '' || github.repository != 'Orchestration-Maestro/rust-workflows') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -122,9 +127,19 @@ jobs:
       artifact-id: ${{ steps.upload.outputs.artifact-id }}
       artifact-name: ${{ steps.validate.outputs.artifact-name }}
       revision: ${{ github.sha }}
+      directory: ${{ steps.validate.outputs.directory }}
       platforms: ${{ steps.validate.outputs.platforms }}
       toolchain: ${{ steps.validate.outputs.toolchain }}
     steps:
+      - name: Checkout the gate at this workflow's commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+      - name: Build the gate
+        uses: ./.github/actions/gate
+      # Replaces the gate's checkout: another repository's is deleted first.
       - name: Checkout consumer revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -132,13 +147,12 @@ jobs:
           persist-credentials: false
           # Mutation testing diffs the commit against its first parent: the base
           # branch of a pull request's merge commit, or the previous commit of a
-          # push or tag.
+          # push or tag. A run no workflow called reads its settings there.
           fetch-depth: 2
-      - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@4f1bef9262c4cd87fccf7683fa1872465c7af7a9  # rust-workflows: the commit that ships this gate
       - name: Validate consumer inputs
         id: validate
         env:
+          CALLED: ${{ inputs.artifact-key != '' }}
           DIRECTORY: ${{ inputs.working-directory }}
           REQUESTED_TOOLCHAIN: ${{ inputs.rust-version }}
           COVERAGE: ${{ inputs.coverage-threshold }}
@@ -216,29 +230,30 @@ jobs:
             # one thing nextest does not run.
             cargo-nextest nextest-rs/nextest/releases/download/cargo-nextest-0.9.146/cargo-nextest-0.9.146-x86_64-unknown-linux-musl.tar.gz b64617e8640624e8f9ba99819e37d7971154e97836d7ae4774fed4715501a6aa cargo-nextest
       # Optional gates download only when selected; every consumer otherwise
-      # pays their run time for a tool the invocation never uses.
+      # pays their run time for a tool the invocation never uses. validate
+      # exported each selection, whether a caller or `[ci]` made it.
       - name: Install the mutation testing tool
-        if: ${{ inputs.mutation-test }}
+        if: ${{ env.MUTATION_TEST == 'true' }}
         run: rust-gate install-tools
         env:
           TOOLS: cargo-mutants sourcefrog/cargo-mutants/releases/download/v27.1.0/cargo-mutants-x86_64-unknown-linux-gnu.tar.gz dfe6dc37d0342c891d2829b5a695aa57c2d0edecef7e7d0399a30cc6e206411e cargo-mutants
       - name: Install the API compatibility checker
-        if: ${{ inputs.api-compatibility }}
+        if: ${{ env.API_COMPATIBILITY == 'true' }}
         run: rust-gate install-tools
         env:
           TOOLS: cargo-semver-checks obi1kenobi/cargo-semver-checks/releases/download/v0.50.0/cargo-semver-checks-x86_64-unknown-linux-gnu.tar.gz 52a65dc88dc53fa8b57d6087954eb52cda149ca03bcfca78ce3fdecd23f893c4 cargo-semver-checks
       - name: Install the SARIF converter
-        if: ${{ inputs.sarif-reports }}
+        if: ${{ env.SARIF_REPORTS == 'true' }}
         run: rust-gate install-tools
         env:
           TOOLS: clippy-sarif psastras/sarif-rs/releases/download/clippy-sarif-v0.8.0/clippy-sarif-x86_64-unknown-linux-gnu d97c49a32e50c294437dbfdb764a6ced94c386ee5d45d82ba881694cc6d77329
       - name: Install the unused-dependency tool
-        if: ${{ inputs.unused-dependencies }}
+        if: ${{ env.UNUSED_DEPENDENCIES == 'true' }}
         run: rust-gate install-tools
         env:
           TOOLS: cargo-machete bnjbvr/cargo-machete/releases/download/v0.9.2/cargo-machete-v0.9.2-x86_64-unknown-linux-musl.tar.gz 48200087f54c55aabcd4db4af1e25742b49846c02a1b1bfa134711945b35b2e9 cargo-machete-v0.9.2-x86_64-unknown-linux-musl/cargo-machete
       - name: Install the dependency audit tool
-        if: ${{ inputs.dependency-audit }}
+        if: ${{ env.DEPENDENCY_AUDIT == 'true' }}
         run: rust-gate install-tools
         env:
           TOOLS: cargo-vet mozilla/cargo-vet/releases/download/v0.10.0/cargo-vet-x86_64-unknown-linux-gnu.tar.xz c7664d9db5dd2ff813f20303650ac8253fa712ff2a1ea9ce12bed71e346f1744 cargo-vet-x86_64-unknown-linux-gnu/cargo-vet
@@ -272,8 +287,6 @@ jobs:
         run: rust-gate duplication
       - name: Line coverage gate
         id: coverage
-        env:
-          COVERAGE: ${{ inputs.coverage-threshold }}
         run: rust-gate coverage
       - name: Coverage of the lines a pull request adds
         id: changed-coverage
@@ -399,7 +412,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: ${{ inputs.working-directory }}
+        working-directory: ${{ needs.checks.outputs.directory }}
     steps:
       - name: Checkout consumer revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -415,7 +428,7 @@ jobs:
     needs:
       - checks
       - portability
-    if: ${{ always() }}
+    if: ${{ always() && (inputs.artifact-key != '' || github.repository != 'Orchestration-Maestro/rust-workflows') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
@@ -424,8 +437,14 @@ jobs:
       artifact-name: ${{ needs.checks.outputs.artifact-name }}
       revision: ${{ needs.checks.outputs.revision }}
     steps:
+      - name: Checkout the gate at this workflow's commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@4f1bef9262c4cd87fccf7683fa1872465c7af7a9  # rust-workflows: the commit that ships this gate
+        uses: ./.github/actions/gate
       - name: Require every check
         id: required
         env:

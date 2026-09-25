@@ -87,7 +87,7 @@ fn the_portability_job_tests_the_validated_project_on_each_runner() {
     // "$RUSTUP_TOOLCHAIN" is not the environment variable.
     assert_eq!(
         job["defaults"]["run"],
-        json!({"shell": "bash", "working-directory": "${{ inputs.working-directory }}"})
+        json!({"shell": "bash", "working-directory": "${{ needs.checks.outputs.directory }}"})
     );
     let steps = job["steps"].as_array().unwrap();
     assert!(
@@ -121,6 +121,10 @@ fn checks_hand_the_runners_to_portability_and_the_result_to_the_required_status(
     assert_eq!(
         checks["toolchain"],
         "${{ steps.validate.outputs.toolchain }}"
+    );
+    assert_eq!(
+        checks["directory"],
+        "${{ steps.validate.outputs.directory }}"
     );
     let gate = &ci["jobs"]["gate"];
     assert_eq!(gate["needs"], json!(["checks", "portability"]));

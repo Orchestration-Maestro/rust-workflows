@@ -1,108 +1,68 @@
-//! The gate action: one pin at every call site, and a commit that ships it.
+//! The gate action: every job builds it from the workflow's own commit.
 
-use crate::harness::{
-    Fixture, action, helper_action, root, rust_files, succeeds, workflow, workflow_steps,
-};
-use std::collections::BTreeSet;
+use crate::harness::{Fixture, action, root, succeeds, workflow_steps};
+use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 #[test]
-fn helper_actions_are_pinned_to_one_commit_that_contains_them() {
-    // A reusable workflow runs in the consumer's checkout, so the only way
-    // every workflow gets the same gate binary is a composite action fetched
-    // by commit SHA, and that commit must ship every action it is called for.
-    let (pins, called, sites) = call_sites();
-    assert!(sites >= 10, "only {sites} gate action call sites");
-    assert_eq!(
-        pins.len(),
-        1,
-        "every call site must pin the same commit: {pins:?}"
-    );
-    let pin = pins.into_iter().next().unwrap();
-    let shipped = shipped_actions();
-    assert_eq!(
-        called, shipped,
-        "every shipped action is called, every called action is shipped"
-    );
-    for name in &shipped {
-        let status = Command::new("git")
-            .args([
-                "cat-file",
-                "-e",
-                &format!("{pin}:.github/actions/{name}/action.yml"),
-            ])
-            .current_dir(root())
-            .status()
-            .unwrap();
-        assert!(
-            status.success(),
-            "pinned commit {pin} does not contain {name}"
-        );
+fn every_job_builds_the_gate_from_the_workflows_own_commit() {
+    // A reusable workflow runs in the consumer's checkout, and a ruleset's in
+    // the target repository's; either way `job.workflow_sha` names the commit
+    // of this repository the workflow runs from. Every job that runs a step
+    // body checks that commit out, builds the gate from it, and only then
+    // checks out the consumer, so a gate change ships without a pin to move.
+    let mut jobs: BTreeMap<(String, String), Vec<Value>> = BTreeMap::new();
+    for (name, id, step) in workflow_steps() {
+        jobs.entry((name, id)).or_default().push(step);
     }
-}
-
-#[test]
-fn the_pinned_gate_embeds_the_managed_files_this_commit_holds() {
-    // The organization's bot renders a release's managed files with the gate
-    // built at the release tag; every repository's CI checks them with the
-    // gate action this commit pins. A managed file this repository is the
-    // source of must read the same at the pinned commit, or the two renderings
-    // disagree and every sync pull request fails, as v2.5.0's did.
-    let (pins, _, _) = call_sites();
-    let pin = pins.into_iter().next().unwrap();
-    let render = fs::read_to_string(root().join("gate/src/steps/managed_files/render.rs")).unwrap();
-    let sources: Vec<&str> = render
-        .split("include_str!(\"../../../../")
-        .skip(1)
-        .filter_map(|rest| rest.split('"').next())
-        .collect();
-    assert_eq!(sources.len(), 6, "{sources:?}");
-    for source in sources {
-        let pinned = Command::new("git")
-            .args(["show", &format!("{pin}:{source}")])
-            .current_dir(root())
-            .output()
-            .unwrap();
+    let mut sites = 0;
+    for ((name, id), steps) in jobs {
+        let runs_gate = steps.iter().any(|step| {
+            step["run"]
+                .as_str()
+                .is_some_and(|body| body.trim_start().starts_with("rust-gate "))
+        });
+        let build = steps
+            .iter()
+            .position(|step| step["uses"] == "./.github/actions/gate");
+        if !runs_gate {
+            assert_eq!(build, None, "{name}/{id} builds a gate it never runs");
+            continue;
+        }
+        assert_eq!(
+            build,
+            Some(1),
+            "{name}/{id}: the gate's checkout, then its build"
+        );
+        let checkout = &steps[0];
         assert!(
-            pinned.status.success(),
-            "pinned commit {pin} lacks {source}"
+            checkout["uses"]
+                .as_str()
+                .is_some_and(|uses| uses.starts_with("actions/checkout@")),
+            "{name}/{id}"
         );
         assert_eq!(
-            String::from_utf8(pinned.stdout).unwrap(),
-            fs::read_to_string(root().join(source)).unwrap(),
-            "{source} changed since the pinned gate {pin}: pin the gate action to a commit \
-             that holds it before any release"
+            checkout["with"],
+            json!({
+                "repository": "${{ job.workflow_repository }}",
+                "ref": "${{ job.workflow_sha }}",
+                "persist-credentials": false
+            }),
+            "{name}/{id}"
         );
+        sites += 1;
     }
-}
-
-#[test]
-fn repository_checkout_fetches_the_history_needed_to_verify_gate_pins() {
-    let data = workflow("ci-internal");
-    let checkout = data["jobs"]["check"]["steps"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|step| {
-            step["uses"]
+    assert!(sites >= 10, "only {sites} jobs build the gate");
+    assert_eq!(shipped_actions(), BTreeSet::from(["gate".to_owned()]));
+    for (name, id, step) in workflow_steps() {
+        assert!(
+            !step["uses"]
                 .as_str()
-                .is_some_and(|uses| uses.starts_with("actions/checkout@"))
-        })
-        .unwrap();
-    assert_eq!(checkout["with"]["fetch-depth"], 0);
-    assert_eq!(checkout["with"]["persist-credentials"], false);
-}
-
-#[test]
-fn every_gate_reference_uses_the_private_provider_owner() {
-    for (_, _, step) in workflow_steps() {
-        if let Some(reference) = step["uses"].as_str()
-            && reference.contains("/rust-workflows/.github/actions/")
-        {
-            assert!(reference.starts_with("Orchestration-Maestro/rust-workflows/"));
-        }
+                .is_some_and(|uses| uses.contains("/rust-workflows/.github/actions/")),
+            "{name}/{id} pins the gate instead of building it from its own commit"
+        );
     }
 }
 
@@ -151,23 +111,6 @@ printf 'rebuilt\n' > "$target/release/rust-gate""#,
             .as_str()
             .is_some_and(|uses| uses.starts_with("actions/cache"))
     }));
-}
-
-/// Every `uses:` of one of this repository's actions across the workflows:
-/// the pins seen, the actions called, and the number of call sites.
-fn call_sites() -> (BTreeSet<String>, BTreeSet<String>, usize) {
-    let mut pins = BTreeSet::new();
-    let mut called = BTreeSet::new();
-    let mut sites = 0;
-    for (_, _, step) in workflow_steps() {
-        let Some((name, pin)) = step["uses"].as_str().and_then(helper_action) else {
-            continue;
-        };
-        pins.insert(pin);
-        called.insert(name);
-        sites += 1;
-    }
-    (pins, called, sites)
 }
 
 /// Every action under `.github/actions/`, each checked against the policy a
@@ -226,38 +169,4 @@ fn an_unknown_command_is_refused_by_name() {
         stderr.contains("unknown gate command: nonsense"),
         "{stderr}"
     );
-}
-
-#[test]
-fn every_file_the_gate_reads_when_built_ships_in_the_action_archive() {
-    // GitHub fetches the action as the repository's archive, which leaves out
-    // every export-ignore path; a file the gate reads at build time and the
-    // archive leaves out fails every call site's build.
-    let mut read = 0;
-    for source in rust_files(&root().join("gate/src")) {
-        let text = fs::read_to_string(&source).unwrap();
-        let directory = source.parent().unwrap();
-        for (index, _) in text.match_indices("include_str!(\"") {
-            let rest = &text[index + "include_str!(\"".len()..];
-            let relative = rest.split('"').next().unwrap();
-            let Ok(file) = directory.join(relative).canonicalize() else {
-                // A fixture inside a test's string, not a file of the gate.
-                continue;
-            };
-            let path = file.strip_prefix(root()).unwrap().display().to_string();
-            let attribute = Command::new("git")
-                .args(["check-attr", "export-ignore", "--", &path])
-                .current_dir(root())
-                .output()
-                .unwrap();
-            let attribute = String::from_utf8_lossy(&attribute.stdout).into_owned();
-            assert!(
-                attribute.ends_with(": unspecified\n"),
-                "the gate reads {path} when built, and the action archive leaves it out: \
-                 {attribute}"
-            );
-            read += 1;
-        }
-    }
-    assert!(read >= 6, "only {read} files the gate reads were checked");
 }

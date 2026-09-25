@@ -45,8 +45,7 @@ expect it to print; its last lines are the SPEED reading and the verdict.
 7. Bundle a session's work into one pull request, titled for the change a
    consumer sees; documentation, test and CI changes ride along. A `feat` and
    a `fix` need one each, because a squash merge keeps a single title and so a
-   single changelog line. A gate change needs its second pull request anyway;
-   see CONTRIBUTING.
+   single changelog line.
 
 ## Before you change something
 
@@ -64,10 +63,12 @@ expect it to print; its last lines are the SPEED reading and the verdict.
 
 ## How a run works
 
-1. A consumer calls a reusable workflow pinned to a reviewed commit. Checkout
-   retrieves the consumer's revision, never this repository's.
-2. The gate action builds `rust-gate` from this repository's pinned commit,
-   in a fresh directory without an executable cache, and puts it on the PATH.
+1. An organization ruleset requires `ci.yml` (or `hygiene.yml`) on every pull
+   request, pinned to a reviewed commit; a caller may still call it as a
+   reusable workflow. The consumer's checkout replaces the gate's.
+2. The gate action builds `rust-gate` from this repository at the workflow's
+   own commit, `job.workflow_sha`, in a fresh directory without an executable
+   cache, and puts it on the PATH.
    Every step body is one
    `rust-gate` command.
 3. `ci.yml` validates its inputs, runs quality, coverage and security gates, then
@@ -166,8 +167,7 @@ Plain sentences, no em or en dashes, no bold-label lists. A version is a floor
   are separate integrations. Downloads use direct upstream origins; never infer
   a write destination or authorization from successful dependency reads.
 - Never invent a commit SHA, an organisation variable, a secret or a licence
-  policy. A gate change repins this repository's own gate action in a second
-  pull request; the procedure is in CONTRIBUTING.
+  policy.
 - Live publication, remote writes, credentials, Git operations and releases need
   explicit authorization in the request.
 - Local checks establish local behaviour. Nothing here exercises a hosted

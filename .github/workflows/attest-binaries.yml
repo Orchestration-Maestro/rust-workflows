@@ -57,8 +57,14 @@ jobs:
       subject-digest: ${{ steps.verify.outputs.payload-digest }}
       attested: ${{ steps.outcome.outputs.attested }}
     steps:
+      - name: Checkout the gate at this workflow's commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@4f1bef9262c4cd87fccf7683fa1872465c7af7a9  # rust-workflows: the commit that ships this gate
+        uses: ./.github/actions/gate
       - name: Validate consumer inputs
         id: validate
         env:

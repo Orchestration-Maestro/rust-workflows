@@ -145,12 +145,22 @@ fn ci_entry_jobs_accept_fork_pull_requests() {
     // is checked like any other, so an outside contribution can pass the
     // required status. pull_request_target, which runs with the base
     // repository's privileges, stays refused.
-    for (name, job) in [("ci", "checks"), ("ci-internal", "check")] {
-        assert_eq!(
-            workflow(name)["jobs"][job]["if"],
+    // Inside this repository, ci.yml runs only for a caller: its root holds
+    // no Cargo package for a run no workflow called.
+    for (name, job, condition) in [
+        (
+            "ci",
+            "checks",
+            "${{ github.event_name != 'pull_request_target' && (inputs.artifact-key != '' || \
+             github.repository != 'Orchestration-Maestro/rust-workflows') }}",
+        ),
+        (
+            "ci-internal",
+            "check",
             "${{ github.event_name != 'pull_request_target' }}",
-            "{name}/{job}"
-        );
+        ),
+    ] {
+        assert_eq!(workflow(name)["jobs"][job]["if"], condition, "{name}/{job}");
         assert!(
             workflow(name)["on"]["workflow_call"]["secrets"].is_null(),
             "{name} must take no secret to run fork pull requests"
