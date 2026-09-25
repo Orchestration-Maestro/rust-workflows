@@ -1,7 +1,8 @@
 //! The steps: `sync` writes every managed file, and moves every other call to
 //! rust-workflows to the caller's release; `sync --check` and the
 //! `managed-files` step of `ci.yml` refuse any difference, and `init` writes
-//! them for a repository whose caller pins no release yet.
+//! them for a repository whose caller pins no release yet, with its rule map
+//! and, in a git repository, its Copilot guide.
 
 use super::pin::{Pin, caller_pin, parse_pin, repinned};
 use super::render::{Repository, managed_files};
@@ -45,7 +46,7 @@ pub(crate) const STEPS: &[Step] = &[
         id: "init",
         summary: "The managed files of a repository whose caller pins no release yet",
         inputs: &["RUST_WORKFLOWS_PIN"],
-        tools: &["jaq"],
+        tools: &["jaq", "rust-gate"],
         reports: &[],
         run: init,
     },
@@ -102,7 +103,20 @@ fn init() -> Outcome {
             "init: set RUST_WORKFLOWS_PIN to `<commit> v<version>`, the release to pin".into(),
         );
     }
-    write_all(&root, Some(&pin))
+    write_all(&root, Some(&pin))?;
+    adapted(&root)
+}
+
+/// Write the repository's rule map and, in a git repository, its Copilot
+/// guide, which the commit hooks keep current from then on; the guide lists
+/// tracked files, so outside git the first commit's hook writes it.
+fn adapted(root: &Path) -> Outcome {
+    Cmd::new("rust-gate rules").cwd(root).run()?;
+    if root.join(".git").exists() {
+        return Cmd::new("rust-gate guide").cwd(root).run();
+    }
+    println!("guide: not a git repository yet; the first commit's hook writes it");
+    Ok(())
 }
 
 /// Refuse the `differing` files, by name, with the fix.

@@ -219,3 +219,34 @@ fn the_managed_files_step_refuses_a_difference_in_ci() {
         ".editorconfig\n"
     );
 }
+
+#[test]
+fn init_writes_the_rule_map_and_in_a_git_repository_the_guide() {
+    let outside = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
+    let written = in_project(&outside, &format!("{} rust-gate init", pin('a', "2.0.0")));
+    succeeds(&written);
+    assert!(
+        managed(&outside, "docs/standards/engineering.md").starts_with("# Engineering rules in `")
+    );
+    assert!(
+        !outside
+            .root
+            .join("project/.github/copilot-instructions.md")
+            .exists()
+    );
+    assert!(String::from_utf8_lossy(&written.stdout).contains("the first commit's hook writes it"));
+    let inside = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
+    succeeds(&in_project(
+        &inside,
+        &format!(
+            "git init -q && git remote add origin \
+             https://github.com/Orchestration-Maestro/example.git && git add -A && {} rust-gate \
+             init",
+            pin('a', "2.0.0")
+        ),
+    ));
+    assert!(
+        managed(&inside, "docs/standards/security.md").starts_with("# Security rules in `example`")
+    );
+    assert!(managed(&inside, ".github/copilot-instructions.md").contains("── lib.rs"));
+}

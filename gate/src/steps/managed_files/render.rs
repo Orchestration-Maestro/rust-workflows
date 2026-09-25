@@ -163,13 +163,24 @@ fn deny(config: &QualityConfig) -> String {
     text
 }
 
-/// `typos.toml`: the words the repository means, each allowed as written.
+/// The words every repository means: `FND`, the prefix of the foundations its
+/// rule map cites.
+const ORGANIZATION_WORDS: [&str; 1] = ["FND"];
+
+/// `typos.toml`: the words the repository means, each allowed as written: the
+/// organization's first, then its own, each once. The header stays as it was,
+/// so a repository that already listed `FND` renders the same bytes under the
+/// gate its CI pins and under this one.
 fn typos(words: &[String]) -> String {
     let mut text = format!(
         "{HEADER}# The words this repository means, from [typos] words in maestro-quality.toml.\n\n\
          [default.extend-words]\n"
     );
-    for word in words {
+    let own = words
+        .iter()
+        .map(String::as_str)
+        .filter(|word| !ORGANIZATION_WORDS.contains(word));
+    for word in ORGANIZATION_WORDS.into_iter().chain(own) {
         let _ = writeln!(text, "{word} = \"{word}\"");
     }
     text
@@ -335,6 +346,22 @@ mod tests {
     }
 
     #[test]
+    fn every_repository_means_the_foundations_prefix_once() {
+        let config = QualityConfig {
+            typos: vec!["FND".to_owned(), "jaq".to_owned()],
+            ..QualityConfig::default()
+        };
+        let files = managed_files(&repository(config)).unwrap();
+        let typos = files
+            .iter()
+            .find(|(path, _)| path == "typos.toml")
+            .map(|(_, text)| text.as_str())
+            .unwrap();
+        assert_eq!(typos.matches("FND = \"FND\"").count(), 1);
+        assert!(typos.ends_with("[default.extend-words]\nFND = \"FND\"\njaq = \"jaq\"\n"));
+    }
+
+    #[test]
     fn the_caller_pins_one_release_and_passes_the_declared_inputs() {
         let config = QualityConfig {
             ci: vec![("platforms".to_owned(), "macos windows".to_owned())],
@@ -357,7 +384,9 @@ mod tests {
              macos windows\n"
         )));
         assert_eq!(caller.matches(&commit).count(), 3);
-        assert!(text("typos.toml").ends_with("[default.extend-words]\njaq = \"jaq\"\n"));
+        assert!(
+            text("typos.toml").ends_with("[default.extend-words]\nFND = \"FND\"\njaq = \"jaq\"\n")
+        );
         let mut unpinned = repository(QualityConfig::default());
         unpinned.pin = None;
         assert!(

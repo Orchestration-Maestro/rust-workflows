@@ -125,10 +125,17 @@ fn every_rendered_hook_runs_a_pinned_version_and_this_repository_runs_them_all()
     };
     let here = ids(&root().join(".pre-commit-config.yaml"));
     for id in ids(&rendered) {
-        // The gate's rules and Clippy run in `just check` here, per crate.
+        // The gate's rules and Clippy run in `just check` here, per crate. The
+        // rule map and the guide are not written here: this repository keeps
+        // its own standards pages and guide, under its own tests, until it
+        // maps its standards onto the golden rules.
         if matches!(
             id.as_str(),
-            "rust-gate-architecture" | "rust-gate-hygiene" | "clippy"
+            "rust-gate-architecture"
+                | "rust-gate-hygiene"
+                | "rust-gate-rules"
+                | "rust-gate-guide"
+                | "clippy"
         ) {
             continue;
         }
