@@ -357,3 +357,10 @@ Rulings taken while executing, newest last.
     `.rumdl.toml`, `.taplo.toml`, `.yamlfmt.yml` and `rust-toolchain.toml`;
     what the gate writes from its data is still compared. The repin that
     follows moves the `export-ignore` line to `PULL_REQUEST_TEMPLATE.md`.
+31. v2.5.0 pinned its gate action at #56 while #57 had changed `.gitattributes`
+    after it: the organization's bot rendered the file with the gate built at
+    the tag, every repository's CI checked it with the pinned action, and the
+    two disagreed, so every sync pull request failed on managed files. The
+    action moves to #57's commit, and a test holds each managed file this
+    repository is the source of to its copy at the pinned commit, so a release
+    can no longer ship two renderings of one file.

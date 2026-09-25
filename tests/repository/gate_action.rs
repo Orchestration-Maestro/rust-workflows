@@ -44,6 +44,41 @@ fn helper_actions_are_pinned_to_one_commit_that_contains_them() {
 }
 
 #[test]
+fn the_pinned_gate_embeds_the_managed_files_this_commit_holds() {
+    // The organization's bot renders a release's managed files with the gate
+    // built at the release tag; every repository's CI checks them with the
+    // gate action this commit pins. A managed file this repository is the
+    // source of must read the same at the pinned commit, or the two renderings
+    // disagree and every sync pull request fails, as v2.5.0's did.
+    let (pins, _, _) = call_sites();
+    let pin = pins.into_iter().next().unwrap();
+    let render = fs::read_to_string(root().join("gate/src/steps/managed_files/render.rs")).unwrap();
+    let sources: Vec<&str> = render
+        .split("include_str!(\"../../../../")
+        .skip(1)
+        .filter_map(|rest| rest.split('"').next())
+        .collect();
+    assert_eq!(sources.len(), 6, "{sources:?}");
+    for source in sources {
+        let pinned = Command::new("git")
+            .args(["show", &format!("{pin}:{source}")])
+            .current_dir(root())
+            .output()
+            .unwrap();
+        assert!(
+            pinned.status.success(),
+            "pinned commit {pin} lacks {source}"
+        );
+        assert_eq!(
+            String::from_utf8(pinned.stdout).unwrap(),
+            fs::read_to_string(root().join(source)).unwrap(),
+            "{source} changed since the pinned gate {pin}: pin the gate action to a commit \
+             that holds it before any release"
+        );
+    }
+}
+
+#[test]
 fn repository_checkout_fetches_the_history_needed_to_verify_gate_pins() {
     let data = workflow("ci-internal");
     let checkout = data["jobs"]["check"]["steps"]
