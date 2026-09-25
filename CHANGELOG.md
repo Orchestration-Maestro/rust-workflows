@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/Orchestration-Maestro/rust-workflows/compare/v3.0.0...v3.0.1) (2026-09-25)
+
+
+### Bug Fixes
+
+* let a subdirectory's markdown settings apply ([#65](https://github.com/Orchestration-Maestro/rust-workflows/issues/65)) ([61b2d5e](https://github.com/Orchestration-Maestro/rust-workflows/commit/61b2d5ee1b01cfc566985a16ab32df081b7271d4))
+
 ## [3.0.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.5.1...v3.0.0) (2026-09-25)
 
 
