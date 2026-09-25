@@ -4,7 +4,9 @@
 
 mod comments;
 mod files;
+mod names;
 mod step;
 mod widths;
+mod words;
 
 pub(super) use step::STEPS;

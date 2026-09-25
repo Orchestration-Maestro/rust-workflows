@@ -73,7 +73,7 @@ fn required_files_exist(root: &Path) {
         ".github/ISSUE_TEMPLATE/bug_report.yml",
         ".github/ISSUE_TEMPLATE/feature_request.yml",
         ".github/ISSUE_TEMPLATE/config.yml",
-        ".github/pull_request_template.md",
+        ".github/PULL_REQUEST_TEMPLATE.md",
         ".github/copilot-instructions.md",
         ".github/workflows/release-please.yml",
         ".github/release-please/config.json",

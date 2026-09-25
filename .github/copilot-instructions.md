@@ -60,10 +60,10 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── upload-coverage.yml                 # Line coverage and test results into Codecov, the one job with id-token: write
 │   │   └── upload-sarif.yml                    # Clippy and secret-scan SARIF into code scanning, the one job with security-events: write
 │   ├── CODEOWNERS                              # Required reviewers for every change
+│   ├── PULL_REQUEST_TEMPLATE.md                # Review checklist and release-impact prompt
 │   ├── actionlint.yml                          # Uses the built-in GitHub-hosted runner labels
 │   ├── copilot-instructions.md                 # This file: the maintained-file map
 │   ├── dependabot.yml                          # Weekly action and Cargo updates, patch and minor grouped per ecosystem
-│   ├── pull_request_template.md                # Review checklist and release-impact prompt
 │   └── zizmor.yml                              # Workflow audit exceptions, each with its reason
 ├── docs/                                       # Contracts, standards and platform boundaries
 │   ├── generators/                             # The jaq filters just docs renders the generated tables with
@@ -149,6 +149,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   ├── golden-rules/                           # The golden rules this release carries, copied from .github
 │   │   ├── commit.txt                          # The .github commit the golden rules were copied from
 │   │   ├── engineering.md                      # Copy of the engineering rules; never edited here
+│   │   ├── glossary.md                         # Copy of the organization's glossary, whose _Never_ words HYG-007 refuses; never edited here
 │   │   ├── northstar.md                        # Copy of the Northstar; never edited here
 │   │   └── security.md                         # Copy of the security rules; never edited here
 │   ├── src/                                    # The three layers: runner, checks, steps
@@ -206,8 +207,10 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   │   ├── comments.rs                 # HYG-001: work left for later names its issue
 │   │   │   │   ├── files.rs                    # HYG-002 to HYG-005: snapshots, large files, modes, case, symlinks, required files
 │   │   │   │   ├── mod.rs                      # The step's door: its modules and its declaration
+│   │   │   │   ├── names.rs                    # HYG-006: every file named the way its kind is named across the organization
 │   │   │   │   ├── step.rs                     # The step: tracked files, the rules, the exceptions and the report
-│   │   │   │   └── widths.rs                   # SIZE-003 for shell scripts and justfiles
+│   │   │   │   ├── widths.rs                   # SIZE-003 for shell scripts and justfiles
+│   │   │   │   └── words.rs                    # HYG-007: no word a glossary marks _Never_, the organization's or CONTEXT.md's
 │   │   │   ├── managed_files/                  # rust-gate sync, sync --check, init and managed-files: the files every repository holds
 │   │   │   │   ├── hooks.rs                    # The commit hooks rendered: prek's checks, each tool through mise, the gate at the release
 │   │   │   │   ├── mod.rs                      # The steps' door: their modules and their declaration

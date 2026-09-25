@@ -21,7 +21,7 @@ pub(crate) const STEPS: &[Step] = &[Step {
 
 /// The rules this step runs: the exceptions it judges are theirs.
 const RULES: &[&str] = &[
-    "HYG-001", "HYG-002", "HYG-003", "HYG-004", "HYG-005", "SIZE-003",
+    "HYG-001", "HYG-002", "HYG-003", "HYG-004", "HYG-005", "HYG-006", "HYG-007", "SIZE-003",
 ];
 
 /// Run the step.
@@ -33,6 +33,8 @@ fn run() -> Outcome {
     let files = tracked_files(&workspace)?;
     let mut found = super::comments::findings(&workspace, &files);
     found.extend(super::files::findings(&workspace, &files));
+    found.extend(super::names::findings(&workspace, &files));
+    found.extend(super::words::findings(&workspace, &files));
     found.extend(super::widths::findings(&workspace, &files, config.limits));
     found.sort();
     found.dedup();

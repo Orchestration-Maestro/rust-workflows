@@ -219,12 +219,14 @@ proofs = [
 [[gate]]
 name = "Repository hygiene"
 kind = "always"
-fails = "A marker without its issue, a pending snapshot, a large file, a mode or link fault, a missing README, LICENSE or CHANGELOG, a wide shell line"
-standard = "HYG-001 to HYG-005, SIZE-003"
+fails = "A marker without its issue, a pending snapshot, a large file, a mode or link fault, a missing README, LICENSE or CHANGELOG, a file named against its kind, a word a glossary never uses, a wide shell line"
+standard = "HYG-001 to HYG-007, SIZE-003"
 proofs = [
   "unlinked_markers_in_comments_are_refused_and_linked_ones_pass",
   "snapshots_large_files_modes_and_links_are_refused",
   "a_readme_a_licence_and_a_changelog_are_required",
+  "file_names_follow_the_form_of_their_kind",
+  "words_a_glossary_never_uses_are_refused_everywhere_but_records",
   "wide_shell_lines_and_justfiles_are_refused",
 ]
 

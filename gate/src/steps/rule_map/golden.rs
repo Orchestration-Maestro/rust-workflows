@@ -1,6 +1,8 @@
-//! The golden rules this release carries: the three pages of the `.github`
+//! The golden rules this release carries: the pages of the `.github`
 //! repository's golden-rules directory, copied beside the gate and embedded
-//! when it is built, and the commit they were copied from.
+//! when it is built, and the commit they were copied from. The three rule
+//! pages are embedded here; the glossary beside them is embedded by the
+//! hygiene step, whose HYG-007 refuses its `_Never_` words.
 
 /// The engineering rules page.
 pub(super) const ENGINEERING: &str = include_str!("../../../golden-rules/engineering.md");

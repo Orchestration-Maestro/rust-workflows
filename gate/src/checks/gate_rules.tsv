@@ -32,6 +32,8 @@ HYG-002	No pending snapshot	none	No `*.snap.new` or `*.pending-snap` committed
 HYG-003	No large file	exception	No file over 500 KB
 HYG-004	Sound files	none	Shebangs match the executable bit; no case clash, no broken symlink
 HYG-005	Required files	none	A `README.md` and a `LICENSE`, and a `CHANGELOG.md` beside release-please
+HYG-006	File names	exception	Each file named as its kind is: kebab-case pages, workflows and scripts, snake_case modules, `NNNN-title.md` records
+HYG-007	One word per concept	exception	No word a glossary marks `_Never_`, the organization's or the repository's `CONTEXT.md`
 COV-001	Coverage floor	none	At least 90 % of lines covered
 COV-002	Covered changes	none	A pull request's new lines covered: 95 % for `feat` and `fix`, 90 % otherwise
 PRL-001	Features come with tests	none	A `feat` or `fix` that changes product code touches a test
