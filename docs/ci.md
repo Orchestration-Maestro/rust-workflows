@@ -1133,7 +1133,9 @@ verified bytes; the attestation workflow signs exactly that digest.
 
 ## Repository testing
 
-`ci-internal.yml` runs `CHECK_NETWORK=1 just check`: Rust development tests, the
+`ci-internal.yml` runs on every pull request and merge group, since this
+repository's ruleset requires its two checks, `Required repository quality` and
+`Required consumer tests`. It runs `CHECK_NETWORK=1 just check`: Rust development tests, the
 gate crate's formatting, Clippy, unit tests and strict rustdoc, actionlint, zizmor,
 yamlfmt, taplo, ShellCheck over the Just recipes and the gate action's build step, real
 fixture checks and live advisory lookup. The isolated test crate uses

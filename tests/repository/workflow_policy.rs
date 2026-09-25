@@ -168,9 +168,11 @@ fn ci_entry_jobs_accept_fork_pull_requests() {
 fn ruleset_workflows_run_on_every_merge_group() {
     // A merge queue merges a group only once every check its rulesets require
     // has reported on the group's commit, so each workflow an organization
-    // ruleset requires runs on `merge_group`. Only a pull request's run gives
-    // way to a newer one: a cancelled merge group run would drop the entry.
-    for name in ["ci", "hygiene"] {
+    // ruleset requires runs on `merge_group`, and so does `ci-internal`,
+    // whose two checks this repository's own ruleset requires. Only a pull
+    // request's run gives way to a newer one: a cancelled merge group run
+    // would drop the entry.
+    for name in ["ci", "hygiene", "ci-internal"] {
         let data = workflow(name);
         let triggers = data["on"].as_object().unwrap();
         assert!(triggers.contains_key("pull_request"), "{name}");
