@@ -21,7 +21,8 @@ suitable workflow dependencies until actual releases and a support policy exist.
 This repository does not claim a published supported release or complete
 GitHub/registry integration. See [platform requirements](docs/platform-requirements.md)
 for the remaining boundaries, and [docs/standards/security.md](docs/standards/security.md)
-for the full control status, including the requirements that are **not** met.
+with [docs/standards/controls.md](docs/standards/controls.md) for the full control
+status, including the requirements that are **not** met.
 
 The `release` environment must have real required reviewers and only the `v*`
 tag deployment policy. Live preflight and write steps verify that configuration

@@ -336,7 +336,8 @@ rules the release carries: `docs/standards/engineering.md`, `security.md` and
 `northstar.md`. A row, a section or a KPI the repository wrote is kept; a rule
 the organization holds everywhere gets its default; any other rule arrives as
 "Not mapped yet". `rust-gate rules --check` refuses a stale page or a row not
-mapped yet.
+mapped yet. This repository's own rule map is written by `just docs` and
+checked in `just check`, from the copy it carries.
 
 `rust-gate guide`, run at the root of a repository, writes its Copilot guide,
 `.github/copilot-instructions.md`: where to start, every tracked file with what

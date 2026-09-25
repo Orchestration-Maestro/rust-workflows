@@ -56,8 +56,8 @@ expect it to print; its last lines are the SPEED reading and the verdict.
 | A step of the binary, or its layout | [docs/rust-gate.md](docs/rust-gate.md), then [docs/steps.md](docs/steps.md) |
 | A publisher, or anything that writes to a registry | [docs/publishing.md](docs/publishing.md) |
 | Runners, registries, authentication or tool sources | [docs/platform-requirements.md](docs/platform-requirements.md) |
-| A quality target, or what counts as evidence | [docs/standards/northstar.md](docs/standards/northstar.md) |
-| Anything, when a rule's enforcement is unclear | [docs/standards/engineering.md](docs/standards/engineering.md), [security.md](docs/standards/security.md) |
+| A quality target, or what counts as evidence | [docs/standards/northstar.md](docs/standards/northstar.md), [controls.md](docs/standards/controls.md) |
+| Anything, when a rule's enforcement is unclear | [docs/standards/engineering.md](docs/standards/engineering.md), [security.md](docs/standards/security.md), [controls.md](docs/standards/controls.md) |
 | A test, its name or its directory | [CONTRIBUTING.md](CONTRIBUTING.md), the gate and the coding standard |
 | A word whose meaning here is narrower than usual | [CONTEXT.md](CONTEXT.md) |
 | Any file, added or removed | [.github/copilot-instructions.md](.github/copilot-instructions.md) |

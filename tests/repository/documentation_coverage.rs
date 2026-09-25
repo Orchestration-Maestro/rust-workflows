@@ -226,6 +226,7 @@ fn every_test_the_standards_cite_exists() {
         "docs/standards/engineering.md",
         "docs/standards/security.md",
         "docs/standards/northstar.md",
+        "docs/standards/controls.md",
         "CONTEXT.md",
         "CONTRIBUTING.md",
         "AGENTS.md",
