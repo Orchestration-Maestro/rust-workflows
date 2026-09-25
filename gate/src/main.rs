@@ -21,7 +21,7 @@ fn main() {
         print!("{}", steps::describe());
         return;
     }
-    let step = arguments.next().unwrap_or_default();
+    let step = arguments.collect::<Vec<_>>().join(" ");
     if let Err(failure) = steps::run(&command, &step) {
         if let Some(message) = failure.message {
             eprintln!("{message}");

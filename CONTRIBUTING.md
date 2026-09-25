@@ -86,6 +86,11 @@ scanning and each fixture's formatting, Clippy, unit/integration/doc/release tes
 90% line-coverage gate, release build, packaging, SBOM validation and the actual
 workflow artifact-staging and selected-package verification commands.
 
+The pre-push hook `scripts/bootstrap.sh` installs runs `just check` before
+every push, the way another repository's runs `rust-gate ci --local`
+([run CI before you push](docs/ci.md#run-ci-before-you-push)): this
+repository's CI is that gate, so a push CI would refuse is refused here first.
+
 `CHECK_NETWORK=1` also fetches one isolated RustSec database snapshot and
 audits the development and all consumer lockfiles, failing on findings or lookup/
 parser errors. Without it the advisory check is explicitly **NOT RUN**;

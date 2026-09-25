@@ -128,16 +128,18 @@ fn every_rendered_hook_runs_a_pinned_version_and_this_repository_runs_them_all()
     let here = ids(&root().join(".pre-commit-config.yaml"));
     for id in ids(&rendered) {
         // The gate's rules and Clippy run in `just check` here, per crate, and
-        // so does `rust-gate rules --check` on this repository's rule map. The
-        // guide is not written here: this repository keeps its own, the model,
-        // under its own inventory test.
+        // so does `rust-gate rules --check` on this repository's rule map;
+        // `just check` is also what runs before a push, where another
+        // repository runs `rust-gate ci --local`. The guide is not written
+        // here: this repository keeps its own, the model, under its own
+        // inventory test.
         if matches!(
             id.as_str(),
             "rust-gate-architecture"
                 | "rust-gate-hygiene"
                 | "rust-gate-rules"
                 | "rust-gate-guide"
-                | "clippy"
+                | "rust-gate-ci"
         ) {
             continue;
         }

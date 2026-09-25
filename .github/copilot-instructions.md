@@ -211,8 +211,15 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   │   ├── step.rs                     # The step: tracked files, the rules, the exceptions and the report
 │   │   │   │   ├── widths.rs                   # SIZE-003 for shell scripts and justfiles
 │   │   │   │   └── words.rs                    # HYG-007: no word a glossary marks _Never_, the organization's or CONTEXT.md's
+│   │   │   ├── local_ci/                       # rust-gate ci --local: the checks job of ci.yml on a developer's machine, before a push
+│   │   │   │   ├── cache.rs                    # What CI's cache keeps between runs, moved into the job and back out
+│   │   │   │   ├── checkout.rs                 # The commit a run checks: a branch as its pull request's merge, the default branch as a push
+│   │   │   │   ├── environment.rs              # The one environment every step starts with: a runner's, each step's exports taken
+│   │   │   │   ├── job.rs                      # ci.yml's jobs as a local run takes them: each step run, done here, or not applied and why
+│   │   │   │   ├── mod.rs                      # The step's door: its five modules and its declarations
+│   │   │   │   └── step.rs                     # rust-gate ci --local: every step in order, fail fast or keep going, and the summary
 │   │   │   ├── managed_files/                  # rust-gate sync, sync --check, init and managed-files: the files every repository holds
-│   │   │   │   ├── hooks.rs                    # The commit hooks rendered: prek's checks, each tool through mise with the organization's options, the gate at the release
+│   │   │   │   ├── hooks.rs                    # The commit hooks rendered: prek's checks, each tool through mise with the organization's options, the gate at the release, CI before a push
 │   │   │   │   ├── mod.rs                      # The steps' door: their modules and their declaration
 │   │   │   │   ├── pin.rs                      # The release a caller pins: a commit and its version
 │   │   │   │   ├── render.rs                   # Every managed file rendered: what a tool or GitHub reads from the repository itself
@@ -243,7 +250,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   ├── install_toolchain.rs            # rust-gate install-tools: what it refuses, honours, and ci.yml installs
 │   │   │   ├── install_tools.rs                # rust-gate install-tools: official release assets, digests verified before extraction
 │   │   │   ├── line_coverage.rs                # rust-gate coverage: LCOV line coverage, failing below the threshold
-│   │   │   ├── local_runs.rs                   # rust-gate architecture, hygiene and clippy --local: a step as a commit hook runs it
+│   │   │   ├── local_runs.rs                   # rust-gate architecture, hygiene and clippy --local: a step as a hook or a developer runs it
 │   │   │   ├── mod.rs                          # One module per step, the registry among them; run and describe are its doors
 │   │   │   ├── mutation_testing.rs             # rust-gate mutants: cargo-mutants scoped to the change, a diff or the last commit
 │   │   │   ├── performance.rs                  # rust-gate performance: PRF-001, declared benchmarks base against head under gungraun
@@ -286,6 +293,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── feature_combinations.rs             # ci.yml: real per-feature and combined compilation, plus replay coverage
 │   │   ├── input_validation.rs                 # unsafe-audit.yml and fuzz.yml: every malformed input refused before a toolchain is touched
 │   │   ├── install_tools.rs                    # rust-gate install-tools: what it refuses, honours, and ci.yml installs
+│   │   ├── local_ci_run.rs                     # rust-gate ci --local: every ci.yml step run or said not applied, a branch as its pull request
 │   │   ├── managed_files.rs                    # init, sync, sync --check and managed-files: written, refused by name, written back
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
 │   │   ├── organization_lints.rs               # LNT-001: written, refused when missing or looser, and read by real Clippy through the gate

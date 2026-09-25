@@ -16,8 +16,9 @@ CHECK_NETWORK=1 just check   # adds the live advisory lookup
 just docs                    # regenerates docs/steps.md and every generated table
 ```
 
-`just check` is the acceptance criterion. Report what it printed, not what you
-expect it to print; its last lines are the SPEED reading and the verdict.
+`just check` is the acceptance criterion, and the pre-push hook runs it before
+every push. Report what it printed, not what you expect it to print; its last
+lines are the SPEED reading and the verdict.
 
 ## Work here
 

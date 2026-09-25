@@ -1,8 +1,9 @@
 //! `rust-gate hooks`: the commit hooks of the repository's
 //! `.pre-commit-config.yaml` over every file, the way a commit runs them, on
 //! the toolbelt `rust-gate setup` installs on a developer's machine. The
-//! hooks CI runs as steps of their own, the formatter, Clippy and the gate's
-//! rules, are skipped rather than run twice. The home of the workflows runs
+//! hooks CI runs as steps of their own, the formatter and the gate's rules,
+//! and the pre-push hook that runs CI's steps, are skipped rather than run
+//! twice. The home of the workflows runs
 //! its own hooks in `just check`, on its pinned toolbelt.
 
 use crate::checks::toolbelt::{install_toolbelt, toolbelt_path};
@@ -41,11 +42,13 @@ pub(crate) const STEPS: &[Step] = &[Step {
     run,
 }];
 
-/// The hooks CI runs as steps of their own, and the two that rewrite the rule
-/// map and the Copilot guide: CI never fails on a stale one, which the daily
-/// drift check reports instead.
-const SKIPPED: &str =
-    "rustfmt,clippy,rust-gate-architecture,rust-gate-hygiene,rust-gate-rules,rust-gate-guide";
+/// The hooks CI runs as steps of their own, the one that runs CI's steps
+/// before a push, and the two that rewrite the rule map and the Copilot guide:
+/// CI never fails on a stale one, which the daily drift check reports instead.
+const SKIPPED: &str = concat!(
+    "rustfmt,rust-gate-ci,rust-gate-architecture,rust-gate-hygiene,",
+    "rust-gate-rules,rust-gate-guide"
+);
 
 /// Run the step.
 fn run() -> Outcome {
