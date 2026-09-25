@@ -167,3 +167,10 @@ fn adapted(root: &Path) -> Outcome {
   in every repository, before the repository's own words and once, so a
   repository that also lists it keeps a valid file:
   `every_repository_means_the_foundations_prefix_once`.
+- The hooks ship only after `.github` stopped writing rule maps and guides
+  with its Python scripts (Orchestration-Maestro/.github#35): its sync and its
+  drift check now run `rust-gate rules` and `rust-gate guide` at the latest
+  release, the same commands at the same release as the hooks, so neither
+  undoes the other. The spec's phase 4 carried the golden rules through an
+  event; `.github`'s sync already carries them with a pull request that merges
+  itself, so that part of phase 4 is done.

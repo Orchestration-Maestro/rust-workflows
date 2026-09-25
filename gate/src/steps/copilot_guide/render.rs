@@ -84,7 +84,7 @@ fn link(label: &str, target: &str) -> String {
     text
 }
 
-/// What to read before editing, and what binds every change.
+/// What to read before editing, and what comes before every change.
 fn reading(root: &Path) -> String {
     let mut reads = vec![format!(
         "{} for the rules that bind every change",
@@ -105,9 +105,13 @@ fn reading(root: &Path) -> String {
         .map_or(("", &[][..]), |(last, first)| (last.as_str(), first));
     format!(
         "Paths below are relative to this repository. Before editing, read {} and {last}. The \
-         organization's {} binds every specification, plan, review and release.",
+         organization's {} come first: nothing in a specification, a plan or this repository \
+         weakens them.",
         first.join(", "),
-        link("constitution", &format!("{ORG}/CONSTITUTION.md"))
+        link(
+            "golden rules",
+            &format!("{ORG}/golden-rules/engineering.md")
+        )
     )
 }
 
@@ -301,8 +305,27 @@ fn is_absolute(target: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_absolute, relinked, repository_name, without_fences, without_first_heading};
+    use super::{
+        is_absolute, reading, relinked, repository_name, without_fences, without_first_heading,
+    };
     use std::path::Path;
+    use std::{env, fs, process};
+
+    #[test]
+    fn the_guide_puts_the_golden_rules_first_and_the_constitution_nowhere() {
+        let root = env::temp_dir().join(format!("guide-reading-{}", process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let text = reading(&root);
+        fs::remove_dir_all(&root).unwrap();
+        assert!(
+            text.contains(concat!(
+                "organization's [golden rules](https://github.com/Orchestration-Maestro/",
+                ".github/blob/main/golden-rules/engineering.md) come first"
+            )),
+            "{text}"
+        );
+        assert!(!text.to_lowercase().contains("constitution"), "{text}");
+    }
 
     #[test]
     fn fenced_blocks_and_the_first_heading_are_dropped() {
