@@ -347,3 +347,13 @@ Rulings taken while executing, newest last.
     step runs both, and `hygiene.yml` runs them as
     `rust-gate hygiene pull-request-names`, so a repository without Rust is
     held too. Neither takes an exception.
+30. #53 renamed the pull request template and edited `.gitattributes` to
+    match; every consumer job refused it, because rust-workflows' own CI runs
+    the gate action it pins, whose `.gitattributes` was read in at an older
+    commit. A file the home is the source of could therefore never change:
+    the pull request that edits it fails, and a repin cannot help, since the
+    pinned commit holds the old copy. In the home, `managed-files` and
+    `sync --check` no longer compare `.editorconfig`, `.gitattributes`,
+    `.rumdl.toml`, `.taplo.toml`, `.yamlfmt.yml` and `rust-toolchain.toml`;
+    what the gate writes from its data is still compared. The repin that
+    follows moves the `export-ignore` line to `PULL_REQUEST_TEMPLATE.md`.

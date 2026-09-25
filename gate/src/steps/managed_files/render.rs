@@ -3,6 +3,14 @@
 //! built, so the home of the gate is the one place to change them; the rest
 //! are written from the gate's data and the repository's
 //! `maestro-quality.toml`.
+//!
+//! The home is not compared with its own sources: `.editorconfig`,
+//! `.gitattributes`, `.rumdl.toml`, `.taplo.toml`, `.yamlfmt.yml` and
+//! `rust-toolchain.toml`. Its CI runs the gate it pins, whose copies are
+//! older than the pull request that edits them, so comparing them would
+//! refuse every change to a source. What the gate writes from its data,
+//! `typos.toml`, the Clippy, nextest, rustfmt and cargo-deny settings and the
+//! manifest's lint block, is compared in the home as everywhere else.
 
 use super::hooks::commit_hooks;
 use super::pin::Pin;
@@ -32,6 +40,16 @@ const RUMDL: &str = include_str!("../../../../.rumdl.toml");
 
 /// The organization's compiler.
 const TOOLCHAIN: &str = include_str!("../../../../rust-toolchain.toml");
+
+/// The files every repository holds as they are in the home, read in when
+/// the gate is built; the home holds their source and is not compared.
+const SOURCES: &[(&str, &str)] = &[
+    (".editorconfig", EDITORCONFIG),
+    (".gitattributes", GITATTRIBUTES),
+    (".rumdl.toml", RUMDL),
+    (".taplo.toml", TAPLO),
+    (".yamlfmt.yml", YAMLFMT),
+];
 
 /// The organization's formatting: rustfmt's own, in the 2024 style.
 const RUSTFMT: &str = "style_edition = \"2024\"\n";
@@ -97,15 +115,13 @@ pub(super) struct Repository {
 
 /// Every managed file of `repository` and its content, in path order.
 pub(super) fn managed_files(repository: &Repository) -> Result<Vec<(String, String)>, String> {
-    let mut files: Vec<(&str, String)> = vec![
-        (".editorconfig", EDITORCONFIG.to_owned()),
-        (".gitattributes", GITATTRIBUTES.to_owned()),
-        (".rumdl.toml", RUMDL.to_owned()),
-        (".taplo.toml", TAPLO.to_owned()),
-        (".yamlfmt.yml", YAMLFMT.to_owned()),
-        ("typos.toml", typos(&repository.config.typos)),
-    ];
+    let mut files: Vec<(&str, String)> = vec![("typos.toml", typos(&repository.config.typos))];
     if !repository.home {
+        files.extend(
+            SOURCES
+                .iter()
+                .map(|(path, text)| (*path, (*text).to_owned())),
+        );
         let pin = repository.pin.as_ref().ok_or(
             "no release to pin: .github/workflows/ci.yml names none; set RUST_WORKFLOWS_PIN to \
              `<commit> v<version>`",
@@ -124,7 +140,9 @@ pub(super) fn managed_files(repository: &Repository) -> Result<Vec<(String, Stri
         let profile = nextest_profile("default", "");
         files.push((".config/nextest.toml", format!("{HEADER}{profile}")));
         files.push(("clippy.toml", format!("{HEADER}{}", clippy_config())));
-        files.push(("rust-toolchain.toml", TOOLCHAIN.to_owned()));
+        if !repository.home {
+            files.push(("rust-toolchain.toml", TOOLCHAIN.to_owned()));
+        }
         files.push(("rustfmt.toml", format!("{HEADER}{RUSTFMT}")));
         files.push(("deny.toml", deny(&repository.config)));
     }
@@ -354,6 +372,26 @@ mod tests {
             "    ignore:\n      - dependency-name: Orchestration-Maestro/rust-workflows*\n      \
              - dependency-name: Orchestration-Maestro/maestro-rust-workflows*\n    groups:\n"
         ));
+    }
+
+    #[test]
+    fn the_home_is_not_compared_with_the_files_it_is_the_source_of() {
+        let mut home = repository(QualityConfig::default());
+        home.home = true;
+        home.pin = None;
+        let files = managed_files(&home).unwrap();
+        let paths: Vec<&str> = files.iter().map(|(path, _)| path.as_str()).collect();
+        assert_eq!(
+            paths,
+            [
+                ".config/nextest.toml",
+                "Cargo.toml",
+                "clippy.toml",
+                "deny.toml",
+                "rustfmt.toml",
+                "typos.toml",
+            ]
+        );
     }
 
     #[test]

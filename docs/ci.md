@@ -274,7 +274,13 @@ duplicate the ecosystem forces is a DEP-001 exception whose `path` names the
 crate and version, `windows-sys@0.52`, rendered as one of cargo-deny's skips
 with its reason. The files every
 repository holds as they are here are rust-workflows' own, read in when the
-gate is built.
+gate is built: `.editorconfig`, `.gitattributes`, `.rumdl.toml`,
+`.taplo.toml`, `.yamlfmt.yml` and `rust-toolchain.toml`. In rust-workflows
+itself neither `managed-files` nor `sync --check` compares them, since its CI
+runs the gate it pins, whose copies predate the pull request that edits them;
+what the gate writes from its data, `typos.toml`, the Clippy, nextest, rustfmt
+and cargo-deny settings and the manifest's lint block, is compared there as
+everywhere else.
 
 ### Commit hooks
 

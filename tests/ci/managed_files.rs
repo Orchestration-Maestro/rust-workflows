@@ -221,6 +221,41 @@ fn the_managed_files_step_refuses_a_difference_in_ci() {
 }
 
 #[test]
+fn the_home_may_change_the_files_it_is_the_source_of() {
+    let mut fixture = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
+    succeeds(&in_project(
+        &fixture,
+        &format!("{} rust-gate init", pin('a', "2.0.0")),
+    ));
+    let project = fixture.root.join("project");
+    fixture.set("GITHUB_WORKSPACE", &project.display().to_string());
+    let edited = format!("{}*.snap binary\n", managed(&fixture, ".gitattributes"));
+    fs::write(project.join(".gitattributes"), &edited).unwrap();
+    refused(
+        &fixture.run("ci", "managed-files"),
+        "managed files: 1 managed file differs from the organization's rendering \
+         (.gitattributes); run rust-gate sync",
+    );
+    // The home of the workflows: its ci.yml is called, not a caller.
+    fs::write(
+        project.join(".github/workflows/ci.yml"),
+        "name: CI\non:\n  workflow_call:\n",
+    )
+    .unwrap();
+    succeeds(&fixture.run("ci", "managed-files"));
+    succeeds(&in_project(&fixture, "rust-gate sync --check"));
+    succeeds(&in_project(&fixture, "rust-gate sync"));
+    assert_eq!(managed(&fixture, ".gitattributes"), edited);
+    // What the gate writes from its data is still the organization's.
+    fs::write(project.join("rustfmt.toml"), "max_width = 120\n").unwrap();
+    refused(
+        &in_project(&fixture, "rust-gate sync --check"),
+        "sync --check: 1 managed file differs from the organization's rendering \
+         (rustfmt.toml); run rust-gate sync",
+    );
+}
+
+#[test]
 fn init_writes_the_rule_map_and_in_a_git_repository_the_guide() {
     let outside = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
     let written = in_project(&outside, &format!("{} rust-gate init", pin('a', "2.0.0")));
