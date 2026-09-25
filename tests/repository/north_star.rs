@@ -44,7 +44,7 @@ const PROMISED_CONTROLS: &[(&str, &[&str], &[&str])] = &[
     (
         "licen",
         &["cargo deny"],
-        &["the_dependency_policy_holds_by_default_and_licences_only_with_a_list"],
+        &["the_organization_dependency_policy_applies_to_every_repository"],
     ),
     (
         "SBOM",

@@ -148,9 +148,6 @@ impl Fixture {
         let project = fixture.root.join("project");
         fs::remove_dir_all(&project).unwrap();
         copy_tree(&root().join("examples").join(name), &project);
-        // Every organization repository holds the organization's clippy.toml
-        // at its root, the thresholds and test allowances Clippy reads.
-        fs::copy(root().join("clippy.toml"), fixture.root.join("clippy.toml")).unwrap();
         for (key, value) in [
             ("CARGO_BUILD_TARGET", "x86_64-unknown-linux-gnu"),
             ("COVERAGE", "90"),
@@ -182,8 +179,9 @@ impl Fixture {
             ),
         )
         .unwrap();
-        // The organization's lints and thresholds, LNT-001, written the way a
-        // repository gets them: by the gate's own command and its clippy.toml.
+        // The organization's lints, LNT-001, written the way a repository gets
+        // them: by the gate's own command. The gate hands Clippy the
+        // organization's thresholds itself.
         let written = tool("rust-gate")
             .args(["lints", "--write"])
             .env(
@@ -194,7 +192,6 @@ impl Fixture {
             .output()
             .unwrap();
         succeeds(&written);
-        fs::copy(root().join("clippy.toml"), fixture.root.join("clippy.toml")).unwrap();
         for (path, source) in files {
             let file = project.join(path);
             fs::create_dir_all(file.parent().unwrap()).unwrap();

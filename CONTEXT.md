@@ -118,12 +118,17 @@ request: MSRV `1.85.0` plus `1.95.0`, `1.96.1`, `1.97.1` and the `1.98.1`
 default. What CI accepts is wider: any exact stable version from the MSRV up,
 never a channel like `stable`, and never nightly inside `ci.yml`.
 
-**deny.toml**: The consumer's committed licence, dependency-ban and source policy.
-It belongs to them, not to us: we run the check against their file. Without one,
-the default policy applies: approved registries only, no git dependency, no
-wildcard version; licences alone are checked against the `LICENSE_ALLOWLIST`
-organization variable when administrators set it, and the report says so when no
-licence list applied.
+**deny.toml**: cargo-deny's policy file, which no repository commits: the gate
+renders DEP-001, the organization's licence, dependency-ban and source policy,
+at run time with the exceptions `maestro-quality.toml` records, adds the
+`LICENSE_ALLOWLIST` organization variable's licences when administrators set
+it, and refuses a `deny.toml` a repository wrote itself.
+
+**Runtime configuration**: The organization's settings a tool receives from
+the gate as it runs, an option on its command line or a file under the
+runner's temporary directory, rather than from a file copied into every
+repository. Only what a tool or GitHub reads from the repository itself stays
+a managed file.
 
 ## Release
 

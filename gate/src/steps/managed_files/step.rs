@@ -1,11 +1,13 @@
-//! The steps: `sync` writes every managed file, and moves every other call to
-//! rust-workflows to the caller's release; `sync --check` and the
-//! `managed-files` step of `ci.yml` refuse any difference, and `init` writes
+//! The steps: `sync` writes every managed file, deletes each retired one it
+//! wrote before, and moves every other call to rust-workflows to the caller's
+//! release; `sync --check` and the `managed-files` step of `ci.yml` refuse any
+//! difference, a retired file still present included, and `init` writes
 //! them for a repository whose caller pins no release yet, with its rule map
 //! and, in a git repository, its Copilot guide.
 
 use super::pin::{Pin, caller_pin, parse_pin, repinned};
-use super::render::{Repository, managed_files};
+use super::render::{RETIRED, Repository, managed_files};
+use crate::checks::organization_config::is_generated;
 use crate::checks::quality_config::read_config;
 use crate::checks::workflow_home::is_workflow_home;
 use crate::runner::{Cmd, Failure, Job, Outcome, Step, input, optional, summary, write};
@@ -136,7 +138,8 @@ fn refuse(context: &str, differing: &[String]) -> Outcome {
 }
 
 /// Write every managed file of the repository at `root`, the release `pin`
-/// names or, without one, the release its caller pins.
+/// names or, without one, the release its caller pins, and delete each
+/// retired one sync wrote.
 fn write_all(root: &Path, pin: Option<&str>) -> Outcome {
     for (path, text) in rendered(root, pin)? {
         let file = root.join(&path);
@@ -145,17 +148,34 @@ fn write_all(root: &Path, pin: Option<&str>) -> Outcome {
         }
         write(&file, text.as_bytes(), false)?;
     }
+    for path in leftovers(root) {
+        fs::remove_file(root.join(&path)).map_err(|error| format!("{path}: {error}"))?;
+    }
     Ok(())
 }
 
 /// The managed files of the repository at `root` whose bytes differ from the
-/// rendering, missing ones included.
+/// rendering, missing ones included, and the retired ones sync wrote.
 fn differences(root: &Path, pin: Option<&str>) -> Result<Vec<String>, Failure> {
-    Ok(rendered(root, pin)?
+    let mut differing: Vec<String> = rendered(root, pin)?
         .into_iter()
         .filter(|(path, text)| fs::read_to_string(root.join(path)).ok().as_ref() != Some(text))
         .map(|(path, _)| path)
-        .collect())
+        .chain(leftovers(root))
+        .collect();
+    differing.sort();
+    Ok(differing)
+}
+
+/// The retired files of the repository at `root` that still open with the
+/// header sync wrote them with. A file without it is the repository's own,
+/// as the home's are, which its own tools read.
+fn leftovers(root: &Path) -> Vec<String> {
+    RETIRED
+        .iter()
+        .filter(|path| is_generated(&root.join(path)))
+        .map(|path| (*path).to_owned())
+        .collect()
 }
 
 /// Every managed file of the repository at `root`, rendered.

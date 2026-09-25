@@ -1,12 +1,13 @@
 //! `rust-gate complexity`: the size of the consumer's functions and files,
 //! reported and never enforced. Clippy measures cognitive complexity, function
 //! length and parameter count against the consumer's own thresholds when a
-//! `clippy.toml` is committed and against this workflow's otherwise; files are
+//! `clippy.toml` is committed and against the organization's otherwise; files are
 //! measured by their lines of code, doc comments not counted. The step exits
 //! zero whatever it finds: the report is information for the consumer.
 
 use crate::checks::checkout_paths::rust_sources;
-use crate::runner::{Cmd, Failure, Job, Outcome, Step, summary, write};
+use crate::checks::organization_config::clippy_directory;
+use crate::runner::{Cmd, Failure, Job, Outcome, Step, input, summary, write};
 use std::cmp::Reverse;
 use std::fmt::Write as _;
 use std::fs;
@@ -17,16 +18,11 @@ pub(crate) const STEPS: &[Step] = &[Step {
     workflow: "ci",
     id: "complexity",
     summary: "Function and file sizes, never blocking",
-    inputs: &[],
+    inputs: &["GITHUB_WORKSPACE"],
     tools: &["cargo clippy", "jaq"],
     reports: &["complexity.json", "complexity.txt"],
     run,
 }];
-
-/// The thresholds applied when the consumer committed no `clippy.toml`.
-const DEFAULT_THRESHOLDS: &str = "cognitive-complexity-threshold = 15\n\
-    too-many-lines-threshold = 100\n\
-    too-many-arguments-threshold = 5\n";
 
 /// Files longer than this many lines of code are listed.
 const FILE_LIMIT: usize = 300;
@@ -51,7 +47,13 @@ fn run() -> Outcome {
     let job = Job::current()?;
     let report = job.report("complexity.txt")?;
     let data = job.report("complexity.json")?;
-    let (thresholds, config_dir) = thresholds_for(&job)?;
+    let workspace = PathBuf::from(input("GITHUB_WORKSPACE")?);
+    let config_dir = clippy_directory(&job.project, &workspace, &job.temp)?;
+    let thresholds = if config_dir.is_some() {
+        "the organization's clippy.toml"
+    } else {
+        "the consumer's clippy.toml"
+    };
     let messages = job.temp.join("complexity-messages.jsonl");
     let mut clippy =
         Cmd::new("cargo clippy --workspace --all-targets --locked --message-format=json --")
@@ -64,7 +66,7 @@ fn run() -> Outcome {
             ])
             .cwd(&job.project);
     if let Some(directory) = &config_dir {
-        clippy = clippy.env("CLIPPY_CONF_DIR", &directory.display().to_string());
+        clippy = clippy.env("CLIPPY_CONF_DIR", directory);
     }
     if clippy.stdout_to(&messages).is_err() {
         write(
@@ -118,21 +120,6 @@ fn run() -> Outcome {
         functions.len(),
         files.len()
     ))
-}
-
-/// Where Clippy's thresholds come from: the consumer's own `clippy.toml`, or
-/// a generated one carrying this workflow's defaults, handed over through
-/// `CLIPPY_CONF_DIR`.
-fn thresholds_for(job: &Job) -> Result<(&'static str, Option<PathBuf>), String> {
-    if job.project.join("clippy.toml").is_file() || job.project.join(".clippy.toml").is_file() {
-        return Ok(("the consumer's clippy.toml", None));
-    }
-    let directory = job.temp.join("complexity-config");
-    fs::create_dir_all(&directory)
-        .map_err(|error| format!("cannot create {}: {error}", directory.display()))?;
-    fs::write(directory.join("clippy.toml"), DEFAULT_THRESHOLDS)
-        .map_err(|error| format!("cannot write the default thresholds: {error}"))?;
-    Ok(("this workflow's defaults", Some(directory)))
 }
 
 /// Every size finding in Clippy's messages.

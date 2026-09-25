@@ -2,7 +2,7 @@
 //! step of `hygiene.yml`: the organization's commit hooks over every file, a
 //! step outside Actions, and the checkout a repository without Rust is.
 
-use crate::harness::{Fixture, refused, succeeds, tool};
+use crate::harness::{Fixture, refused, root, succeeds, tool};
 use std::fs;
 
 #[test]
@@ -34,11 +34,6 @@ fn the_hooks_step_runs_prek_over_every_file_and_skips_what_ci_runs_itself() {
 fn a_step_runs_locally_the_way_a_commit_hook_runs_it() {
     let fixture = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
     let project = fixture.root.join("project");
-    fs::copy(
-        fixture.root.join("clippy.toml"),
-        project.join("clippy.toml"),
-    )
-    .unwrap();
     for (path, text) in [("README.md", "# Fixture\n"), ("LICENSE", "MIT\n")] {
         fs::write(project.join(path), text).unwrap();
     }
@@ -60,10 +55,51 @@ fn a_step_runs_locally_the_way_a_commit_hook_runs_it() {
         &fixture.run_body("cd project && rust-gate hygiene --local"),
         "hygiene: 1 finding",
     );
-    fs::remove_file(project.join("clippy.toml")).unwrap();
+    // A clippy.toml the repository writes itself may tighten the
+    // organization's thresholds, never loosen them.
+    let looser = fs::read_to_string(root().join("clippy.toml"))
+        .unwrap()
+        .replace("= 100", "= 150");
+    fs::write(project.join("clippy.toml"), looser).unwrap();
     refused(
         &fixture.run_body("cd project && rust-gate architecture --local"),
         "source rules: 1 finding",
+    );
+}
+
+#[test]
+fn the_clippy_hook_hands_clippy_the_organization_thresholds_at_run_time() {
+    // No clippy.toml in the repository: Clippy reads the organization's from
+    // a scratch directory. One the repository wrote itself is Clippy's to
+    // read, held no looser by the source rules.
+    let fixture = Fixture::new();
+    fixture.stub(
+        "cargo",
+        r#"printf 'CLIPPY_CONF_DIR=%s\n' "${CLIPPY_CONF_DIR:-}" >> "$CALLS"
+if [[ -n "${CLIPPY_CONF_DIR:-}" ]]; then cat "$CLIPPY_CONF_DIR/clippy.toml" >> "$CALLS"; fi"#,
+    );
+    succeeds(&fixture.run_body("cd project && rust-gate clippy --local"));
+    let calls = fixture.calls();
+    assert!(
+        calls.contains("clippy --workspace --all-targets --locked -- -D warnings\n"),
+        "{calls}"
+    );
+    assert!(
+        calls.contains("too-many-lines-threshold = 100\n"),
+        "{calls}"
+    );
+    let project = fixture.root.join("project");
+    fs::write(
+        project.join("clippy.toml"),
+        "too-many-lines-threshold = 80\n",
+    )
+    .unwrap();
+    fs::write(fixture.root.join("calls"), "").unwrap();
+    succeeds(&fixture.run_body("cd project && rust-gate clippy --local"));
+    assert!(
+        fixture.calls().contains("CLIPPY_CONF_DIR=\n"),
+        "{}",
+        fixture.calls()
     );
 }
 
