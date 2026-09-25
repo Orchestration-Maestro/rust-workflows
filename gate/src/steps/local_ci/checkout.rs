@@ -8,6 +8,7 @@
 
 use super::environment::Environment;
 use crate::runner::{Cmd, Failure};
+use std::fs;
 use std::path::Path;
 
 /// The commit checked out and what GitHub would say about its run.
@@ -53,8 +54,10 @@ pub(super) fn repository_root(environment: &Environment) -> Result<String, Failu
     Ok(top.trim().to_owned())
 }
 
-/// Check the committed state of `root` out into `directory`, reusing the
-/// clone a previous run left there.
+/// Check the committed state of `root` out into a fresh clone in
+/// `directory`, as a runner's checkout is: every file written anew, so a
+/// build the last run kept, a mutant's included, is never taken for this
+/// run's sources.
 pub(super) fn check_out(
     environment: &Environment,
     root: &Path,
@@ -66,12 +69,14 @@ pub(super) fn check_out(
         .capture()
         .map(|name| name.trim().to_owned())
         .unwrap_or_default();
-    if !directory.join(".git").is_dir() {
-        git(environment, Path::new("."))?
-            .args(["init", "--quiet"])
-            .arg(directory)
-            .run()?;
+    if directory.exists() {
+        fs::remove_dir_all(directory)
+            .map_err(|error| format!("{}: {error}", directory.display()))?;
     }
+    git(environment, Path::new("."))?
+        .args(["init", "--quiet"])
+        .arg(directory)
+        .run()?;
     git(environment, directory)?
         .args(["fetch", "--quiet", "--no-tags", "--force"])
         .arg(root)

@@ -8,7 +8,7 @@
 
 pub(crate) mod cargo_metadata;
 pub(crate) mod checkout_paths;
-mod digests;
+pub(crate) mod digests;
 pub(crate) mod findings;
 pub(crate) mod gate_rules;
 pub(crate) mod inputs;

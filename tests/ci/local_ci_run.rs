@@ -41,8 +41,14 @@ case $1 in
   registry)
     mkdir -p "$RUNNER_TEMP/cargo-home"
     printf 'CARGO_HOME=%s\n' "$RUNNER_TEMP/cargo-home" >> "$GITHUB_ENV" ;;
-  quality) mkdir -p "$RUNNER_TEMP/rust-target" && touch "$RUNNER_TEMP/rust-target/built" ;;
-  features|mutants) printf 'applied=false\n' >> "$GITHUB_OUTPUT" ;;
+  quality)
+    kept="$RUNNER_TEMP/rust-target/built"
+    {{ [[ Cargo.toml -nt "$kept" ]] && echo newer || echo older; }} >> {root}/sources
+    mkdir -p "$RUNNER_TEMP/rust-target" && touch "$kept" ;;
+  mutants)
+    touch "$RUNNER_TEMP/rust-target/built"
+    printf 'applied=false\n' >> "$GITHUB_OUTPUT" ;;
+  features) printf 'applied=false\n' >> "$GITHUB_OUTPUT" ;;
 esac
 if [[ -e {root}/fail-$1 ]]; then echo "the $1 stand-in failed" >&2; exit 3; fi
 "#
@@ -275,6 +281,10 @@ fn the_build_directory_of_one_run_serves_the_next() {
         .unwrap()
         .path();
     assert!(kept.join("cache/RUNNER_TEMP/rust-target/built").is_file());
+    // The checkout is written anew, every file newer than the build a mutant
+    // of the last run left, so that build is never taken for these sources.
+    let sources = fs::read_to_string(fixture.root.join("sources")).unwrap();
+    assert!(!sources.contains("older"), "{sources}");
     // A run stopped midway leaves the build directory in the job; the next
     // run keeps it before it starts afresh.
     fs::rename(

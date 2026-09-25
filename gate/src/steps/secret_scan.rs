@@ -28,7 +28,9 @@ fn run() -> Outcome {
         .arg(path("GITHUB_WORKSPACE")?)
         .args(["archive", "HEAD"])
         .capture_bytes()?;
-    Cmd::new("tar -x -C")
+    // `-f -` names the standard input: a BSD tar reads a tape device
+    // otherwise.
+    Cmd::new("tar -x -f - -C")
         .arg(&source)
         .stdin_bytes(&archive)
         .run()?;

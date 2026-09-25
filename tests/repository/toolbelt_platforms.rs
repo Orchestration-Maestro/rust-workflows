@@ -1,9 +1,9 @@
 //! The toolbelt on every platform `rust-gate setup` installs it on: each pin
 //! locked to a release asset of that platform with its checksum, or a gap
 //! `mise.toml` declares with its reason, mise told to leave it out there, and
-//! nothing else.
+//! nothing else; and CI's checks run on it before a push on each platform.
 
-use crate::harness::{capture, query, root, tool};
+use crate::harness::{capture, query, root, tool, workflow};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 
@@ -162,4 +162,49 @@ fn every_pin_is_locked_with_a_checksum_on_every_platform_or_declares_its_gap() {
         }
     }
     assert!(checked > 120, "only {checked} downloads checked");
+}
+
+#[test]
+fn every_platform_runs_ci_s_checks_before_a_push_and_stops_a_broken_change() {
+    // `rust-gate ci --local` runs the same on every platform the toolbelt is
+    // pinned for: the workflow that proves the toolbelt runs it on a runner of
+    // each, over a consumer whose default branch passes and whose failing test
+    // stops at the step ci.yml names for it.
+    let platforms = workflow("toolbelt-platforms");
+    let job = &platforms["jobs"]["toolbelt"];
+    let runners: Vec<&str> = job["strategy"]["matrix"]["include"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|leg| leg["runner"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        runners,
+        [
+            "ubuntu-24.04",
+            "ubuntu-24.04-arm",
+            "macos-15-intel",
+            "macos-15",
+            "windows-2025"
+        ]
+    );
+    let body = job["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|step| step["run"].as_str())
+        .find(|run| run.contains("rust-gate ci --local"))
+        .unwrap();
+    assert_eq!(body.matches("rust-gate ci --local").count(), 2, "{body}");
+    let quality = workflow("ci")["jobs"]["checks"]["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|step| step["id"] == "quality")
+        .map(|step| step["name"].as_str().unwrap().to_owned())
+        .unwrap();
+    assert!(
+        body.contains(&format!("'^ci --local: one step failed: {quality}'")),
+        "{body}"
+    );
 }

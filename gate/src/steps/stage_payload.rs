@@ -5,6 +5,7 @@
 
 use crate::checks::cargo_metadata::EXECUTABLES;
 use crate::checks::checkout_paths::{canonical, strictly_inside};
+use crate::checks::digests::sha256_hex;
 use crate::checks::simple_names::simple;
 use crate::runner::{Cmd, Failure, Job, Outcome, Step, input, path, write};
 use std::fmt::Write as _;
@@ -17,7 +18,7 @@ pub(crate) const STEPS: &[Step] = &[Step {
     id: "stage",
     summary: "Stage immutable release payload",
     inputs: &["CARGO_TARGET_DIR", "GITHUB_SHA", "GITHUB_WORKSPACE"],
-    tools: &["cargo sbom", "cyclonedx", "jaq", "sha256sum", "tar"],
+    tools: &["cargo sbom", "cyclonedx", "jaq", "tar"],
     reports: &["*.spdx.json", "payload.cdx.json"],
     run,
 }];
@@ -230,11 +231,12 @@ impl Payload<'_> {
     /// The tarball, its provenance and the checksums of both, from the lists of
     /// what went into it.
     fn seal(&self, release: &Path, binaries: &[String], members: &[String]) -> Outcome {
-        Cmd::new("tar -czf")
-            .arg(release.join("payload.tar.gz"))
-            .arg("-C")
+        // The archive is named relative to the release directory: a GNU tar
+        // on Windows reads `C:\...` as a remote host.
+        Cmd::new("tar -czf payload.tar.gz -C")
             .arg(&self.directory)
             .arg(".")
+            .cwd(release)
             .run()?;
         let binaries_list = self.job.temp.join("binaries");
         let sboms_list = self.job.temp.join("sboms");
@@ -258,9 +260,15 @@ impl Payload<'_> {
          sboms: ($sboms | split(\"\\n\") | map(select(length > 0)) | sort)}",
             )
             .stdout_to(&release.join("provenance.json"))?;
-        Cmd::new("sha256sum payload.tar.gz provenance.json")
-            .cwd(release)
-            .stdout_to(&release.join("SHA256SUMS"))
+        // The checksums in sha256sum's own format, computed here so that no
+        // platform needs a sha256sum of its own.
+        let mut sums = String::new();
+        for name in ["payload.tar.gz", "provenance.json"] {
+            let bytes = fs::read(release.join(name))
+                .map_err(|error| format!("cannot read {name}: {error}"))?;
+            let _ = writeln!(sums, "{}  {name}", sha256_hex(&bytes));
+        }
+        write(&release.join("SHA256SUMS"), sums.as_bytes(), false)
     }
 }
 

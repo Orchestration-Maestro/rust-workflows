@@ -465,7 +465,8 @@ line above its pin declares. gungraun-runner is the one tool left out: it
 drives Valgrind, which runs on Linux alone, so on macOS and Windows `setup`
 names it and the [performance budget](#performance-budget) runs in Linux CI.
 `toolbelt-platforms.yml` runs `setup` from nothing on each of those platforms,
-then a consumer's rendered hooks through the `hooks` step.
+then a consumer's rendered hooks through the `hooks` step, then
+[CI before a push](#run-ci-before-you-push) over the library example.
 
 A repository keeps no tool pins of its own: `managed-files` and `rust-gate
 sync --check` refuse a `mise.toml`, `mise.lock`, `.mise.toml`,
@@ -513,10 +514,18 @@ checkout and build, the tool installations, whose tools the toolbelt already
 holds, the artifact uploads, and the portability, upload and required-status
 jobs. On macOS and Windows `hardening` is not applied, since it reads the ELF
 binaries a Linux build writes, and the build targets the machine's own
-platform; `performance` runs only with Valgrind on the PATH. A test runs the
-command against the job and fails when a step of `ci.yml` is neither run nor
-declared not applied
-(`every_step_of_the_ci_job_runs_locally_or_says_why_not`).
+platform; `performance` runs only with Valgrind on the PATH. Every other step
+runs the same on Linux, macOS and Windows, with no tool the toolbelt does not
+hold: the gate computes each digest itself and gives every tar the arguments
+GNU and BSD tar read alike. A test runs the command against the job and fails
+when a step of `ci.yml` is neither run nor declared not applied
+(`every_step_of_the_ci_job_runs_locally_or_says_why_not`), and
+`toolbelt-platforms.yml` runs it on a runner of each of the five platforms,
+the library example's default branch passing and a failing test stopped at the
+quality step
+(`every_platform_runs_ci_s_checks_before_a_push_and_stops_a_broken_change`).
+Each run checks out a fresh clone, as a runner does, so a build a mutant of the
+last run left is never taken for this run's sources.
 
 rust-workflows has no Cargo package at its root and no `ci.yml` run of its
 own; its pre-push hook runs `just check`.

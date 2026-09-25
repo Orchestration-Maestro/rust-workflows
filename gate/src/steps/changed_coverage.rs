@@ -6,6 +6,7 @@
 //! three-line change is not failed by one: `max(1, floor((100 - target) % of
 //! n))`. A push has no base to compare with, and nothing is measured.
 
+use crate::checks::findings::relative;
 use crate::checks::pull_request::{added_lines, pull_request_diff, title_type};
 use crate::runner::{Failure, Job, Outcome, Step, input, optional, output, summary, write};
 use std::collections::BTreeMap;
@@ -91,12 +92,9 @@ fn executed_lines(lcov: &str, workspace: &Path) -> BTreeMap<String, BTreeMap<usi
     let mut file = String::new();
     for line in lcov.lines() {
         if let Some(path) = line.strip_prefix("SF:") {
-            let path = Path::new(path);
-            file = path
-                .strip_prefix(workspace)
-                .unwrap_or(path)
-                .to_string_lossy()
-                .into_owned();
+            // Named as the diff names it, `/`-separated under the checkout,
+            // on Windows and through a symbolic link too.
+            file = relative(workspace, Path::new(path));
         } else if let Some(record) = line.strip_prefix("DA:") {
             let mut fields = record.split(',');
             let number = fields.next().and_then(|field| field.parse().ok());

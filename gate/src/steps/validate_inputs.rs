@@ -4,6 +4,7 @@
 //! starts, takes the same values from `maestro-quality.toml` instead.
 
 use crate::checks::checkout_paths::{canonical, committed_file, inside, project_directory};
+use crate::checks::digests::sha256_hex;
 use crate::checks::inputs::{
     LicensePolicy, artifact_key, clippy_level, coverage_threshold, license_policy, unsafe_policy,
 };
@@ -38,7 +39,7 @@ pub(crate) const STEPS: &[Step] = &[Step {
         "UNSAFE_POLICY",
         "UNUSED_DEPENDENCIES",
     ],
-    tools: &["git", "jaq", "rust-gate", "sha256sum"],
+    tools: &["git", "jaq", "rust-gate"],
     reports: &[],
     run,
 }];
@@ -243,14 +244,7 @@ fn relative_directory(project: &Path, root: &Path) -> Result<String, Failure> {
 /// one identity, then the revision, run and attempt, so two matrix cases can
 /// never share a name.
 fn artifact_name(relative: &str, artifact_key: &str, toolchain: &str) -> Result<String, Failure> {
-    let identity = Cmd::new("sha256sum")
-        .stdin_bytes(format!("{relative}:{artifact_key}:{toolchain}").as_bytes())
-        .capture()?;
-    let digest = identity
-        .split_whitespace()
-        .next()
-        .unwrap_or_default()
-        .to_owned();
+    let digest = sha256_hex(format!("{relative}:{artifact_key}:{toolchain}").as_bytes());
     Ok(format!(
         "rust-{}-x86_64-unknown-linux-gnu-{digest}-{}-{}",
         input("GITHUB_SHA")?,
