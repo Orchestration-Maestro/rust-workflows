@@ -134,7 +134,7 @@ jobs:
       actions: read  # inspect release environment reviewers and tag policies
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@12f8b536457153e7e1285ccee2d77eb3c804b3a6  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@f54152a049c3e4645866283016e70c293a8260b7  # rust-workflows: the commit that ships this gate
       - name: Install verified JSON tool
         run: rust-gate install-tools
         env:
@@ -185,7 +185,7 @@ jobs:
       toolchain: ${{ steps.toolchain.outputs.channel }}
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@12f8b536457153e7e1285ccee2d77eb3c804b3a6  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@f54152a049c3e4645866283016e70c293a8260b7  # rust-workflows: the commit that ships this gate
       - name: Checkout validated consumer revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -247,7 +247,7 @@ jobs:
     environment: release
     steps:
       - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@12f8b536457153e7e1285ccee2d77eb3c804b3a6  # rust-workflows: the commit that ships this gate
+        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@f54152a049c3e4645866283016e70c293a8260b7  # rust-workflows: the commit that ships this gate
       - name: Checkout validated consumer revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
