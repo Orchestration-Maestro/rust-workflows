@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.0.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.5.1...v3.0.0) (2026-09-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* pass the organization's tool settings at run time ([#63](https://github.com/Orchestration-Maestro/rust-workflows/issues/63))
+* run ci.yml from the organization ruleset with its own gate ([#61](https://github.com/Orchestration-Maestro/rust-workflows/issues/61))
+
+### Features
+
+* pass the organization's tool settings at run time ([#63](https://github.com/Orchestration-Maestro/rust-workflows/issues/63)) ([43ddac4](https://github.com/Orchestration-Maestro/rust-workflows/commit/43ddac4783923a48672952f2a532d5e01a1ef7cb))
+* run ci.yml from the organization ruleset with its own gate ([#61](https://github.com/Orchestration-Maestro/rust-workflows/issues/61)) ([75015a9](https://github.com/Orchestration-Maestro/rust-workflows/commit/75015a91f7fdbcf02bd84e669d61a6b7040af2c8))
+
+
+### Bug Fixes
+
+* install jaq before reading a repository's settings ([#64](https://github.com/Orchestration-Maestro/rust-workflows/issues/64)) ([5bbf614](https://github.com/Orchestration-Maestro/rust-workflows/commit/5bbf614a50ce10308e8ae4df7217aa9f4e0c727d))
+
 ## [2.5.1](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.5.0...v2.5.1) (2026-09-25)
 
 
