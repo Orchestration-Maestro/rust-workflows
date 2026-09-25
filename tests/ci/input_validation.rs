@@ -376,18 +376,19 @@ fn ci_validates_the_licence_and_unsafe_policies_before_any_work() {
             "license-policy must reject {value:?}"
         );
     }
-    // A reusable workflow is adopted by many consumers: the default must never
-    // fail a repository that has not committed a licence policy yet, while the
-    // explicit `enforce` value must refuse to pass silently without one.
-    for policy in ["auto", "off"] {
+    // The organization's licence policy always applies: `auto` and `enforce`
+    // both name it, neither needs a committed deny.toml, and `off` is refused.
+    for policy in ["auto", "enforce"] {
         fixture.set("LICENSE_POLICY", policy);
         succeeds(&fixture.run("ci", "validate"));
     }
-    fixture.set("LICENSE_POLICY", "enforce");
+    fixture.set("LICENSE_POLICY", "off");
     refused(
         &fixture.run("ci", "validate"),
-        "license-policy=enforce requires a committed deny.toml",
+        "license-policy=off is refused: the organization's licence policy always applies, \
+         and no repository opts out",
     );
+    fixture.set("LICENSE_POLICY", "auto");
     symlink("/etc/hostname", fixture.root.join("project/deny.toml")).unwrap();
     refused(&fixture.run("ci", "validate"), "deny.toml escapes checkout");
     fs::remove_file(fixture.root.join("project/deny.toml")).unwrap();

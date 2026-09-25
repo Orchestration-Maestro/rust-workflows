@@ -1,7 +1,8 @@
 name: Build the gate
 description: >-
   Builds rust-gate, the binary every step of these workflows runs, from the
-  pinned commit of this repository with the compiler the crate pins, and puts
+  checkout of this repository at the workflow's own commit, `job.workflow_sha`,
+  with the compiler the crate pins, and puts
   it on the PATH of every later step. Rebuilt in a fresh directory on every
   invocation; the crate has no dependency, so nothing is fetched beyond that compiler.
 runs:

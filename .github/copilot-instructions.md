@@ -296,6 +296,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── release_payload_refusals.rs         # The release payload's refusals: lockfile drift, unhardened or irreproducible binaries, malformed staging
 │   │   ├── repository_hygiene.rs               # ci.yml: HYG-001 to HYG-005 and shell width, each refused by name
 │   │   ├── rule_map.rs                         # rules and rules --check: written, kept, refused when stale or unmapped
+│   │   ├── ruleset_settings.rs                 # ci.yml run by a ruleset: its inputs from the base commit's [ci], macOS and Windows kept
 │   │   ├── scorecard_and_required_status.rs    # ci.yml: the scorecard, the required status and mutation testing
 │   │   ├── scorecard_states.rs                 # ci.yml: selection, applicability and execution reported separately
 │   │   ├── source_rules.rs                     # ci.yml: SIZE, NAME, DOC, LIB, TST and WSP, each refused by name, and the limits a repository tightens
@@ -331,7 +332,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── documentation_coverage.rs           # Every report, input and secret documented; links resolve; cited tests exist
 │   │   ├── evidence_receipt.rs                 # The evidence receipt: produced only when every upstream result succeeded
 │   │   ├── executable_stubs.rs                 # Stand-in executables written outside the test process, so none is refused as Text file busy
-│   │   ├── gate_action.rs                      # The gate action: one pin at every call site, and a commit that ships it
+│   │   ├── gate_action.rs                      # The gate action: built from the workflow's own commit in every job
 │   │   ├── gate_rules.rs                       # Every rule the gate names is listed, and has its row in docs/ci.md
 │   │   ├── generated_documents.rs              # Every generated table and the diagram's count are what just docs writes
 │   │   ├── metadata_and_inventory.rs           # Repository files, hook, editor and release policies, the Copilot inventory

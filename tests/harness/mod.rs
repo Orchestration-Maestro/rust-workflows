@@ -15,5 +15,5 @@ pub(crate) use repository::{
     write_executable,
 };
 pub(crate) use workflow_yaml::{
-    GATE_STEPS, action, helper_action, query, step, tool_rows, workflow, workflow_steps,
+    GATE_STEPS, action, query, step, tool_rows, workflow, workflow_steps,
 };

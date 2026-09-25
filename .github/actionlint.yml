@@ -1,2 +1,7 @@
 # GitHub-hosted ubuntu-24.04 is built in; no self-hosted labels.
-{}
+paths:
+  .github/workflows/*.yml:
+    ignore:
+      # The job context names the running workflow's repository and commit,
+      # which the gate is built from; actionlint 1.7.12 predates both.
+      - 'property "workflow_(repository|sha)" is not defined in object type'

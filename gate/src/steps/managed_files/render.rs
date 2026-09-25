@@ -16,7 +16,7 @@ use super::hooks::commit_hooks;
 use super::pin::Pin;
 use crate::checks::lint_policy::{clippy_config, with_lint_block};
 use crate::checks::nextest_profile::nextest_profile;
-use crate::checks::quality_config::QualityConfig;
+use crate::checks::quality_config::{DESKTOPS, QualityConfig};
 use crate::checks::workflow_home::{NAMES, ORGANIZATION};
 use std::fmt::Write as _;
 
@@ -259,14 +259,15 @@ fn hygiene_caller(pin: &Pin) -> String {
 }
 
 /// The caller of the reusable workflows: the gate at `pin` with the inputs
-/// `maestro-quality.toml` passes, then the uploads of its reports.
+/// `maestro-quality.toml` passes, then the uploads of its reports. Every Rust
+/// repository tests macOS and Windows: without `platforms`, it passes those.
 fn caller(pin: &Pin, inputs: &[(String, String)]) -> String {
-    let mut with = String::new();
-    if !inputs.is_empty() {
-        with.push_str("    with:\n");
-        for (key, value) in inputs {
-            let _ = writeln!(with, "      {key}: {value}");
-        }
+    let mut with = String::from("    with:\n");
+    if !inputs.iter().any(|(key, _)| key == "platforms") {
+        let _ = writeln!(with, "      platforms: {}", DESKTOPS.join(" "));
+    }
+    for (key, value) in inputs {
+        let _ = writeln!(with, "      {key}: {value}");
     }
     let upload = |job: &str, workflow: &str, scope: &str| {
         format!(
@@ -436,6 +437,14 @@ mod tests {
         assert!(
             text("typos.toml").ends_with("[default.extend-words]\nFND = \"FND\"\njaq = \"jaq\"\n")
         );
+        // Without `platforms`, the caller still tests macOS and Windows.
+        let bare = managed_files(&repository(QualityConfig::default())).unwrap();
+        assert!(bare.iter().any(|(path, text)| {
+            path == ".github/workflows/ci.yml"
+                && text.contains(
+                    "      contents: read\n    with:\n      platforms: macos windows\n  #",
+                )
+        }));
         let mut unpinned = repository(QualityConfig::default());
         unpinned.pin = None;
         assert!(

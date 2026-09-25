@@ -1,6 +1,10 @@
 name: Hygiene
 # Contract: The checks every repository holds to, for one without Rust: secrets, hygiene, the pull request title and branch, managed files and the commit hooks over every file
 "on":
+  # The organization's hygiene-ci ruleset requires this file on every pull
+  # request of a repository without Rust, in that repository's context.
+  pull_request:
+  merge_group:
   workflow_call:
 permissions:
   contents: read
@@ -16,18 +20,27 @@ jobs:
   # hygiene-required ruleset requires, "hygiene / Required hygiene".
   hygiene:
     name: Required hygiene
+    # This repository holds itself to ci-internal.yml, not to this file.
+    if: ${{ github.repository != 'Orchestration-Maestro/rust-workflows' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
     steps:
+      - name: Checkout the gate at this workflow's commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+      - name: Build the gate
+        uses: ./.github/actions/gate
+      # Replaces the gate's checkout: another repository's is deleted first.
       - name: Checkout consumer revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Build the gate
-        uses: Orchestration-Maestro/rust-workflows/.github/actions/gate@4f1bef9262c4cd87fccf7683fa1872465c7af7a9  # rust-workflows: the commit that ships this gate
       - name: Name the checkout and the reports directory
         id: prepare
         run: rust-gate hygiene prepare

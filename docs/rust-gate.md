@@ -1,7 +1,7 @@
 # The gate: one binary instead of step bodies
 
 `rust-gate` is a standard-library-only Rust binary in `gate/`. The workflows
-build it from the pinned commit of this repository through the
+build it from this repository at their own commit, `job.workflow_sha`, through the
 `.github/actions/gate` action, put it on the PATH, and every step then runs
 one subcommand: `rust-gate validate`, `rust-gate stage`, and so on. Inputs
 reach it exactly as the step bodies received them, through `env:`.
@@ -11,8 +11,8 @@ reach it exactly as the step bodies received them, through `env:`.
 A reusable workflow runs in the consumer's checkout and cannot read a script
 from this repository, so every step body was Bash inline in YAML: 510 lines
 in `ci.yml` alone, tested only through a harness that stubs `curl`, `tar` and
-`sha256sum`. A binary built from the pinned commit has the same trust model as
-that Bash (the commit SHA pins it), is typed, has unit tests for its own
+`sha256sum`. A binary built from the workflow's own commit has the same trust model as
+that Bash (the commit SHA that pins the workflow pins it), is typed, has unit tests for its own
 helpers, is exercised end to end by the same contract tests that held the
 Bash, and leaves each workflow step one line long.
 

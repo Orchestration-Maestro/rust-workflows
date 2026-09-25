@@ -112,9 +112,13 @@ workflows.
   <img src=".github/assets/how-it-works.svg" alt="A consumer repository calls the reusable Rust CI on every commit or pull request. Publishing runs that same CI with one job in front of it: a preflight job authorises the boundary before any build, the same revision runs CI, a staging job re-verifies the exact artifact, and the publishing job runs only once the dry run is turned off. Signing and evidence upload are opt-in workflows because they hold elevated scopes. There is no route into publication that skips CI." width="100% From the same run, opt-in jobs upload SARIF findings to code scanning and coverage to Codecov, and test on macOS, Windows and Linux arm64." />
 </p>
 
-1. A consumer calls a reviewed workflow revision. The job runs on
-   `ubuntu-24.04`, checks out the consumer's commit and builds `rust-gate`, the
-   binary that holds every step body, from this repository's pinned commit.
+1. The organization's `rust-ci` ruleset runs `ci.yml` at a reviewed commit on
+   every pull request of a Rust repository, which needs no `ci.yml` caller; a
+   caller may still call it. The job runs on `ubuntu-24.04`, builds `rust-gate`,
+   the binary that holds every step body, from this repository at that commit,
+   and checks out the consumer's commit. Settings come from `[ci]` in
+   `maestro-quality.toml`; see [how a repository is
+   enforced](docs/ci.md#how-a-repository-is-enforced).
 2. Every commit and pull request runs CI directly. CI validates every input,
    then runs the [gates](#-gates): formatting, Clippy, tests, coverage,
    advisories, secret scan, declared MSRV, dependency policy, unused
@@ -248,6 +252,7 @@ A golden workflow enforces the standard: no input switches these off.
 | Release build | A release build or release-mode test failure, a binary that does not rebuild to the same digest, one without PIE, RELRO, BIND_NOW and a non-executable stack, or one missing its embedded dependency list | SCH-008, SCH-009 | `the_release_build_must_be_reproducible_and_auditable_or_fail` |
 | Payload and SBOMs | A lockfile that changes during SBOM generation, an invalid CycloneDX or SPDX document, or a payload whose checksums do not verify | SCH-003, SCH-004 | `release_payload_carries_both_sbom_formats_and_auditable_binaries`, `sbom_staging_rejects_malformed_data_and_emits_verifiable_payload` |
 | Input validation | Any input the workflow cannot prove safe, before a job does any work: paths, versions, keys, publication boundaries | SEC-002, SEC-003 | `ci_rejects_unsafe_paths_and_symlinks`, `ci_validates_toolchain_threshold_and_artifact_identity` |
+| Dependency policy | Violations of your `deny.toml`, or the default source/version policy; licence checks apply only with a consumer policy or `LICENSE_ALLOWLIST`. No repository opts out: `license-policy: off` is refused | SCH-010 | `ci_validates_the_licence_and_unsafe_policies_before_any_work`, `the_organization_allowlist_adds_licences_and_a_committed_policy_wins`, `the_dependency_policy_holds_by_default_and_licences_only_with_a_list` |
 | Source rules | A finding of ARC, SIZE, NAME, DOC, LIB, TST, WSP or LNT: an import cycle, a door that does more than declare, a file or line past its limit, a name out of form, a lint not denied | ARC, SIZE, NAME, DOC, LIB, TST, WSP and LNT | `an_import_cycle_between_two_files_is_refused_by_name`, `a_door_holding_a_function_is_refused_and_a_listing_door_passes`, `a_path_past_a_door_re_export_is_refused`, `declared_layers_refuse_an_import_within_or_against_the_order`, `layers_declared_for_a_root_no_target_has_are_refused`, `a_seam_serving_one_outside_caller_is_refused_unless_excused`, `a_binary_root_beyond_declarations_and_a_short_main_is_refused`, `path_attributes_and_rust_includes_are_refused_while_include_str_passes`, `the_quality_file_refuses_unknown_tables_and_unreasoned_exceptions`, `oversized_files_and_lines_are_refused_and_three_hundred_is_reported`, `package_names_follow_the_form_and_publishable_ones_the_prefix`, `badly_named_tests_and_one_word_test_modules_are_refused`, `a_file_without_a_module_comment_is_refused`, `printing_from_a_library_is_refused_and_from_a_binary_allowed`, `a_library_depending_on_anyhow_is_refused_but_a_binary_is_not`, `sleeping_in_a_test_is_refused_unless_excused`, `more_than_one_plain_integration_test_crate_is_refused`, `workspace_members_inherit_their_settings_and_dependencies`, `edition_resolver_and_lockfile_are_held`, `tightened_limits_apply_and_loosened_ones_are_refused`, `a_manifest_without_the_organization_lints_is_refused_until_written`, `a_clippy_toml_looser_than_the_organization_s_is_refused`, `clippy_knows_every_organization_lint_and_applies_it` |
 | Repository hygiene | A marker without its issue, a pending snapshot, a large file, a mode or link fault, a missing README, LICENSE or CHANGELOG, a file named against its kind, a word a glossary never uses, a wide shell line | HYG-001 to HYG-007, SIZE-003 | `unlinked_markers_in_comments_are_refused_and_linked_ones_pass`, `snapshots_large_files_modes_and_links_are_refused`, `a_readme_a_licence_and_a_changelog_are_required`, `file_names_follow_the_form_of_their_kind`, `words_a_glossary_never_uses_are_refused_everywhere_but_records`, `wide_shell_lines_and_justfiles_are_refused` |
 | Managed files | A managed file whose bytes differ from the gate's rendering, missing ones included | The generated files of every repository, TST-004, DEP-001 | `init_writes_every_managed_file_and_the_check_finds_them_equal`, `a_managed_file_changed_by_hand_is_refused_and_sync_writes_it_back`, `the_managed_files_step_refuses_a_difference_in_ci`, `the_home_may_change_the_files_it_is_the_source_of` |
@@ -269,7 +274,6 @@ Each is one input to switch off, documented in [docs/ci.md](docs/ci.md).
 | `unsafe` ban | `unsafe-policy: allow` | An `unsafe` block in your crates; dependencies are unaffected | SST-001 | `clippy_denies_leftover_scaffolding_at_every_level` |
 | SARIF reports | `sarif-reports: false` | A Clippy or secret-scan SARIF report that is missing or empty; `upload-sarif.yml` shows the findings in code scanning | SST-003 | `sarif_reports_are_written_only_when_asked_and_never_empty`, `sarif_reports_are_on_by_default_and_upload_in_their_own_workflow` |
 | Public API compatibility | `api-compatibility: false` | A pull request that breaks a library's public API without `!` after the type in its title; not applicable to a push, a project without a library or Rust older than 1.93 | North Star, Quality | `an_undeclared_break_fails_the_pull_request`, `a_declared_break_and_what_has_no_api_are_not_checked` |
-| Dependency policy | `license-policy: off` | Violations of your `deny.toml`, or the default source/version policy; licence checks apply only with a consumer policy or `LICENSE_ALLOWLIST`. `off` skips the whole gate | SCH-010 | `the_organization_allowlist_adds_licences_and_a_committed_policy_wins`, `the_dependency_policy_holds_by_default_and_licences_only_with_a_list` |
 | Recorded dependency audits | `dependency-audit: false` | A dependency neither audited nor exempted, or a ledger without one of the six imports VET-001 requires | SCH-007, VET-001 | `unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does` |
 
 <!-- end generated -->
@@ -299,7 +303,6 @@ workspaces with `.cargo/mutants.toml` before mutation testing grows past the job
 ```yaml
     with:
       working-directory: crates/service
-      license-policy: enforce
       clippy-level: pedantic
 ```
 

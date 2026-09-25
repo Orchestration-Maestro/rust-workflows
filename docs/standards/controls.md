@@ -57,10 +57,9 @@ gates are on by default as deliberate exceptions to adoption safety, because a
 golden workflow enforces the standard: mutation testing, the unused-dependency
 check, the `unsafe` ban, SARIF reports, public API compatibility and recorded
 dependency audits (VET-001), each with one input to switch it off. The
-scaffolding lints have no off switch. Dependency policy defaults to
-`license-policy: auto`: a consumer `deny.toml` when present, otherwise the
-source/version policy and the organization allowlist when provided. It says
-when no licence list applied; `off` skips the whole dependency-policy step.
+scaffolding lints and the dependency policy have no off switch:
+`license-policy` accepts `auto` and `enforce`, both the organization's policy,
+and refuses `off`. The policy says when no licence list applied.
 Every other default may not change to something that fails a consumer on
 upgrade. The README lists every gate against these axes. Coverage measures Rust
 fixture lines, not how completely the gate's own refusals are tested; preserve

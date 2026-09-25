@@ -12,14 +12,15 @@
 use super::simple_names::simple;
 use crate::runner::input;
 
-/// `license-policy`: what the licence gate does with a consumer `deny.toml`.
+/// `license-policy`, kept for the repositories that set it: the
+/// organization's licence policy applies whatever it says.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum LicensePolicy {
-    /// A committed `deny.toml` when there is one, the default policy otherwise.
+    /// The organization's policy.
     Auto,
-    /// A committed `deny.toml`, required.
+    /// The organization's policy, the same as `auto`.
     Enforce,
-    /// The gate is skipped.
+    /// Refused by `validate`: no repository opts out.
     Off,
 }
 

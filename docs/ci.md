@@ -1,17 +1,48 @@
 # CI contract
 
-Call `.github/workflows/ci.yml`; see the [README](../README.md) for safe revision
-references. The workflow checks out the caller's immutable `github.sha` with no
-persisted checkout credential. No workflow-repository helper script is required
-in that checkout.
+An organization ruleset runs `.github/workflows/ci.yml` on every pull request of
+a Rust repository; see [how a repository is enforced](#how-a-repository-is-enforced).
+A caller may still call it as a reusable workflow; see the [README](../README.md)
+for safe revision references. The workflow checks out the immutable `github.sha`
+with no persisted checkout credential. No workflow-repository helper script is
+required in that checkout.
 
 Every step body is one `rust-gate` command: the standard-library-only binary in
-`gate/` that the `gate` action builds from this repository's pinned commit, with
-every input arriving as an environment variable. A reusable workflow runs in the
-caller's checkout and cannot read this repository's files, so that pinned build
+`gate/` that the `gate` action builds from this repository at the workflow's own
+commit, with every input arriving as an environment variable. A workflow runs in
+the consumer's checkout and cannot read this repository's files, so that build
 is the only copy the job can trust; the contract tests in `tests/` run the same
 commands, and `just check` runs them against the example fixtures. See
 [rust-gate.md](rust-gate.md).
+
+## How a repository is enforced
+
+The organization's `rust-ci` ruleset requires `ci.yml`, and its `hygiene-ci`
+ruleset `hygiene.yml` for a repository without Rust, on every pull request and
+merge queue entry of the default branch. Each rule pins a commit of this
+repository; the run happens in the pull request's repository, and a failing run
+blocks the merge.
+
+A repository therefore needs no `ci.yml` caller. It keeps
+`maestro-quality.toml` and the root files its tools read, `rust-toolchain.toml`,
+`clippy.toml`, `deny.toml` and the others `rust-gate sync` writes. A run no
+workflow called takes its inputs from the `[ci]` table of `maestro-quality.toml`
+at the pull request's base commit, so a pull request cannot loosen its own gate;
+an input the table leaves out takes its default below, and `platforms` takes
+`macos windows`. The Clippy SARIF and Codecov uploads stay with a caller: they
+need `security-events: write` and `id-token: write`, which a ruleset run does
+not hold, and the check never depends on them. Inside this repository, only a
+caller runs `ci.yml` and nothing runs `hygiene.yml`.
+
+### Migrating to the ruleset
+
+This release is breaking in three ways. The ruleset runs `ci.yml` on every pull
+request, so a repository's `ci.yml` caller becomes optional and is deleted at
+rollout; what it passed in `with:` belongs in `[ci]`. `license-policy: off` is
+refused; remove it, since `auto` and `enforce` both apply the organization's
+policy. A ruleset run tests macOS and Windows whatever `[ci]` says, and a
+`[ci] platforms` value that leaves either out is refused with the value to
+write. A caller that keeps calling `ci.yml` keeps its other inputs and defaults.
 
 ## Inputs and outputs
 
@@ -30,7 +61,7 @@ committed `deny.toml` applies the same way to every pull request. See [runner se
 | `rust-version` | string | Empty | Exact stable version, `1.85.0` or newer; empty uses `rust-toolchain.toml` |
 | `coverage-threshold` | number | `90` | Finite minimum line percentage, from the organization's floor of 90 to 100 |
 | `artifact-key` | string | `ci` | Invocation identity, 1 to 40 alphanumeric/underscore/hyphen characters, starting alphanumeric |
-| `license-policy` | string | `auto` | `auto` applies a consumer `deny.toml` when present, else the default source and version policy plus the `LICENSE_ALLOWLIST` organization allowlist when set; `enforce` requires a consumer file; `off` skips the gate |
+| `license-policy` | string | `auto` | Kept for the repositories that set it: `auto` and `enforce` both apply the organization's licence and source policy; `off` is refused, since no repository opts out |
 | `mutation-test` | boolean | `true` | Run cargo-mutants and fail on surviving mutants; a pull request mutates its diff, a push or tag its own commit; set `false` when run time exceeds the job |
 | `sarif-reports` | boolean | `true` | Also emit Clippy and secret findings as SARIF, for `upload-sarif.yml` to show in code scanning |
 | `clippy-level` | string | `default` | `pedantic` or `nursery` also deny those Clippy groups |
@@ -267,7 +298,9 @@ every rust-workflows pin to `sync`. `rust-gate
 init` writes them for a repository with no caller yet, at the release
 `RUST_WORKFLOWS_PIN` names. What a repository may say goes in
 `maestro-quality.toml`: the words it means, `[typos] words = ["jaq"]`, and the
-inputs its caller passes, `[ci] platforms = "macos windows"`. The generated
+inputs its caller passes, `[ci] platforms = "macos windows linux-arm"`, where
+`macos` and `windows` are never left out
+([platform portability](#platform-portability)). The generated
 `deny.toml` holds DEP-001: one version of each crate, no wildcard requirement,
 crates.io alone, no yanked or unmaintained crate, and the reviewed licences; a
 duplicate the ecosystem forces is a DEP-001 exception whose `path` names the
@@ -541,7 +574,7 @@ actually enforced. Each control has a `state`: `passed`, `disabled`,
 turning a control on is not evidence that it ran. Features and mutations supply
 explicit application results. Missing results never count as success. The grouped source, version and licence row
 reflects the selected dependency policy; `licenses.txt` states whether a licence
-allowlist actually applied. `license-policy: off` disables that row.
+allowlist actually applied. `license-policy: off` is refused, so the row always applies.
 
 The badge is generated here, with no external service and no runtime dependency,
 using the palette sampled from this repository's banner. It turns red for a
@@ -674,7 +707,7 @@ Every pinned Rust tool is installed from a checksum-verified prebuilt release
 rather than built with `cargo install`. Compiling them from source cost each
 caller minutes of runner time on every job, multiplied by the compiler matrix.
 Optional tools download only when their gate is selected. On every action
-invocation, `rust-gate` compiles from this repository's pinned commit with its
+invocation, `rust-gate` compiles from this repository at the workflow's commit with its
 own pinned compiler in a fresh directory. Neither its executable nor its Cargo
 build fingerprints are restored from a previous job.
 
@@ -709,7 +742,7 @@ earlier failure. The scorecard identifies controls that never ran.
 | `coverage.lcov` | Line coverage in LCOV format | always |
 | `audit.json` | RustSec advisory results | always |
 | `secrets.json` | Redacted secret-scan findings | always |
-| `licenses.txt` | Selected dependency policy and whether a licence list applied; a text skip with `off` | `license-policy` |
+| `licenses.txt` | Selected dependency policy and whether a licence list applied | always |
 | `msrv.tsv` | Each workspace member and its declared `rust-version` | always |
 | `features.txt` | Every feature name the workspace members declare, one per line | always |
 | `hardening.txt` | Per-binary reproducibility, PIE, RELRO, BIND\_NOW, non-executable stack and embedded dependency list | always |
@@ -747,10 +780,13 @@ otherwise. No list is assumed here. The day administrators set the variable, eve
 without a policy is covered without a release. Advisories stay with `cargo audit`, which also denies yanked, unsound
 and unmaintained crates; the two gates are deliberately separate.
 
-`auto` is the default: the source and version policy holds for everyone, and a
-licence list applies as soon as one exists. Choose `enforce` once your policy is
-committed: the workflow then fails when `deny.toml` is absent, so the gate cannot
-be silently lost. `off` skips the whole step, and the report records the skip.
+`license-policy` stays accepted for the repositories that set it: `auto` and
+`enforce` both apply the organization's policy, and neither requires a committed
+`deny.toml`. `off` is refused before any work, since no repository opts out:
+
+```text
+license-policy=off is refused: the organization's licence policy always applies, and no repository opts out
+```
 
 ### Mutation testing
 
@@ -787,6 +823,18 @@ materials and the scorecard stay Linux x86_64.
     with:
       platforms: macos windows linux-arm
 ```
+
+Every Rust repository of the organization tests Linux, macOS and Windows: a
+ruleset run and the caller `rust-gate sync` renders both test `macos` and
+`windows` when `[ci]` names no `platforms`. `maestro-quality.toml` may add a target, `[ci] platforms = "macos
+windows linux-arm"`, but never drop either; a value that does is refused with
+the fix:
+
+```text
+maestro-quality.toml: [ci] platforms `linux-arm` drops macos and windows, which every Rust repository tests: set it to `macos windows linux-arm`
+```
+
+A caller written by hand keeps the input's empty default.
 
 ### Public API compatibility
 
@@ -906,12 +954,12 @@ rebuilt and never holds credentials.
 
 ## The gate action and the shared commands
 
-The `gate` action under `.github/actions/` builds `rust-gate` from the pinned
-commit and puts it on the PATH of every later step; see
-[rust-gate.md](rust-gate.md). A reusable workflow runs in the consumer's
-checkout, so an action fetched by commit SHA is the one way every workflow gets
-the same binary. Every call site pins the same commit; the pin and its wiring
-are described in [CONTRIBUTING.md](../CONTRIBUTING.md). What every step reads,
+The `gate` action under `.github/actions/` builds `rust-gate` and puts it on the
+PATH of every later step; see [rust-gate.md](rust-gate.md). A workflow runs in
+the consumer's checkout, so each job first checks this repository out at
+`job.workflow_sha`, the commit of the workflow it runs, builds the gate from it,
+and then checks out the consumer, which replaces that tree; see
+[CONTRIBUTING.md](../CONTRIBUTING.md). What every step reads,
 runs and writes is in [steps.md](steps.md), generated from the declarations
 the gate enforces: an input, a tool or a report a step did not declare is
 refused. Two commands serve more than one workflow.
