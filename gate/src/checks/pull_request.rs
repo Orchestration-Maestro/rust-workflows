@@ -89,35 +89,47 @@ const TYPES: &[&str] = &[
     "feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert",
 ];
 
-/// The most characters a title's subject holds, as the commit-msg hook counts.
+/// The most bytes a title's subject holds, as the commit-msg hook's pygrep
+/// counts them.
 const SUBJECT: usize = 71;
 
-/// The branches bots open pull requests from: one name, or a prefix.
+/// The branches bots open pull requests from: one name, or a prefix. GitHub's
+/// Revert button opens `revert-<number>-<branch>`, checked apart.
 const BOT_BRANCHES: &[&str] = &[
     "maestro/sync",
     "release-please--",
     "dependabot/",
     "gh-readonly-queue/",
+    "copilot/",
 ];
 
+/// The branch prefix whose titles keep their length: Dependabot writes titles
+/// it never shortens.
+const UNBOUNDED: &str = "dependabot/";
+
 /// The PRL-003 and PRL-004 findings of a pull request's `title` and head
-/// `branch`, one line each, naming what is wrong and the form expected.
+/// `branch`, one line each, naming what is wrong, the form expected and how
+/// to fix it: a rerun reads the title its run started with, and a branch
+/// cannot be renamed under an open pull request.
 pub(crate) fn name_findings(title: &str, branch: &str) -> Vec<String> {
     let types = TYPES.join(", ");
+    let bounded = !branch.starts_with(UNBOUNDED);
     let mut findings = Vec::new();
-    if !conventional_title(title) {
+    if !conventional_title(title, bounded) {
         findings.push(format!(
             "PRL-003 the title `{title}` is not a conventional header: write \
              `<type>(<scope>)!: <subject>`, the type one of {types}, the lowercase scope \
              and the `!` optional, the subject opening in lowercase within {SUBJECT} \
-             characters"
+             bytes; fix the title, then push a commit or close and reopen the pull \
+             request: a rerun reads the title the run started with"
         ));
     }
     if !conventional_branch(branch) {
         findings.push(format!(
             "PRL-004 the branch `{branch}` is not named `<type>/<name>`: the type one of \
              {types}, then segments in lowercase kebab-case separated by `/`, such as \
-             feat/refuse-a-title"
+             feat/refuse-a-title; open the pull request again from a branch so named: a \
+             branch cannot be renamed under an open pull request"
         ));
     }
     findings
@@ -125,8 +137,15 @@ pub(crate) fn name_findings(title: &str, branch: &str) -> Vec<String> {
 
 /// Whether `title` is a header the commit-msg hook `conventional-commit-header`
 /// accepts: a type, a lowercase scope and a `!`, both optional, `: `, then a
-/// subject opening with a lowercase letter, at most 71 characters long.
-fn conventional_title(title: &str) -> bool {
+/// subject opening with a lowercase letter, at most 71 bytes long when
+/// `bounded`; or `Revert "<header>"`, the title GitHub's Revert button writes.
+fn conventional_title(title: &str, bounded: bool) -> bool {
+    if let Some(reverted) = title
+        .strip_prefix("Revert \"")
+        .and_then(|rest| rest.strip_suffix('"'))
+    {
+        return conventional_title(reverted, bounded);
+    }
     let Some((header, subject)) = title.split_once(": ") else {
         return false;
     };
@@ -147,7 +166,7 @@ fn conventional_title(title: &str) -> bool {
     TYPES.contains(&kind)
         && scope_ok
         && subject.starts_with(|first: char| first.is_ascii_lowercase())
-        && subject.chars().count() <= SUBJECT
+        && (!bounded || subject.len() <= SUBJECT)
         && !subject.contains('\n')
 }
 
@@ -160,13 +179,26 @@ fn conventional_branch(branch: &str) -> bool {
         } else {
             branch == *bot
         }
-    }) {
+    }) || reverted(branch)
+    {
         return true;
     }
     let mut parts = branch.split('/');
     let kind = parts.next().unwrap_or_default();
     let segments: Vec<&str> = parts.collect();
     TYPES.contains(&kind) && !segments.is_empty() && segments.iter().all(|part| kebab(part))
+}
+
+/// Whether `branch` is one GitHub's Revert button opens: `revert-<number>-<branch>`.
+fn reverted(branch: &str) -> bool {
+    branch
+        .strip_prefix("revert-")
+        .and_then(|rest| rest.split_once('-'))
+        .is_some_and(|(number, rest)| {
+            !number.is_empty()
+                && number.bytes().all(|byte| byte.is_ascii_digit())
+                && !rest.is_empty()
+        })
 }
 
 /// Whether `segment` is lowercase letters and digits, runs joined by a single
@@ -231,8 +263,11 @@ mod tests {
             "build(deps-dev): bump serde from 1.0.1 to 1.0.2",
             "chore(main): release 2.4.0",
             &format!("docs: {}", "a".repeat(71)),
+            &format!("docs: a{}", "é".repeat(35)),
+            "Revert \"feat: refuse a title\"",
+            "Revert \"Revert \"fix(api)!: keep the old name\"\"",
         ] {
-            assert!(conventional_title(good), "{good}");
+            assert!(conventional_title(good, true), "{good}");
         }
         for bad in [
             "Update README",
@@ -244,9 +279,16 @@ mod tests {
             "feat:no space",
             "Feat: capital type",
             &format!("docs: {}", "a".repeat(72)),
+            &format!("docs: a{}", "é".repeat(36)),
+            "Revert \"Update README\"",
+            "Revert feat: no quotes",
         ] {
-            assert!(!conventional_title(bad), "{bad}");
+            assert!(!conventional_title(bad, true), "{bad}");
         }
+        // Dependabot never shortens a title: its length is not held.
+        let long = format!("build(deps): bump {}", "a".repeat(80));
+        assert!(!conventional_title(&long, true));
+        assert!(conventional_title(&long, false));
     }
 
     #[test]
@@ -259,6 +301,8 @@ mod tests {
             "release-please--branches--main",
             "dependabot/cargo/serde-1.0.2",
             "gh-readonly-queue/main/pr-1",
+            "revert-54-feat/pull-request-names",
+            "copilot/Fix-Issue_12",
         ] {
             assert!(conventional_branch(good), "{good}");
         }
@@ -273,6 +317,10 @@ mod tests {
             "feat//x",
             "maestro/sync-2",
             "dependabot/",
+            "revert-x-feat/a",
+            "revert-54-",
+            "revert-54",
+            "copilot/",
             "",
         ] {
             assert!(!conventional_branch(bad), "{bad}");
@@ -286,5 +334,8 @@ mod tests {
         assert_eq!(findings.len(), 2);
         assert!(findings[0].starts_with("PRL-003 the title `Add a rule` is not"));
         assert!(findings[1].starts_with("PRL-004 the branch `wip` is not named"));
+        let long = format!("build(deps): bump {}", "a".repeat(80));
+        assert!(name_findings(&long, "dependabot/cargo/a-1.0.1").is_empty());
+        assert_eq!(name_findings(&long, "fix/a").len(), 1);
     }
 }

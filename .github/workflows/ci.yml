@@ -261,11 +261,6 @@ jobs:
           # runner shares its rate limit with every other job on its address.
           MISE_GITHUB_TOKEN: ${{ github.token }}
         run: rust-gate hooks
-      - name: Pull request rules PRL
-        id: pull-request
-        env:
-          PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
-        run: rust-gate pull-request
       - name: Formatting, Clippy and tests
         id: quality
         run: rust-gate quality
@@ -325,6 +320,13 @@ jobs:
       - name: Reproducible build and binary hardening
         id: hardening
         run: rust-gate hardening
+      # Last of the checks: a title or a branch outside the conventions must
+      # not hide what the checks above would say.
+      - name: Pull request rules PRL
+        id: pull-request
+        env:
+          PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
+        run: rust-gate pull-request
       - name: Stage immutable release payload
         id: stage
         run: rust-gate stage

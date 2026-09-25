@@ -54,12 +54,15 @@ fn pull_request(title: &str, files: &[(&str, &str)]) -> Fixture {
 const TITLE_FINDING: &str = "PRL-003 the title `Add b` is not a conventional header: write \
      `<type>(<scope>)!: <subject>`, the type one of feat, fix, docs, style, refactor, perf, \
      test, build, ci, chore, revert, the lowercase scope and the `!` optional, the subject \
-     opening in lowercase within 71 characters";
+     opening in lowercase within 71 bytes; fix the title, then push a commit or close and \
+     reopen the pull request: a rerun reads the title the run started with";
 
 /// What PRL-004 says of the branch `wip`.
 const BRANCH_FINDING: &str = "PRL-004 the branch `wip` is not named `<type>/<name>`: the \
      type one of feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, then \
-     segments in lowercase kebab-case separated by `/`, such as feat/refuse-a-title";
+     segments in lowercase kebab-case separated by `/`, such as feat/refuse-a-title; open \
+     the pull request again from a branch so named: a branch cannot be renamed under an \
+     open pull request";
 
 #[test]
 fn a_title_or_branch_outside_the_conventions_is_refused() {
@@ -79,11 +82,39 @@ fn a_title_or_branch_outside_the_conventions_is_refused() {
         &named.run("hygiene", "pull-request-names"),
         &format!("pull-request-names: {TITLE_FINDING}; {BRANCH_FINDING}"),
     );
-    // A bot's branch and a conventional title pass both; a push has no pull
+    // Each bot's title and branch pass both, as does GitHub's Revert button;
+    // Dependabot's long titles are not held to the length. A push has no pull
     // request to name.
+    let long = format!(
+        "build(deps): bump the cargo group across 5 directories with {}",
+        "a ".repeat(20)
+    );
+    for (title, branch) in [
+        (
+            "chore(main): release 2.4.0",
+            "release-please--branches--main",
+        ),
+        (
+            "ci(deps): bump actions/checkout from 6.0.0 to 7.0.1",
+            "dependabot/github_actions/actions/checkout-7.0.1",
+        ),
+        (long.as_str(), "dependabot/cargo/cargo-a1b2c3"),
+        (
+            "chore: sync the organization's files to rust-workflows v2.4.0",
+            "maestro/sync",
+        ),
+        (
+            "Revert \"feat: refuse a title\"",
+            "revert-54-feat/refuse-a-title",
+        ),
+    ] {
+        let mut bot = pull_request(title, &[("guide.md", "A.\n")]);
+        bot.set("GITHUB_HEAD_REF", branch);
+        succeeds(&bot.run("ci", "pull-request"));
+        succeeds(&bot.run("hygiene", "pull-request-names"));
+    }
     let mut bot = pull_request("chore(main): release 2.4.0", &[("guide.md", "A.\n")]);
     bot.set("GITHUB_HEAD_REF", "release-please--branches--main");
-    succeeds(&bot.run("ci", "pull-request"));
     succeeds(&bot.run("hygiene", "pull-request-names"));
     let summary = fs::read_to_string(bot.root.join("summary")).unwrap();
     assert!(

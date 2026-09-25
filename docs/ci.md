@@ -307,14 +307,20 @@ Measured on a pull request only, against its base branch, the merge commit's fir
 | COV-002 | New lines that never run, past what the pull request may leave: a `feat` or `fix` title covers 95 % of its coverable new lines, any other 90 %, and `max(1, floor((100 - target) % of n))` of the `n` may stay uncovered, so a three-line change is not failed by one line |
 | PRL-001 | A `feat` or `fix` pull request that changes product Rust code, outside a `tests`, `benches` or `examples` directory, and touches no test: no file under a `tests` directory and no new line inside a `#[cfg(test)]` item |
 | PRL-002 | Nothing: past 400 changed lines, lockfiles, snapshots and generated files left out, the pull request is reported in the summary |
-| PRL-003 | A title that is not a Conventional Commits header as the `conventional-commit-header` hook reads one: a type among `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore` and `revert`, an optional lowercase scope and `!`, then a colon, a space and a subject opening in lowercase within 71 characters. A squash merge makes the title the commit release-please reads |
-| PRL-004 | A head branch other than `<type>/<name>`, the same types, each segment after it lowercase kebab-case with a single `-`, `.` or `_` between letters and digits; the bots' `maestro/sync`, `release-please--*`, `dependabot/*` and `gh-readonly-queue/*` pass |
+| PRL-003 | A title that is not a Conventional Commits header as the `conventional-commit-header` hook reads one: a type among `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore` and `revert`, an optional lowercase scope and `!`, then a colon, a space and a subject opening in lowercase within 71 bytes, as the hook counts them. A squash merge makes the title the commit release-please reads. GitHub's Revert button writes `Revert "<header>"`, which passes when the header does, and a title on a `dependabot/*` branch is not held to the length, since Dependabot never shortens one |
+| PRL-004 | A head branch other than `<type>/<name>`, the same types, each segment after it lowercase kebab-case with a single `-`, `.` or `_` between letters and digits; the bots' `maestro/sync`, `release-please--*`, `dependabot/*`, `gh-readonly-queue/*` and `copilot/*`, and the `revert-<number>-<branch>` of GitHub's Revert button, pass |
 
 PRL-003 and PRL-004 hold every repository: `hygiene.yml` runs them too, as
 `rust-gate hygiene pull-request-names`. The organization's commit-message
 ruleset is a metadata rule GitHub enforces only on its Enterprise plan, and a
 branch ruleset matches names with `fnmatch`, which cannot hold their case; these
 two rules are what refuses them.
+
+Each runs after the other checks of its job, so a name never hides what they
+say, and each finding says how to fix it. Neither runs again when a title
+changes, and a rerun reads the title its run started with: fix the title, then
+push a commit or close and reopen the pull request. A branch cannot be renamed
+under an open pull request: open the pull request again from a branch so named.
 
 ### Performance budget
 
