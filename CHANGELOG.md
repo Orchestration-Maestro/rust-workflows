@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.5.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.4.0...v2.5.0) (2026-09-25)
+
+
+### Features
+
+* refuse file names and words the organization does not use ([#53](https://github.com/Orchestration-Maestro/rust-workflows/issues/53)) ([241c9a6](https://github.com/Orchestration-Maestro/rust-workflows/commit/241c9a62e3b082136f050c5707ebe7992d93dd4a))
+* refuse pull request titles and branches outside the conventions ([#54](https://github.com/Orchestration-Maestro/rust-workflows/issues/54)) ([3628906](https://github.com/Orchestration-Maestro/rust-workflows/commit/36289062e2567ce30ce274b190b18cddf32bb749))
+* refuse rust names the organization does not use ([#52](https://github.com/Orchestration-Maestro/rust-workflows/issues/52)) ([fd96251](https://github.com/Orchestration-Maestro/rust-workflows/commit/fd9625125e78b2d33cf70eb471941e4bef749855))
+
+
+### Bug Fixes
+
+* let the home change the files it is the source of ([#56](https://github.com/Orchestration-Maestro/rust-workflows/issues/56)) ([c7f8f36](https://github.com/Orchestration-Maestro/rust-workflows/commit/c7f8f36be750870cc121a5719a499916e98e5c17))
+
 ## [2.4.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.3.0...v2.4.0) (2026-09-25)
 
 
