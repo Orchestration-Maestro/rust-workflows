@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.3.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.2.0...v2.3.0) (2026-09-25)
+
+
+### Features
+
+* write each repository's copilot guide with rust-gate guide ([#43](https://github.com/Orchestration-Maestro/rust-workflows/issues/43)) ([c3ff7af](https://github.com/Orchestration-Maestro/rust-workflows/commit/c3ff7af08637e862a69e5aa10623ced5515fe390))
+
+
+### Bug Fixes
+
+* carry the golden rules of .github 864d855 ([#46](https://github.com/Orchestration-Maestro/rust-workflows/issues/46)) ([843ecca](https://github.com/Orchestration-Maestro/rust-workflows/commit/843ecca383ac3b7f585e6516910cee96619a4219))
+* say in each guide that the golden rules come first ([#47](https://github.com/Orchestration-Maestro/rust-workflows/issues/47)) ([d11e54c](https://github.com/Orchestration-Maestro/rust-workflows/commit/d11e54c9b99215f3721f0e49dc3c3fb71fc988f1))
+
 ## [2.2.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.1.0...v2.2.0) (2026-09-25)
 
 
