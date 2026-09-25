@@ -132,6 +132,15 @@ const HELD_BY_ORGANIZATION: &[(&str, &str)] = &[
     ),
 ];
 
+/// Defaults the organization gave a rule before, which a page may still hold:
+/// such a cell is the organization's word, not the repository's, and takes
+/// the current default.
+const SUPERSEDED: &[(&str, &str)] = &[(
+    "C-001",
+    "These pages, kept current by `scripts/golden-rules.py`; the drift check fails on a rule \
+     not mapped yet",
+)];
+
 /// "The point" until the repository writes its own.
 const POINT: &str = "Not mapped yet: whose problem this repository solves, and what changes \
                      for them when it works.";
@@ -214,6 +223,7 @@ fn rule_map(page: &str, previous: &str) -> Vec<String> {
         let held = kept
             .get(&rule)
             .map(String::as_str)
+            .filter(|cell| !SUPERSEDED.contains(&(rule.as_str(), *cell)))
             .or_else(|| held_by_organization(&rule))
             .unwrap_or(UNMAPPED);
         lines.push(format!("| {rule} {title} | {held} |"));
@@ -402,6 +412,36 @@ mod tests {
                 .1
                 .contains(&format!("| Quality | {UNMAPPED} | not measured |"))
         );
+    }
+
+    /// The engineering page rendered over a previous one that holds `previous`.
+    fn engineering_over(previous: &str) -> String {
+        let [_, engineering, _] = pages("example", |path: &str| {
+            if path.ends_with("engineering.md") {
+                previous.to_owned()
+            } else {
+                String::new()
+            }
+        })
+        .unwrap();
+        engineering.1
+    }
+
+    #[test]
+    fn a_cell_holding_a_superseded_default_takes_the_current_one() {
+        let superseded = "| C-001 Map every rule | These pages, kept current by \
+                          `scripts/golden-rules.py`; the drift check fails on a rule not mapped \
+                          yet |\n";
+        let own = "| C-001 Map every rule | Our own map, checked by `just check` |\n";
+        for (previous, expected) in [
+            (
+                superseded,
+                "| C-001 Map every rule | These pages, kept current by `rust-gate rules`",
+            ),
+            (own, own),
+        ] {
+            assert!(engineering_over(previous).contains(expected), "{expected}");
+        }
     }
 
     #[test]
