@@ -200,6 +200,31 @@ impl Fixture {
         fixture
     }
 
+    /// Point the toolbelt's cache into the fixture and stand in for the mise
+    /// `scripts/bootstrap.sh` pins, already fetched there: it records each call
+    /// and `mise bin-paths` prints `bin_paths`, the directories mise installed
+    /// the tools in. The cache it returns is what `rust-gate setup` writes.
+    pub(crate) fn cached_mise(&mut self, bin_paths: &str) -> PathBuf {
+        let cache = self.root.join("cache");
+        self.set("XDG_CACHE_HOME", &cache.display().to_string());
+        let bootstrap = fs::read_to_string(root().join("scripts/bootstrap.sh")).unwrap();
+        let version = bootstrap
+            .lines()
+            .find_map(|line| line.strip_prefix("readonly MISE_VERSION=v"))
+            .unwrap();
+        let tools = cache.join("maestro/tools");
+        let mise = tools.join("mise").join(version);
+        fs::create_dir_all(&mise).unwrap();
+        write_executable(
+            &mise.join("mise"),
+            &format!(
+                "#!/bin/bash\nset -euo pipefail\nprintf '%s\\n' mise \"$*\" >> \"$CALLS\"\n\
+                 if [[ \"$1\" == bin-paths ]]; then printf '%s\\n' {bin_paths}; fi\n"
+            ),
+        );
+        tools
+    }
+
     /// Write the organization's lints into the project's manifest, as a
     /// repository does after writing a manifest of its own.
     pub(crate) fn write_lints(&self) {

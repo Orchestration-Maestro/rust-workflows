@@ -19,5 +19,11 @@ runs:
         build="$(mktemp -d "$RUNNER_TEMP/rust-gate.XXXXXXXX")"
         cd "$GATE"
         cargo build --release --locked --offline --target-dir "$build/target"
-        install -D -m755 "$build/target/release/rust-gate" "$build/bin/rust-gate"
+        # The same build on the macOS and Windows runners toolbelt-platforms.yml
+        # proves the toolbelt on: macOS's install has no -D, Windows names .exe.
+        executable=rust-gate
+        if [[ "${RUNNER_OS:-}" == Windows ]]; then executable=rust-gate.exe; fi
+        mkdir -p "$build/bin"
+        cp "$build/target/release/$executable" "$build/bin/$executable"
+        chmod 755 "$build/bin/$executable"
         echo "$build/bin" >> "$GITHUB_PATH"

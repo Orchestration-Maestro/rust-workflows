@@ -22,6 +22,12 @@ Everything on `PATH` goes through ignored `.tools/bin`: mise itself and one link
 per tool into mise's store. Cargo keeps its normal rebuildable registry cache. Verification copies consumer fixtures to a temporary directory, so
 packaging, SBOM generation and build output never modify their source.
 
+This repository keeps `scripts/bootstrap.sh`, `mise.toml` and `mise.lock` for
+itself: they are the organization's pins. Every other repository gets the same
+toolbelt from `rust-gate setup`, which carries these two files and installs them
+on Linux, macOS and Windows alike, and keeps no copy
+([the tools on your machine](docs/ci.md#the-tools-on-your-machine)).
+
 Every tool is pinned to an exact version in [mise.toml](mise.toml) and verified
 against the checksum recorded in [mise.lock](mise.lock) before it is unpacked;
 mise refuses bytes that differ. Those two files are where a reviewer should read
@@ -242,8 +248,12 @@ action update, which edits workflow files, merge.
 Dependabot does not read the tools the workflows download. `mise.lock` is their
 one record, and a test holds every workflow install row to the asset it locked.
 `just update-tools` moves every pin to its latest release: `mise.toml`, then
-`mise.lock` through mise, then each install row with the digest of the bytes the
-new asset serves, and the Codecov CLI version. `tool-updates.yml` runs it every
+`mise.lock` through `just _lock`, then each install row with the digest of the
+bytes the new asset serves, and the Codecov CLI version. `just _lock` locks each
+tool for every platform its `os` field allows and hashes each download GitHub
+publishes no digest for; a test refuses a pin with no checksummed download on
+one of the five platforms unless a `# source:` or `# skip:` line above it
+declares the gap. `tool-updates.yml` runs it every
 Monday and opens, or refreshes, one pull request on the same App; a person
 merges it, because a new scanner or test runner can change what the gate
 refuses. A move marked `(major)` needs its release notes read first.

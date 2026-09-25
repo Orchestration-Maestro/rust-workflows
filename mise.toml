@@ -1,10 +1,19 @@
-# The development toolbelt: every tool `just check` needs, at the version CI
-# pins. mise installs them from prebuilt releases and refuses any download whose
-# checksum differs from mise.lock, so the two files together are the pin.
+# The organization's toolbelt: every tool `just check` and the commit hooks
+# need, at the version CI pins. mise installs them from prebuilt releases and
+# refuses any download whose checksum differs from mise.lock, so the two files
+# together are the pin. The gate reads both in when it is built: `rust-gate
+# setup` installs this toolbelt for every repository, which keeps none of its
+# own, on Linux, macOS and Windows alike; `just _lock` locks it for each.
 #
-# Only mise itself is obtained another way: scripts/bootstrap.sh fetches one
-# checksum-verified release, then hands over. Rust stays with rustup, provisioned
-# through the approved platform channel, never through mise.
+# Only mise itself is obtained another way: scripts/bootstrap.sh here, and
+# `rust-gate setup` everywhere, fetch one checksum-verified release, then hand
+# over. Rust stays with rustup, provisioned through the approved platform
+# channel, never through mise.
+#
+# A tool that publishes no build for a platform says so above its pin, and its
+# `os` field leaves that platform out: `# source:` has `rust-gate setup` build
+# the pinned version from crates.io there, `# skip:` names the one tool that
+# cannot run there at all. A test holds the lock to exactly these gaps.
 #
 # Aliases give the Cargo plugins that live in a monorepo their command name, so
 # `mise ls` and the tool-version contract test read the same names ci.yml uses.
@@ -49,41 +58,62 @@ taplo = "0.10.0"
 # tool: jaq | workflows | Rust | The JSON the steps read and the YAML the tests read
 jaq = "3.1.1"
 # tool: prek | run | Rust | Runs the git hooks on a commit and on its message, with no Python dependency
-prek = { version = "0.5.3", matching = "x86_64-unknown-linux-musl" }
+prek = { version = "0.5.3", matching_regex = "musl|apple-darwin|windows" }
 # tool: cargo-deny | security | Rust | Licences, banned dependencies and package sources
 cargo-deny = "0.20.2"
 # tool: cyclonedx | security | C# | Merges and validates them into the payload's document
 cyclonedx = "0.33.1"
 # tool: cargo-hack | rust | Rust | Each declared feature compiled on its own, not only the default set
-cargo-hack = { version = "0.6.45", matching = "x86_64-unknown-linux-musl" }
+cargo-hack = { version = "0.6.45", matching_regex = "musl|apple-darwin|windows" }
 # tool: cargo-llvm-cov | rust | Rust | Line coverage measured against the threshold
-cargo-llvm-cov = { version = "0.9.1", matching = "x86_64-unknown-linux-gnu" }
+cargo-llvm-cov = "0.9.1"
 # tool: cargo-audit | security | Rust | RustSec advisories, plus yanked, unsound and unmaintained crates
-cargo-audit = { version = "0.22.2", version_prefix = "cargo-audit/v", matching = "cargo-audit-x86_64-unknown-linux-gnu" }
+cargo-audit = { version = "0.22.2", version_prefix = "cargo-audit/v" }
 # tool: cargo-cyclonedx | security | Rust | One CycloneDX document per crate
-cargo-cyclonedx = { version = "0.5.9", version_prefix = "cargo-cyclonedx-", matching = "cargo-cyclonedx-x86_64-unknown-linux-gnu" }
+cargo-cyclonedx = { version = "0.5.9", version_prefix = "cargo-cyclonedx-" }
 # tool: cargo-mutants | rust | Rust | Mutation testing; a surviving mutant fails the run
-cargo-mutants = { version = "27.1.0", matching = "x86_64-unknown-linux-gnu" }
+# source: cargo-mutants | linux-arm64 macos-arm64 | No release build for these platforms; rust-gate setup builds the pinned version from crates.io
+cargo-mutants = { version = "27.1.0", os = [
+  "linux/x64",
+  "macos/x64",
+  "windows",
+] }
 # tool: cargo-semver-checks | rust | Rust | A pull request's undeclared public API break
-cargo-semver-checks = { version = "0.50.0", matching = "x86_64-unknown-linux-gnu" }
+cargo-semver-checks = "0.50.0"
 # tool: cargo-machete | rust | Rust | A declared dependency no source file uses
-cargo-machete = { version = "0.9.2", matching = "x86_64-unknown-linux-musl" }
+cargo-machete = "0.9.2"
 # tool: cargo-nextest | rust | Rust | The tests, one process each, with their results as `JUnit`
-cargo-nextest = { version = "0.9.146", version_prefix = "cargo-nextest-", matching = "x86_64-unknown-linux-musl" }
+cargo-nextest = { version = "0.9.146", version_prefix = "cargo-nextest-", matching_regex = "musl|apple-darwin|windows" }
 # tool: cargo-auditable | security | Rust | Embeds the dependency list inside the binary
-cargo-auditable = { version = "0.7.6", matching = "x86_64-unknown-linux-gnu" }
+cargo-auditable = "0.7.6"
 # tool: cargo-sbom | security | Rust | The SPDX document that ships beside it
-cargo-sbom = { version = "0.10.0", version_prefix = "cargo-sbom-v", matching = "cargo-sbom-x86_64-unknown-linux-gnu", bin = "cargo-sbom" }
+# source: cargo-sbom | linux-arm64 macos-x64 windows-x64 | No release build for these platforms; rust-gate setup builds the pinned version from crates.io
+cargo-sbom = { version = "0.10.0", version_prefix = "cargo-sbom-v", bin = "cargo-sbom", os = [
+  "linux/x64",
+  "macos/arm64",
+] }
 # tool: clippy-sarif | rust | Rust | Clippy findings as SARIF, for code scanning
-clippy-sarif = { version = "0.8.0", version_prefix = "clippy-sarif-v", matching = "clippy-sarif-x86_64-unknown-linux-gnu", bin = "clippy-sarif" }
+# source: clippy-sarif | linux-arm64 macos-x64 windows-x64 | No release build for these platforms; rust-gate setup builds the pinned version from crates.io
+clippy-sarif = { version = "0.8.0", version_prefix = "clippy-sarif-v", bin = "clippy-sarif", os = [
+  "linux/x64",
+  "macos/arm64",
+] }
 # tool: cargo-vet | security | Rust | The dependency audits you recorded yourself
-cargo-vet = { version = "0.10.0", matching = "x86_64-unknown-linux-gnu" }
+# source: cargo-vet | linux-arm64 | No release build for these platforms; rust-gate setup builds the pinned version from crates.io
+cargo-vet = { version = "0.10.0", os = ["linux/x64", "macos", "windows"] }
 # tool: similarity-rs | rust | Rust | Functions whose syntax trees match, reported without failing the run
-similarity-rs = { version = "0.5.0", matching = "x86_64-unknown-linux-gnu", bin = "similarity-rs" }
+# source: similarity-rs | linux-arm64 macos-x64 windows-x64 | No release build for these platforms; rust-gate setup builds the pinned version from crates.io
+similarity-rs = { version = "0.5.0", bin = "similarity-rs", os = [
+  "linux/x64",
+  "macos/arm64",
+] }
 # tool: typos | workflows | Rust | Spelling in code and prose; `typos.toml` names the words this repository means
-typos = { version = "1.50.2", matching = "x86_64-unknown-linux-musl" }
+typos = "1.50.2"
 # tool: gungraun-runner | rust | Rust | Instruction counts of the declared benchmarks under Valgrind, base against head
-gungraun-runner = { version = "0.19.4", matching = "gungraun-runner-v0.19.4-x86_64-unknown-linux-gnu", bin = "gungraun-runner" }
+# skip: gungraun-runner | macos-x64 macos-arm64 windows-x64 | It drives Valgrind, which runs on Linux alone; the performance step runs in Linux CI
+gungraun-runner = { version = "0.19.4", bin = "gungraun-runner", os = [
+  "linux",
+] }
 # tool: shfmt | workflows | Go | Shell formatting, the width and indentation .editorconfig sets
 shfmt = "3.14.1"
 # tool: rumdl | workflows | Rust | Markdown structure: headings, lists, fences and blank lines

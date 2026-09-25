@@ -52,11 +52,6 @@ jobs:
           TOOLS: |
             jaq 01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu 5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454
             gitleaks gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb gitleaks
-            prek j178/prek/releases/download/v0.5.3/prek-x86_64-unknown-linux-musl.tar.gz d4eae1f31c0817d0a9bfa532d4bb66df60a8b01f121def002021915e826c3d1f prek-x86_64-unknown-linux-musl/prek
-            # mise, which prek installs every hook's tool through, at the version
-            # and digest scripts/bootstrap.sh pins; without it on PATH, prek
-            # fetches whatever mise release it finds.
-            mise jdx/mise/releases/download/v2026.9.9/mise-v2026.9.9-linux-x64.tar.gz e4767e4854af5daeff2191b2bbdc94f834742a23efad591dbd33187861d41604 mise/bin/mise
       - name: Redacted source secret scan
         id: secrets
         env:
@@ -71,8 +66,10 @@ jobs:
       - name: Commit hooks over every file
         id: hooks
         env:
-          # mise asks GitHub's API for each hook's release; an anonymous
-          # runner shares its rate limit with every other job on its address.
+          # The step installs the toolbelt `rust-gate setup` installs, prek
+          # and every hook's tool; mise asks GitHub's API for each release's
+          # attestations, and an anonymous runner shares its rate limit with
+          # every other job on its address.
           MISE_GITHUB_TOKEN: ${{ github.token }}
         run: rust-gate hooks
       # Last: a title or a branch outside the conventions must not hide what

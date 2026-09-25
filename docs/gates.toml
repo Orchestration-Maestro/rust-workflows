@@ -240,6 +240,7 @@ proofs = [
   "a_managed_file_changed_by_hand_is_refused_and_sync_writes_it_back",
   "the_managed_files_step_refuses_a_difference_in_ci",
   "the_home_may_change_the_files_it_is_the_source_of",
+  "tool_pins_of_the_repository_s_own_are_refused_with_the_replacement",
 ]
 
 [[gate]]
@@ -251,7 +252,7 @@ proofs = [
   "the_hooks_step_runs_prek_over_every_file_and_skips_what_ci_runs_itself",
   "a_step_runs_locally_the_way_a_commit_hook_runs_it",
   "every_rendered_hook_runs_a_pinned_version_and_this_repository_runs_them_all",
-  "the_rendered_hooks_run_in_a_fresh_clone_with_only_prek_and_rustup",
+  "the_rendered_hooks_run_in_a_fresh_clone_on_the_toolbelt_setup_installs",
 ]
 
 [[gate]]

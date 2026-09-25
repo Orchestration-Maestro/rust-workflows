@@ -1,0 +1,92 @@
+name: Toolbelt platforms
+
+# The toolbelt `rust-gate setup` installs, proven on every platform it is
+# pinned for: the gate built from this commit, the toolbelt installed from
+# nothing, the second run from its cache, and a consumer's rendered commit
+# hooks run on it, as CI's hooks step runs them. The hosted runners cover each
+# platform mise.lock locks, the tools built from source included.
+
+"on":
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: toolbelt-platforms-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  toolbelt:
+    name: Toolbelt on ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            built: ~/.cache/maestro/tools/*/source
+          - runner: ubuntu-24.04-arm
+            built: ~/.cache/maestro/tools/*/source
+          - runner: macos-15-intel
+            built: ~/.cache/maestro/tools/*/source
+          - runner: macos-15
+            built: ~/.cache/maestro/tools/*/source
+          - runner: windows-2025
+            built: ~/AppData/Local/maestro/tools/*/source
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    # On Windows the default shell is PowerShell; every body here is Bash.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout the gate at this workflow's commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+      - name: Build the gate
+        uses: ./.github/actions/gate
+      # Only what setup builds from source is kept: every download is fetched
+      # from nothing on every run.
+      - name: Restore the tools built from source
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ matrix.built }}
+          key: toolbelt-source-${{ matrix.runner }}-${{ hashFiles('mise.toml', 'mise.lock', 'version.txt') }}
+      - name: The organization's pinned toolbelt for this user, and the repository's commit hooks
+        env:
+          # mise asks GitHub's API for each release's attestations; an anonymous
+          # runner shares its rate limit with every other job on its address.
+          MISE_GITHUB_TOKEN: ${{ github.token }}
+        run: rust-gate setup
+      - name: The organization's pinned toolbelt for this user, and the repository's commit hooks
+        run: rust-gate setup
+      - name: A consumer's rendered hooks over every file
+        env:
+          REVISION: ${{ github.sha }}
+          # The hooks CI's hooks step skips: the formatter, Clippy and the
+          # gate's own, which install the release a consumer pins.
+          SKIP: rustfmt,clippy,rust-gate-architecture,rust-gate-hygiene,rust-gate-rules,rust-gate-guide
+        run: |
+          set -euo pipefail
+          version="$(tr -d '\r\n' < version.txt)"
+          consumer="$RUNNER_TEMP/consumer"
+          mkdir -p "$consumer/src"
+          cd "$consumer"
+          git init -q
+          printf '[package]\nname = "maestro-probe"\nversion = "0.1.0"\nedition = "2024"\npublish = false\n' > Cargo.toml
+          printf '//! A probe.\n' > src/lib.rs
+          printf '# Probe\n' > README.md
+          printf 'MIT\n' > LICENSE
+          printf '# Agents\n' > AGENTS.md
+          RUST_WORKFLOWS_PIN="$REVISION v$version" rust-gate init
+          cargo generate-lockfile --offline
+          git add -A
+          prek run --all-files --show-diff-on-failure --color never

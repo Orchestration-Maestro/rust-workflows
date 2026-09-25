@@ -25,4 +25,5 @@ rules:
       - publish-binaries.yml
       - publish-crate.yml
       - publish-evidence.yml
+      - toolbelt-platforms.yml
       - unsafe-audit.yml

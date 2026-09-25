@@ -52,6 +52,7 @@ const REGISTRY: &[&[Step]] = &[
     super::rule_map::STEPS,
     super::copilot_guide::STEPS,
     super::local_runs::STEPS,
+    super::toolbelt_setup::STEPS,
 ];
 
 /// Every registered step, in registry order.

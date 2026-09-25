@@ -1,35 +1,17 @@
 //! The commit hooks every repository runs, rendered into its
-//! `.pre-commit-config.yaml`: prek's own checks, each tool through prek's
-//! `mise` language at the version this repository's `mise.toml` pins, the
+//! `.pre-commit-config.yaml`: prek's own checks, each tool from the PATH, where
+//! `rust-gate setup` puts the toolbelt the home's `mise.toml` pins, the
 //! commit message rules, and for Rust the formatter, the gate's source rules at
 //! the pinned release and Clippy before a push. Each tool takes the
 //! organization's configuration on its command line, from the hook, rather
 //! than from a file in the repository; Clippy takes it through
 //! `rust-gate clippy --local`, since no option carries it. At the same release, the gate
 //! keeps the rule map and the Copilot guide current: a hook rewrites either when
-//! it is stale, so the next commit carries it. A developer needs prek and
-//! rustup, nothing else.
+//! it is stale, so the next commit carries it. A developer needs rustup and
+//! the toolbelt `rust-gate setup` installs, nothing else.
 
 use crate::checks::organization_config::RUSTFMT_OPTIONS;
 use std::fmt::Write as _;
-
-/// Every tool a hook runs and the `mise` spec that installs it.
-const TOOLS: &[(&str, &str)] = &[
-    ("actionlint", "aqua:rhysd/actionlint@1.7.12"),
-    (
-        "editorconfig-checker",
-        "github:editorconfig-checker/editorconfig-checker@4.0.2",
-    ),
-    ("gitleaks", "aqua:gitleaks/gitleaks@8.30.1"),
-    ("lychee", "aqua:lycheeverse/lychee@0.24.2"),
-    ("rumdl", "aqua:rvben/rumdl@0.2.77"),
-    ("shellcheck", "aqua:koalaman/shellcheck@0.11.0"),
-    ("shfmt", "aqua:mvdan/sh@3.14.1"),
-    ("taplo", "aqua:tamasfe/taplo@0.10.0"),
-    ("typos", "aqua:crate-ci/typos@1.50.2"),
-    ("yamlfmt", "aqua:google/yamlfmt@0.21.0"),
-    ("zizmor", "aqua:zizmorcore/zizmor@1.30.1"),
-];
 
 /// The jaq the gate reads TOML and JSON through, built by Cargo.
 const JAQ: &str = "cli:jaq:3.1.1";
@@ -54,16 +36,14 @@ const BUILTIN: &str = concat!(
     "      - id: check-shebang-scripts-are-executable\n",
 );
 
-/// A hook whose tools prek installs through mise: its id, its name, the
-/// tools it needs, its command with the organization's configuration, and the
-/// files it reads, as a `types:` or `files:` line, or nothing for every file.
+/// A hook that runs a tool of the toolbelt: its id, its name, its command
+/// with the organization's configuration, and the files it reads, as a
+/// `types:` or `files:` line, or nothing for every file.
 struct ToolHook {
     /// The hook's id, what `SKIP` names.
     id: &'static str,
     /// What prek prints for it.
     name: &'static str,
-    /// The tools of [`TOOLS`] it needs.
-    tools: &'static [&'static str],
     /// The command, the files it reads appended.
     entry: &'static str,
     /// The `types:` or `files:` line, or empty.
@@ -74,12 +54,11 @@ struct ToolHook {
     whole: bool,
 }
 
-/// Every hook whose tools prek installs through mise.
+/// Every hook that runs a tool of the toolbelt.
 const TOOL_HOOKS: &[ToolHook] = &[
     ToolHook {
         id: "typos",
         name: "Spelling in code and prose",
-        tools: &["typos"],
         entry: "typos --force-exclude",
         files: "",
         exclude: "",
@@ -88,7 +67,6 @@ const TOOL_HOOKS: &[ToolHook] = &[
     ToolHook {
         id: "gitleaks",
         name: "Secrets in the staged change",
-        tools: &["gitleaks"],
         entry: "gitleaks git --pre-commit --staged --redact --no-banner",
         files: "",
         exclude: "",
@@ -97,7 +75,6 @@ const TOOL_HOOKS: &[ToolHook] = &[
     ToolHook {
         id: "yamlfmt",
         name: "YAML formatting",
-        tools: &["yamlfmt"],
         entry: "yamlfmt -no_global_conf -lint -formatter indent=2,include_document_start=false,\
                 retain_line_breaks_single=true,pad_line_comments=2,line_ending=lf",
         files: "types: [yaml]",
@@ -107,7 +84,6 @@ const TOOL_HOOKS: &[ToolHook] = &[
     ToolHook {
         id: "taplo",
         name: "TOML formatting",
-        tools: &["taplo"],
         entry: "taplo fmt --check --diff --no-auto-config --option array_auto_collapse=false",
         files: "types: [toml]",
         exclude: "(^|/)supply-chain/",
@@ -116,7 +92,6 @@ const TOOL_HOOKS: &[ToolHook] = &[
     ToolHook {
         id: "actionlint",
         name: "GitHub workflow lint",
-        tools: &["actionlint", "shellcheck"],
         entry: "actionlint",
         files: "files: '^\\.github/workflows/.*\\.ya?ml$'",
         exclude: "",
@@ -125,7 +100,6 @@ const TOOL_HOOKS: &[ToolHook] = &[
     ToolHook {
         id: "zizmor",
         name: "GitHub workflow security audit",
-        tools: &["zizmor"],
         entry: "zizmor --offline --persona=pedantic --no-progress",
         files: "files: '^\\.github/(workflows/.*|dependabot|actions/.*/action)\\.ya?ml$'",
         exclude: "",
@@ -134,7 +108,6 @@ const TOOL_HOOKS: &[ToolHook] = &[
     ToolHook {
         id: "shellcheck",
         name: "Shell lint",
-        tools: &["shellcheck"],
         entry: "shellcheck",
         files: "types: [shell]",
         exclude: "",
@@ -143,7 +116,6 @@ const TOOL_HOOKS: &[ToolHook] = &[
     ToolHook {
         id: "shfmt",
         name: "Shell formatting",
-        tools: &["shfmt"],
         entry: "shfmt -d",
         files: "types: [shell]",
         exclude: "",
@@ -152,7 +124,6 @@ const TOOL_HOOKS: &[ToolHook] = &[
     ToolHook {
         id: "rumdl",
         name: "Markdown structure",
-        tools: &["rumdl"],
         entry: "rumdl check --no-cache --disable MD013,MD041 --config \
                 'MD033.allowed-elements = [\"a\", \"br\", \"details\", \"h1\", \"img\", \"p\", \
                 \"picture\", \"source\", \"strong\", \"summary\"]'",
@@ -163,7 +134,6 @@ const TOOL_HOOKS: &[ToolHook] = &[
     ToolHook {
         id: "lychee",
         name: "Markdown links, offline",
-        tools: &["lychee"],
         entry: "lychee --offline --no-progress",
         files: "types: [markdown]",
         exclude: "",
@@ -172,7 +142,6 @@ const TOOL_HOOKS: &[ToolHook] = &[
     ToolHook {
         id: "editorconfig-checker",
         name: "Every file against .editorconfig",
-        tools: &["editorconfig-checker"],
         entry: "editorconfig-checker -disable-indent-size",
         files: "",
         exclude: "",
@@ -222,20 +191,10 @@ pub(super) fn commit_hooks(header: &str, rust: bool, version: &str) -> String {
          - repo: local\n    hooks:\n"
     );
     for hook in TOOL_HOOKS {
-        let specs: Vec<String> = hook
-            .tools
-            .iter()
-            .filter_map(|tool| TOOLS.iter().find(|(name, _)| name == tool))
-            .map(|(_, spec)| format!("\"{spec}\""))
-            .collect();
         let _ = write!(
             text,
-            "      - id: {}\n        name: {}\n        language: mise\n        \
-             additional_dependencies: [{}]\n        entry: {}\n",
-            hook.id,
-            hook.name,
-            specs.join(", "),
-            hook.entry
+            "      - id: {}\n        name: {}\n        language: system\n        entry: {}\n",
+            hook.id, hook.name, hook.entry
         );
         if !hook.files.is_empty() {
             let _ = writeln!(text, "        {}", hook.files);
@@ -292,25 +251,30 @@ pub(super) fn commit_hooks(header: &str, rust: bool, version: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{TOOL_HOOKS, TOOLS, commit_hooks};
+    use super::{TOOL_HOOKS, commit_hooks};
+
+    /// The toolbelt `rust-gate setup` installs.
+    const TOOLBELT: &str = include_str!("../../../../mise.toml");
 
     #[test]
     fn every_hook_names_a_pinned_tool_and_the_gate_at_the_release() {
         for hook in TOOL_HOOKS {
-            for tool in hook.tools {
-                assert!(
-                    TOOLS.iter().any(|(name, _)| name == tool),
-                    "{} needs {tool}, which no spec pins",
-                    hook.id
-                );
-            }
+            let program = hook.entry.split_whitespace().next().unwrap_or_default();
+            assert!(
+                TOOLBELT
+                    .lines()
+                    .any(|line| line.starts_with(&format!("{program} = "))),
+                "{} runs {program}, which the toolbelt does not pin",
+                hook.id
+            );
         }
         let rust = commit_hooks("# h\n", true, "2.0.0");
         assert!(rust.starts_with("# h\nminimum_prek_version: '0.5.3'\n"));
         assert!(rust.contains(
-            "additional_dependencies: [\"aqua:rhysd/actionlint@1.7.12\", \
-             \"aqua:koalaman/shellcheck@0.11.0\"]\n"
+            "      - id: actionlint\n        name: GitHub workflow lint\n        language: \
+             system\n        entry: actionlint\n"
         ));
+        assert!(!rust.contains("language: mise"));
         assert!(rust.contains("rust-workflows:v2.0.0:rust-gate\"\n"));
         let other = commit_hooks("# h\n", false, "2.0.0");
         assert_eq!(rust.matches("language: rust\n").count(), 5);

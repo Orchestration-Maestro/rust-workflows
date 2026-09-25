@@ -139,8 +139,7 @@ update-tools:
       '.tools | to_entries[] | "\(.key) \(.value | if type == "object" then .version else . end)"' \
       mise.toml)
     if (( ${#was[@]} )); then
-      # Progress goes to stderr: stdout is the list of moves, a commit message.
-      mise lock --platform linux-x64,linux-x64-musl "${!was[@]}" >&2
+      just _lock "${!was[@]}"
       # $1 is a checked tool name, $2 a literal field.
       locked() {
         jaq -r --from toml ".tools[\"$1\"][0][\"platforms.linux-x64\"].$2 // \"\"" mise.lock
@@ -209,6 +208,53 @@ update-tools:
       sed -i -E "s#${from}#${cli_asset}${cli}/codecovcli_linux ${sum}#" "$ci"
       echo "codecov-cli ${used} -> ${cli}"
     fi
+
+# Lock each tool named, or every tool, on every platform its `os` field allows,
+# and hash each download GitHub publishes no digest for, so `--locked` verifies
+# every download `rust-gate setup` makes on every platform.
+[linux]
+_lock *$TOOLS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    read -r -a names <<< "$TOOLS"
+    if (( ! ${#names[@]} )); then
+      mapfile -t names < <(jaq -r --from toml '.tools | keys[]' mise.toml)
+    fi
+    allowed='.tools[env.TOOL] | if type == "object" and has("os") then .os[]'
+    allowed+=' else "linux", "macos", "windows" end'
+    for name in "${names[@]}"; do
+      [[ "$name" =~ ^[a-z0-9-]+$ ]] || { echo "unexpected tool name: ${name}" >&2; exit 1; }
+      platforms=''
+      while read -r os; do
+        case "$os" in
+          linux) platforms+=,linux-x64,linux-x64-musl,linux-arm64 ;;
+          linux/x64) platforms+=,linux-x64,linux-x64-musl ;;
+          linux/arm64) platforms+=,linux-arm64 ;;
+          macos) platforms+=,macos-x64,macos-arm64 ;;
+          macos/x64 | macos/arm64) platforms+=",macos-${os#macos/}" ;;
+          windows) platforms+=,windows-x64 ;;
+          *) echo "${name}: unknown os entry ${os}" >&2; exit 1 ;;
+        esac
+      done < <(TOOL="$name" jaq -r --from toml "$allowed" mise.toml)
+      # Progress goes to stderr: stdout is the list of moves, a commit message.
+      mise lock --platform "${platforms#,}" "$name" >&2
+    done
+    downloads="$(mktemp -d)"
+    trap 'rm -rf "$downloads"' EXIT
+    unsigned='.tools | to_entries[] | .key + " " + (.value[] | to_entries[]'
+    unsigned+=' | select((.key | startswith("platforms.")) and .value.url != null)'
+    unsigned+=' | select(.value.checksum == null)'
+    unsigned+=' | (.key | ltrimstr("platforms.")) + " " + .value.url)'
+    while read -r name platform url; do
+      [[ "$url" == https://github.com/*/releases/download/*/* ]] || {
+        echo "${name} ${platform}: mise.lock names no GitHub release asset" >&2; exit 1;
+      }
+      curl --fail --silent --show-error --location --retry 4 --retry-all-errors \
+        -o "$downloads/asset" "$url"
+      digest="$(sha256sum "$downloads/asset" | cut -d' ' -f1)"
+      table="^\\[tools\\.${name}\\.\"platforms\\.${platform}\"\\]\$"
+      sed -i "/${table}/a checksum = \"sha256:${digest}\"" mise.lock
+    done < <(jaq -r --from toml "$unsigned" mise.lock)
 
 # Regenerate every generated document: the steps, every generated table, the
 # managed files, and the organization's lints in every crate's manifest.
