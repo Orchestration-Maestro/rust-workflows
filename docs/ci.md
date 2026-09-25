@@ -305,12 +305,17 @@ block; GitHub reads `ci.yml` and `dependabot.yml`, and prek reads
 | nextest | `--config-file`, TST-004's profile, `retries = 0`, in `quality` |
 | taplo | `--no-auto-config --option array_auto_collapse=false`, and the hook leaves `supply-chain/` to cargo-vet |
 | yamlfmt | `-formatter` with the indentation, comment padding and line endings |
-| rumdl | `--no-config`, `--disable MD013,MD041` and the HTML elements MD033 allows; the hook leaves `CHANGELOG.md` to release-please |
+| rumdl | `--disable MD013,MD041` and the HTML elements MD033 allows; the hook leaves `CHANGELOG.md` to release-please |
 
 A repository still holding `.config/nextest.toml`, `.rumdl.toml`,
 `.taplo.toml`, `.yamlfmt.yml`, `clippy.toml`, `deny.toml` or `rustfmt.toml` as
 sync wrote them, header first, is refused until `rust-gate sync` deletes them;
-a file without the header is the repository's own and stays. A `deny.toml`
+a file without the header is the repository's own and stays. rumdl's settings
+are the exception: at the root, a `.rumdl.toml`, a `.markdownlint` file or a
+`pyproject.toml` rumdl table would loosen every Markdown file, so
+`managed-files` and `rust-gate sync --check` refuse them there. In a
+subdirectory, rumdl applies a `.rumdl.toml` to that subdirectory alone, which
+exempts test fixtures compared byte for byte. A `deny.toml`
 the repository wrote itself is refused by `licenses`: DEP-001 holds for every
 repository, and its exceptions live in `maestro-quality.toml`.
 

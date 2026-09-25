@@ -1,7 +1,8 @@
 //! The steps: `sync` writes every managed file, deletes each retired one it
 //! wrote before, and moves every other call to rust-workflows to the caller's
 //! release; `sync --check` and the `managed-files` step of `ci.yml` refuse any
-//! difference, a retired file still present included, and `init` writes
+//! difference, a retired file still present included, and Markdown settings
+//! at the root, which rumdl would read over the organization's; `init` writes
 //! them for a repository whose caller pins no release yet, with its rule map
 //! and, in a git repository, its Copilot guide.
 
@@ -60,6 +61,23 @@ const CALLER: &str = ".github/workflows/ci.yml";
 /// Whether a manifest is a workspace root: it holds a `[workspace]` table.
 const IS_WORKSPACE: &str = "has(\"workspace\")";
 
+/// The files rumdl reads its settings from at the root of a repository. The
+/// commit hook passes the organization's settings over them, so one of them
+/// at the root would loosen every Markdown file; in a subdirectory, rumdl
+/// applies it to that subdirectory alone.
+const MARKDOWN_SETTINGS: [&str; 10] = [
+    ".config/rumdl.toml",
+    ".markdownlint-cli2.jsonc",
+    ".markdownlint-cli2.yaml",
+    ".markdownlint.json",
+    ".markdownlint.jsonc",
+    ".markdownlint.yaml",
+    ".markdownlint.yml",
+    ".rumdl.toml",
+    "pyproject.toml",
+    "rumdl.toml",
+];
+
 /// Run `managed-files`: the checkout's managed files against the rendering.
 fn in_ci() -> Outcome {
     let job = Job::current()?;
@@ -76,7 +94,8 @@ fn in_ci() -> Outcome {
          `managed-files.txt` in the reports artifact.\n",
         differing.len()
     ))?;
-    refuse("managed files", &differing)
+    refuse("managed files", &differing)?;
+    refuse_root_markdown("managed files", &root)
 }
 
 /// Run `sync`: write every managed file of the repository here.
@@ -89,7 +108,8 @@ fn sync() -> Outcome {
 /// Run `sync --check`: refuse any managed file here that differs.
 fn check() -> Outcome {
     let root = canonical(Path::new("."))?;
-    refuse("sync --check", &differences(&root, None)?)
+    refuse("sync --check", &differences(&root, None)?)?;
+    refuse_root_markdown("sync --check", &root)
 }
 
 /// Run `init`: the managed files of a repository with no caller yet, at the
@@ -134,6 +154,29 @@ fn refuse(context: &str, differing: &[String]) -> Outcome {
     Err(Failure::from(format!(
         "{context}: {count} from the organization's rendering ({}); run rust-gate sync",
         differing.join(", ")
+    )))
+}
+
+/// Refuse the Markdown settings rumdl would read at `root`: a `pyproject.toml`
+/// only when it holds rumdl's table. The home's are its own.
+fn refuse_root_markdown(context: &str, root: &Path) -> Outcome {
+    if is_workflow_home(root) {
+        return Ok(());
+    }
+    let found: Vec<&str> = MARKDOWN_SETTINGS
+        .into_iter()
+        .filter(|path| match fs::read_to_string(root.join(path)) {
+            Ok(text) => *path != "pyproject.toml" || text.contains("[tool.rumdl"),
+            Err(_) => false,
+        })
+        .collect();
+    if found.is_empty() {
+        return Ok(());
+    }
+    Err(Failure::from(format!(
+        "{context}: {} would loosen the organization's Markdown settings at the root; a \
+         .rumdl.toml in a subdirectory applies to it alone",
+        found.join(", ")
     )))
 }
 

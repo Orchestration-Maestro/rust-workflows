@@ -255,6 +255,44 @@ fn the_managed_files_step_refuses_a_difference_in_ci() {
 }
 
 #[test]
+fn markdown_settings_at_the_root_are_refused_and_a_subdirectory_keeps_its_own() {
+    let mut fixture = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
+    succeeds(&in_project(
+        &fixture,
+        &format!("{} rust-gate init", pin('a', "2.0.0")),
+    ));
+    let project = fixture.root.join("project");
+    fixture.set("GITHUB_WORKSPACE", &project.display().to_string());
+    // A subdirectory's settings apply to it alone: its fixtures may be exempt.
+    fs::create_dir_all(project.join("examples")).unwrap();
+    let everything = "[global]\ndisable = [\"all\"]\n";
+    fs::write(project.join("examples/.rumdl.toml"), everything).unwrap();
+    fs::write(project.join("pyproject.toml"), "[project]\nname = \"a\"\n").unwrap();
+    succeeds(&in_project(&fixture, "rust-gate sync --check"));
+    // At the root, rumdl would read them for every file the hook checks.
+    fs::write(project.join(".rumdl.toml"), everything).unwrap();
+    fs::write(project.join(".markdownlint.yaml"), "default: false\n").unwrap();
+    fs::write(
+        project.join("pyproject.toml"),
+        "[tool.rumdl]\ndisable = [\"all\"]\n",
+    )
+    .unwrap();
+    refused(
+        &in_project(&fixture, "rust-gate sync --check"),
+        "sync --check: .markdownlint.yaml, .rumdl.toml, pyproject.toml would loosen the \
+         organization's Markdown settings at the root; a .rumdl.toml in a subdirectory \
+         applies to it alone",
+    );
+    fs::remove_file(project.join(".markdownlint.yaml")).unwrap();
+    fs::remove_file(project.join("pyproject.toml")).unwrap();
+    refused(
+        &fixture.run("ci", "managed-files"),
+        "managed files: .rumdl.toml would loosen the organization's Markdown settings at \
+         the root; a .rumdl.toml in a subdirectory applies to it alone",
+    );
+}
+
+#[test]
 fn the_home_may_change_the_files_it_is_the_source_of() {
     let mut fixture = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
     succeeds(&in_project(
@@ -284,6 +322,11 @@ fn the_home_may_change_the_files_it_is_the_source_of() {
     fs::write(
         project.join("clippy.toml"),
         "too-many-lines-threshold = 100\n",
+    )
+    .unwrap();
+    fs::write(
+        project.join(".rumdl.toml"),
+        "[global]\ndisable = [\"MD013\"]\n",
     )
     .unwrap();
     succeeds(&in_project(&fixture, "rust-gate sync --check"));
