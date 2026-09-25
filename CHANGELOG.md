@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.0.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v3.0.1...v4.0.0) (2026-09-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* a repository deletes its own toolbelt files, and each developer runs `rust-gate setup` and adds the PATH line it prints.
+* upload-sarif.yml and upload-coverage.yml are removed. Every caller of ci.yml, publish-binaries.yml or publish-crate.yml grants `security-events: write` and `id-token: write`, which GitHub checks at startup for the skipped upload jobs; a release workflow's publisher job adds those two lines. Each repository's ci.yml caller is deleted by rust-gate sync.
+
+### Features
+
+* set up the pinned tools from the gate, not from each repository ([#70](https://github.com/Orchestration-Maestro/rust-workflows/issues/70)) ([0f0be71](https://github.com/Orchestration-Maestro/rust-workflows/commit/0f0be71a491a1c5a6944b7b2061eaf2db8fbdb07))
+* upload sarif and coverage from the central check ([#67](https://github.com/Orchestration-Maestro/rust-workflows/issues/67)) ([63740a0](https://github.com/Orchestration-Maestro/rust-workflows/commit/63740a0ddd27be032760de2188e8a2135aa22da6))
+* upload the default branch's baselines from the merge queue ([#69](https://github.com/Orchestration-Maestro/rust-workflows/issues/69)) ([79bc628](https://github.com/Orchestration-Maestro/rust-workflows/commit/79bc62850ca962a6b7a2f9ee7a8e710fc3868c96))
+
 ## [3.0.1](https://github.com/Orchestration-Maestro/rust-workflows/compare/v3.0.0...v3.0.1) (2026-09-25)
 
 
