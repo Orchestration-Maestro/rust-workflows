@@ -60,6 +60,7 @@ fn setup_installs_the_locked_toolbelt_links_it_and_prints_its_path() {
         "MISE_GLOBAL_CONFIG_FILE",
         "MISE_TRUSTED_CONFIG_PATHS",
         "MISE_CEILING_PATHS",
+        "MISE_HTTP_RETRIES",
     ] {
         assert!(trace.contains(&format!("{setting}=")), "{setting}: {trace}");
     }
@@ -119,6 +120,8 @@ printf 'not mise' > "$out""#,
         )),
         "{calls}"
     );
+    // Two minutes of server errors before the download fails.
+    assert!(calls.contains("--retry 7 --retry-all-errors "), "{calls}");
     assert!(!calls.contains("tar\n"), "{calls}");
     // Nothing half-fetched is left for the next run to trust.
     let tools = fixture.root.join("cache/maestro/tools");
