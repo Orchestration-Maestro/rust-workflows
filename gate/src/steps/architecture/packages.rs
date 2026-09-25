@@ -139,6 +139,7 @@ mod tests {
             library,
             binary,
             plain_tests: tests.iter().map(|name| (*name).to_owned()).collect(),
+            features: Vec::new(),
         }
     }
 

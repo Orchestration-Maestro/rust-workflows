@@ -10,11 +10,15 @@ use crate::runner::{Cmd, Failure};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Cargo's targets, one line each: their kinds and their root file.
-const TARGETS: &str = ".packages[] | .targets[] | [(.kind | join(\",\")), .src_path] | @tsv";
+/// Cargo's targets, one line each: their package, their kinds and their root
+/// file.
+const TARGETS: &str = ".packages[] | .name as $package | .targets[] \
+    | [$package, (.kind | join(\",\")), .src_path] | @tsv";
 
 /// One target and the modules its root reaches.
 pub(crate) struct Tree {
+    /// The package the target belongs to.
+    pub(crate) package: String,
     /// The target's kinds, as Cargo names them: `lib`, `bin`, `test`...
     pub(crate) kinds: Vec<String>,
     /// Every module, the root first.
@@ -146,10 +150,13 @@ pub(crate) fn module_trees(metadata: &Path) -> Result<Vec<Tree>, Failure> {
 
 /// The tree of the target one line of the listing names.
 fn target_tree(line: &str) -> Result<Tree, Failure> {
-    let Some((kinds, root)) = line.split_once('\t') else {
+    let mut fields = line.splitn(3, '\t');
+    let (Some(package), Some(kinds), Some(root)) = (fields.next(), fields.next(), fields.next())
+    else {
         return Err(format!("cargo metadata listed a target the gate cannot read: {line}").into());
     };
     Ok(Tree {
+        package: package.to_owned(),
         kinds: kinds.split(',').map(str::to_owned).collect(),
         modules: walk(Path::new(root))?,
     })
@@ -221,6 +228,7 @@ pub(crate) fn sample(kinds: &[&str], files: &[(&str, &str)]) -> Tree {
         .collect();
     modules.sort_by(|left, right| left.path.cmp(&right.path));
     Tree {
+        package: "sample".to_owned(),
         kinds: kinds.iter().map(|kind| (*kind).to_owned()).collect(),
         modules,
     }
@@ -315,6 +323,12 @@ mod tests {
             .map(|module| module.path.join("::"))
             .collect();
         assert_eq!(paths, ["", "a", "a::c", "b"]);
+        let listed = format!("maestro-core\tlib,rlib\t{}", root.join("lib.rs").display());
+        let tree = target_tree(&listed).unwrap();
+        assert_eq!(
+            (tree.package.as_str(), tree.kinds.len()),
+            ("maestro-core", 2)
+        );
         fs::remove_dir_all(&root).unwrap();
     }
 
@@ -324,6 +338,11 @@ mod tests {
         assert_eq!(
             error.message.as_deref(),
             Some("cargo metadata listed a target the gate cannot read: lib")
+        );
+        let error = target_tree("maestro-core\tlib").err().unwrap();
+        assert_eq!(
+            error.message.as_deref(),
+            Some("cargo metadata listed a target the gate cannot read: maestro-core\tlib")
         );
     }
 }

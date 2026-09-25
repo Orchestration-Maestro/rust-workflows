@@ -8,11 +8,14 @@ use std::path::{Path, PathBuf};
 
 /// Every package, one line each: name, whether it may be published, its
 /// manifest, its edition, its normal dependencies, the kinds of its targets,
-/// and the test targets that build without required features.
+/// the test targets that build without required features, and the features it
+/// declares, those Cargo makes of an optional dependency left out.
 const PACKAGES: &str = ".packages[] | [.name, (.publish != [] | tostring), .manifest_path, \
     .edition, ([.dependencies[] | select(.kind == null) | .name] | join(\",\")), \
     ([.targets[].kind[]] | unique | join(\",\")), ([.targets[] | select(.kind == [\"test\"] \
-    and ((.[\"required-features\"] // []) | length) == 0) | .name] | join(\",\"))] | @tsv";
+    and ((.[\"required-features\"] // []) | length) == 0) | .name] | join(\",\")), \
+    ([.features | to_entries[] | select(.value != [\"dep:\" + .key]) | .key] \
+    | join(\",\"))] | @tsv";
 
 /// The workspace: its root, then how many members it has.
 const WORKSPACE: &str = "[.workspace_root, (.workspace_members | length | tostring)] | @tsv";
@@ -56,6 +59,8 @@ pub(crate) struct Package {
     pub(crate) binary: bool,
     /// Its test targets that build without required features.
     pub(crate) plain_tests: Vec<String>,
+    /// The features its manifest declares, in Cargo's order.
+    pub(crate) features: Vec<String>,
 }
 
 /// The workspace the packages form.
@@ -154,6 +159,7 @@ fn parse_package(line: &str) -> Result<Package, Failure> {
         dependencies,
         kinds,
         plain_tests,
+        features,
     ] = fields[..]
     else {
         return Err(format!("cargo metadata listed a package the gate cannot read: {line}").into());
@@ -170,6 +176,7 @@ fn parse_package(line: &str) -> Result<Package, Failure> {
             .any(|kind| LIBRARY_KINDS.contains(&kind.as_str())),
         binary: kinds.iter().any(|kind| kind == "bin"),
         plain_tests: list(plain_tests),
+        features: list(features),
     })
 }
 
@@ -213,7 +220,8 @@ mod tests {
     #[test]
     fn a_package_line_gives_its_targets_dependencies_and_plain_tests() {
         let package = parse_package(
-            "maestro-core\ttrue\t/w/core/Cargo.toml\t2024\tanyhow,serde\tbin,lib,test\tmain,other",
+            "maestro-core\ttrue\t/w/core/Cargo.toml\t2024\tanyhow,serde\tbin,lib,test\tmain,other\t\
+             default,serve",
         )
         .unwrap();
         assert_eq!(package.name, "maestro-core");
@@ -222,9 +230,11 @@ mod tests {
         assert_eq!(package.edition, "2024");
         assert_eq!(package.dependencies, ["anyhow", "serde"]);
         assert_eq!(package.plain_tests, ["main", "other"]);
-        let bare = parse_package("fixture\tfalse\t/w/Cargo.toml\t2021\t\tlib\t").unwrap();
+        assert_eq!(package.features, ["default", "serve"]);
+        let bare = parse_package("fixture\tfalse\t/w/Cargo.toml\t2021\t\tlib\t\t").unwrap();
         assert!(!bare.publishable && bare.library && !bare.binary);
         assert!(bare.dependencies.is_empty() && bare.plain_tests.is_empty());
+        assert!(bare.features.is_empty());
         assert_eq!(
             parse_package("broken").err().unwrap().message.as_deref(),
             Some("cargo metadata listed a package the gate cannot read: broken")

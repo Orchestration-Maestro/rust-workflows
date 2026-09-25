@@ -1,10 +1,31 @@
 //! The home of the reusable workflows: the repository whose
 //! `.github/workflows/ci.yml` declares `workflow_call`, rust-workflows itself.
 //! Its `ci.yml`, its Dependabot settings and its hooks are its own, and its
-//! hooks run in `just check` on its pinned toolbelt.
+//! hooks run in `just check` on its pinned toolbelt. Its name on GitHub is
+//! one constant, [`HOME`], so the rename to `maestro-rust-workflows` flips
+//! every call, pin, signer and URL the gate writes at once.
 
 use std::fs;
 use std::path::Path;
+
+/// The organization on GitHub.
+pub(crate) const ORGANIZATION: &str = "Orchestration-Maestro";
+
+/// The repository that holds every reusable workflow and action of the
+/// organization, as the gate names it. It flips to `maestro-rust-workflows`
+/// when the repository is renamed: GitHub Actions follows no rename, so every
+/// call must carry the new name.
+pub(crate) const HOME: &str = "rust-workflows";
+
+/// Every name the home repository answers to: its name before the rename and
+/// after. A pinned call under either moves to [`HOME`], and Dependabot leaves
+/// both alone.
+pub(crate) const NAMES: [&str; 2] = ["rust-workflows", "maestro-rust-workflows"];
+
+/// The home repository as `owner/name`.
+pub(crate) fn home_repository() -> String {
+    format!("{ORGANIZATION}/{HOME}")
+}
 
 /// Whether the repository at `root` is the home of the reusable workflows.
 pub(crate) fn is_workflow_home(root: &Path) -> bool {
@@ -14,10 +35,16 @@ pub(crate) fn is_workflow_home(root: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::is_workflow_home;
+    use super::{HOME, NAMES, home_repository, is_workflow_home};
     use std::env;
     use std::fs;
     use std::process;
+
+    #[test]
+    fn the_home_is_one_of_the_names_it_answers_to() {
+        assert!(NAMES.contains(&HOME));
+        assert_eq!(home_repository(), "Orchestration-Maestro/rust-workflows");
+    }
 
     #[test]
     fn only_a_callable_ci_workflow_marks_the_home() {
