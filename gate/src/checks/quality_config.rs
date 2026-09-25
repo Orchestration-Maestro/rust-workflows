@@ -407,7 +407,8 @@ mod tests {
                 .as_deref(),
             Some(
                 "maestro-quality.toml: ARC-001 takes no exception; \
-                 only ARC-005, NAME-004, TST-001, DUP-001, HYG-003, DEP-001, PRF-001 do"
+                 only ARC-005, NAME-004, TST-001, DUP-001, HYG-003, HYG-006, HYG-007, DEP-001, \
+                 PRF-001 do"
             )
         );
         assert_eq!(

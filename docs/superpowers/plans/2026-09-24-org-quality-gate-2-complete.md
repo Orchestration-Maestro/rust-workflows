@@ -322,3 +322,17 @@ Rulings taken while executing, newest last.
     it too, so flipping `HOME` is the whole rename for the gate's code. The
     prose that names today's repository moves at the cutover: `SECURITY.md`,
     `docs/publishing.md`, the README, `docs/ci.md` and the tests' fixtures.
+28. The owner asked for names and words to hold across the organization. Two
+    hygiene rules join, both open to an exception. HYG-006 names each file as
+    its kind is named: kebab-case pages, workflows and scripts, `UPPER_SNAKE`
+    community pages, snake_case Rust files and Python modules, `NNNN-title.md`
+    decision records; stand-in directories are not read. HYG-007 refuses the
+    `_Never_` words of the organization's glossary, carried in
+    `gate/golden-rules/glossary.md` and kept current by the sync like the other
+    pages, and of the repository's `CONTEXT.md`, in every text file but
+    records, glossaries and `maestro-quality.toml`. `_Avoid_` words stay a
+    review matter: their meaning depends on the sentence, and rust-workflows'
+    own "harness" has 96 correct uses. rust-workflows renames its pull request
+    template to `PULL_REQUEST_TEMPLATE.md`; its `.gitattributes`, a managed
+    file the pinned gate renders, keeps the old `export-ignore` line, which
+    follows at the next repin.

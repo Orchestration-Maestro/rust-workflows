@@ -1,5 +1,5 @@
 //! `ci.yml`: what every tracked file of a repository holds to, HYG-001 to
-//! HYG-005 and the width of shell scripts, each refused by its identifier
+//! HYG-007 and the width of shell scripts, each refused by its identifier
 //! with its file and line.
 
 use crate::harness::{Fixture, refused, succeeds, tool, write_executable};
@@ -134,5 +134,114 @@ fn wide_shell_lines_and_justfiles_are_refused() {
             "SIZE-003 scripts/run.sh:2: 120 columns, over 100; wrap it, strings and comments ",
             "included\n",
         )
+    );
+}
+
+#[test]
+fn file_names_follow_the_form_of_their_kind() {
+    let fixture = checkout(&[
+        ("docs/Setup_Guide.md", "Guide\n"),
+        ("docs/adr/10-choice.md", "Choice\n"),
+        ("docs/adr/0010-choice.md", "Choice\n"),
+        ("docs/adr/README.md", "Records\n"),
+        ("CODE_OF_CONDUCT.md", "Conduct\n"),
+        ("src/fooBar.rs", "//! Foo.\n"),
+        (".github/workflows/Build.yaml", "on: push\n"),
+        ("scripts/run_all.sh*", "#!/bin/sh\n"),
+        ("tools/Lint*", "#!/bin/sh\n"),
+        ("scripts/Helper.py", "VALUE = 1\n"),
+        ("scripts/__init__.py", ""),
+        ("tests/fixtures/Odd_Name.md", "Stand-in\n"),
+    ]);
+    refused(&fixture.run("ci", "hygiene"), "hygiene: 7 findings");
+    assert_eq!(
+        report(&fixture),
+        concat!(
+            "HYG-006 .github/workflows/Build.yaml: a workflow named `Build.yaml`; name it in ",
+            "kebab-case with the extension `.yml`\n",
+            "HYG-006 docs/Setup_Guide.md: a Markdown page named `Setup_Guide.md`; name it in ",
+            "lowercase kebab-case, or UPPER_SNAKE for a community file such as README\n",
+            "HYG-006 docs/adr/10-choice.md: a decision record named `10-choice.md`; name it ",
+            "`NNNN-title.md`, the title in kebab-case, or README.md\n",
+            "HYG-006 scripts/Helper.py: a Python module named `Helper.py`; name it in snake_case, ",
+            "the form Python imports\n",
+            "HYG-006 scripts/run_all.sh: a script named `run_all.sh`; name it in lowercase ",
+            "kebab-case\n",
+            "HYG-006 src/fooBar.rs: a Rust file named `fooBar.rs`; name it in snake_case\n",
+            "HYG-006 tools/Lint: a script named `Lint`; name it in lowercase kebab-case\n",
+        )
+    );
+    fs::write(
+        fixture.root.join("maestro-quality.toml"),
+        concat!(
+            "[[exception]]\nrule = \"HYG-006\"\npath = \"scripts/Helper.py\"\n",
+            "reason = \"the name a plugin loader imports\"\n",
+        ),
+    )
+    .unwrap();
+    refused(&fixture.run("ci", "hygiene"), "hygiene: 6 findings");
+    assert!(
+        report(&fixture).contains("EXCUSED HYG-006 scripts/Helper.py:"),
+        "{}",
+        report(&fixture)
+    );
+}
+
+/// `text` with `#` read as `i`, `@` as `a` and `&` as `A`: this repository's own
+/// hygiene reads this file too, and would refuse the words spelled out.
+fn spelled(text: &str) -> String {
+    text.replace('#', "i").replace('@', "a").replace('&', "A")
+}
+
+#[test]
+fn words_a_glossary_never_uses_are_refused_everywhere_but_records() {
+    let guide = spelled(concat!(
+        "Wh#telisted names pass a San#ty-Check.\n",
+        "See https://x.y/wh#telist for more.\n",
+        "A Wh#teList and a bl@ck_list.\n",
+    ));
+    let library = spelled("//! Babysitters restart servers.\nconst BL&CKLISTED: u8 = 0;\n");
+    let changelog = spelled("Removed the wh#telist.\n");
+    let record = spelled("A bl@cklist.\n");
+    let fixture = checkout(&[
+        (
+            "CONTEXT.md",
+            "**Supervisor**: The process that restarts servers.\n_Never_: babysitter\n",
+        ),
+        ("docs/guide.md", &guide),
+        ("src/lib.rs", &library),
+        ("CHANGELOG.md", &changelog),
+        ("docs/adr/0001-names.md", &record),
+    ]);
+    refused(&fixture.run("ci", "hygiene"), "hygiene: 6 findings");
+    let never = "is a word the organization's glossary never uses; say";
+    assert_eq!(
+        report(&fixture),
+        spelled(&format!(
+            concat!(
+                "HYG-007 docs/guide.md:1: `san#ty check` {never} coherence check\n",
+                "HYG-007 docs/guide.md:1: `wh#telist` {never} allowlist\n",
+                "HYG-007 docs/guide.md:3: `bl@cklist` {never} denylist\n",
+                "HYG-007 docs/guide.md:3: `wh#telist` {never} allowlist\n",
+                "HYG-007 src/lib.rs:1: `babysitter` is a word CONTEXT.md never uses; ",
+                "say supervisor\n",
+                "HYG-007 src/lib.rs:2: `bl@cklist` {never} denylist\n",
+            ),
+            never = never
+        ))
+    );
+    let exception = spelled(concat!(
+        "[[exception]]\nrule = \"HYG-007\"\npath = \"src/lib.rs\"\nitem = \"bl@cklist\"\n",
+        "reason = \"the name a generated binding keeps\"\n",
+    ));
+    fs::write(fixture.root.join("maestro-quality.toml"), exception).unwrap();
+    // The fixture keeps its reports in its checkout, and the last one quotes
+    // the words; a run on GitHub writes them outside it.
+    fs::remove_file(fixture.root.join("reports/hygiene.txt")).unwrap();
+    refused(&fixture.run("ci", "hygiene"), "hygiene: 5 findings");
+    assert!(
+        report(&fixture).contains("EXCUSED HYG-007 src/lib.rs:2:"),
+        "{}",
+        report(&fixture)
     );
 }

@@ -1,6 +1,11 @@
-//! The golden rules this release carries: the three pages of the `.github`
+//! The golden rules this release carries: the pages of the `.github`
 //! repository's golden-rules directory, copied beside the gate and embedded
-//! when it is built, and the commit they were copied from.
+//! when it is built, and the commit they were copied from. The three rule
+//! pages are embedded here; the glossary beside them is embedded by the
+//! hygiene step, whose HYG-007 refuses its `_Never_` words. The `.github`
+//! quality sync carries every page present in the directory, the glossary
+//! included, and rewrites `commit.txt` whenever any of them changes, so the
+//! one commit names where every page came from.
 
 /// The engineering rules page.
 pub(super) const ENGINEERING: &str = include_str!("../../../golden-rules/engineering.md");
@@ -11,7 +16,8 @@ pub(super) const SECURITY: &str = include_str!("../../../golden-rules/security.m
 /// The Northstar page.
 pub(super) const NORTHSTAR: &str = include_str!("../../../golden-rules/northstar.md");
 
-/// The `.github` commit the three pages were copied from, on one line.
+/// The `.github` commit every page beside it was copied from, the glossary
+/// included, on one line.
 const COMMIT: &str = include_str!("../../../golden-rules/commit.txt");
 
 /// The `.github` commit the embedded pages were copied from.
