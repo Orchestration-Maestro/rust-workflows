@@ -24,6 +24,8 @@ adopting them. Security has its own [security rules](security.md); the
 
 ### FND-001 — Think before coding
 
+> State assumptions, surface every reading, stop when unclear.
+
 - **Requirement:** State assumptions before implementing, and push back when a
   simpler approach exists. Where more than one reading exists, surface the
   competing interpretations. When something is unclear, stop and name what is
@@ -36,6 +38,8 @@ adopting them. Security has its own [security rules](security.md); the
 
 ### FND-002 — Simplicity first
 
+> The least complex solution that meets the need, nothing speculative.
+
 - **Requirement:** Choose the least complex solution that satisfies the
   requirement. Add no speculative abstraction, configuration, dependency or
   scaffolding.
@@ -45,6 +49,8 @@ adopting them. Security has its own [security rules](security.md); the
 
 ### FND-003 — Surgical changes
 
+> Touch only what the goal requires, no drive-by refactors.
+
 - **Requirement:** A change touches only the files and behaviour its goal
   requires: no drive-by refactoring, no unrelated formatting.
 - **Applies to:** every change, documentation and configuration included.
@@ -52,6 +58,8 @@ adopting them. Security has its own [security rules](security.md); the
   records any necessary adjacent fix.
 
 ### FND-004 — Goal-driven execution
+
+> Define done first, run the check, report what it actually said.
 
 - **Requirement:** A change defines an observable result that means done, runs
   that previously defined check, and reports its actual result.
@@ -92,6 +100,8 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
 
 ### ENF-001 — No machine-named paths
 
+> Paths are derived at runtime, never a home directory or a drive letter.
+
 - **Requirement:** Code, configuration, task runners and workflows never write
   an absolute path that names a machine: no home directory, drive letter or
   user profile. Paths are derived at runtime; platform roots (`/usr`, `/opt`,
@@ -103,6 +113,8 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
 
 ### ENF-002 — Every claimed platform is tested
 
+> Merge-blocking checks cover each claimed platform on every pull request.
+
 - **Requirement:** Each platform a repository claims to support is covered on
   every pull request by merge-blocking checks. A platform without that coverage
   is not claimed.
@@ -112,6 +124,8 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
 
 ### ENF-003 — English only
 
+> Prose and identifiers are English.
+
 - **Requirement:** Prose and identifiers are English. A diacritic scan may help,
   but it does not prove English; review does.
 - **Applies to:** source, configuration, documentation, identifiers and content
@@ -119,6 +133,8 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
 - **Evidence:** scan output plus review.
 
 ### ENF-004 — Conventional commits
+
+> Commit titles follow Conventional Commits; changelogs come from them.
 
 - **Requirement:** Commit titles follow Conventional Commits. The organization
   refuses any other form, and changelogs are generated from the commit types.
@@ -128,12 +144,16 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
 
 ### ENF-005 — Failing test first
 
+> A behaviour change starts with a test seen failing.
+
 - **Requirement:** For a behaviour change, the test is written first and seen
   failing before the implementation.
 - **Applies to:** every behaviour change; not documentation-only changes.
 - **Evidence:** history or recorded output showing the failure, then the pass.
 
 ### ENF-006 — Never weaken a gate
+
+> A gate that blocks something correct is reported, never bypassed.
 
 - **Requirement:** A gate is never weakened, bypassed or removed to make a
   change pass. A gate that blocks something correct is reported in the pull
@@ -144,6 +164,8 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
 
 ### ENF-007 — Pull requests only
 
+> Signed pull requests only; no direct push, force-push or deletion.
+
 - **Requirement:** Every change to the default branch arrives through a pull
   request, maintainers included, as a signed commit. The platform refuses a
   direct push, a force-push and the deletion of the default branch.
@@ -152,6 +174,8 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
   unsigned commit.
 
 ### ENF-008 — Tiered checks
+
+> Cheap checks at commit, the same check locally and in CI, heavy checks weekly.
 
 - **Requirement:** Cheap commit checks SHOULD be distinct from pre-push checks.
   The local aggregate check MUST run the same commands as the CI quality gate,
@@ -162,6 +186,9 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
 
 ### ENF-009 — Allowlists that cannot rot
 
+> Every allowlist entry or suppression has a reason and a check that fails once
+> it stops being true.
+
 - **Requirement:** Every allowlist entry, suppressed finding and excused lint
   records its reason and its scope, and a check fails when the entry is no
   longer true. A suppression never hides a tool error or a missing report.
@@ -171,6 +198,8 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
 
 ### ENF-010 — Configuration is the authority
 
+> Enforced configuration beats settings applied by hand.
+
 - **Requirement:** Enforced configuration is authoritative over settings applied
   by hand. Renaming a required check updates every rule that requires it in the
   same change.
@@ -178,6 +207,8 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
 - **Evidence:** protected configuration and the coordinated rename.
 
 ### ENF-011 — Instructions grant nothing
+
+> Prose and links never grant tools, permissions or exemptions.
 
 - **Requirement:** Instruction prose and links never grant tools, permissions,
   execution authority or security exemptions. Authority comes only from
@@ -187,6 +218,8 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
   say.
 
 ### ENF-012 — Pinned inputs
+
+> Lockfiles for dependencies, full commit SHAs for actions, checksums for tools.
 
 - **Requirement:** Every dependency resolves from a committed lockfile, every
   external CI action or reusable workflow is pinned to a full commit SHA, and
@@ -199,6 +232,8 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
 
 ### ENF-013 — No secret in history
 
+> Every push is scanned; a leaked secret is revoked, not just deleted.
+
 - **Requirement:** A secret never enters version control, history, examples and
   fixtures included. Every push is scanned and the platform blocks one that
   carries a secret. A leaked secret is revoked and rotated, not merely deleted.
@@ -207,6 +242,8 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
   rotation record of any leak.
 
 ### ENF-014 — Multi-factor authentication
+
+> Every account signs in with a second factor.
 
 - **Requirement:** Every member and outside collaborator signs in with a second
   factor; the organization refuses access to any account without one.
@@ -257,22 +294,22 @@ Every mandate except ENF-008 and ENF-009 is **non-negotiable**.
 
 ## Aligned with
 
-These rules follow the standards below, in the versions reviewed on
-2026-09-24; a new version of any of them triggers a review of these rules. This
-is alignment, not certification: no assessment, score or level is claimed. The
+These rules follow the [standards](https://github.com/Orchestration-Maestro/.github/blob/main/golden-rules/standards.md), in the versions listed there;
+a new version of any of them triggers a review of these rules. This is
+alignment, not certification: no assessment, score or level is claimed. The
 [security rules](security.md#aligned-with) map the rest, and list what no rule
 covers yet.
 
-| Standard | Version | Control → rule |
-| --- | --- | --- |
-| [OWASP Top 10](https://owasp.org/Top10/2025/) | 2025 | A01 → P-014; A02 → ENF-010; A03 → ENF-012; A05 → P-013; A07 → ENF-014; A08 → ENF-007; A10 → P-011 |
-| [OWASP Top 10 for Agentic Applications](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/) | 2026 | ASI01 → ENF-011; ASI03 → P-014; ASI04 → ENF-012 |
-| [OWASP Top 10 for LLM Applications](https://genai.owasp.org/llm-top-10/) | 2025 | LLM01 → ENF-011; LLM03 → ENF-012; LLM06 → P-014 |
-| [OpenSSF OSPS Baseline](https://baseline.openssf.org/) | 2026-08-28 | OSPS-AC-01.01 → ENF-014; OSPS-AC-03.01 and AC-03.02 → ENF-007; OSPS-AC-04.01 and AC-04.02 → P-014; OSPS-BR-05.01 → ENF-012; OSPS-BR-07.01 → ENF-013; OSPS-QA-03.01 → ENF-006; OSPS-VM-05.03 and VM-06.02 → ENF-009 |
-| [NIST SSDF, SP 800-218](https://csrc.nist.gov/pubs/sp/800/218/final) | 1.1 | PS.1 → ENF-007, ENF-013, ENF-014 |
-| [SLSA](https://slsa.dev/spec/v1.2/) | 1.2 | Source Track → ENF-007 |
-| [OpenSSF Scorecard](https://scorecard.dev/) | Current checks | Branch-Protection → ENF-007; Pinned-Dependencies → ENF-012; Token-Permissions → P-014 |
-| [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) | 1.0.0 | The whole specification → ENF-004 |
+| Standard | Control → rule |
+| --- | --- |
+| OWASP Top 10 | A01 → P-014; A02 → ENF-010; A03 → ENF-012; A05 → P-013; A07 → ENF-014; A08 → ENF-007; A10 → P-011 |
+| OWASP Top 10 for Agentic Applications | ASI01 → ENF-011; ASI03 → P-014; ASI04 → ENF-012 |
+| OWASP Top 10 for LLM Applications | LLM01 → ENF-011; LLM03 → ENF-012; LLM06 → P-014 |
+| OpenSSF OSPS Baseline | OSPS-AC-01.01 → ENF-014; OSPS-AC-03.01 and AC-03.02 → ENF-007; OSPS-AC-04.01 and AC-04.02 → P-014; OSPS-BR-05.01 → ENF-012; OSPS-BR-07.01 → ENF-013; OSPS-QA-03.01 → ENF-006; OSPS-VM-05.03 and VM-06.02 → ENF-009 |
+| NIST SSDF, SP 800-218 | PS.1 → ENF-007, ENF-013, ENF-014 |
+| SLSA | Source Track → ENF-007 |
+| OpenSSF Scorecard | Branch-Protection → ENF-007; Pinned-Dependencies → ENF-012; Token-Permissions → P-014 |
+| Conventional Commits | The whole specification → ENF-004 |
 
 ENF-001, ENF-002, ENF-003, ENF-005 and ENF-008 are the organization's own
 engineering practice: no external standard owns them.
