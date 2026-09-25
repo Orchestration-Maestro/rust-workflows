@@ -6,6 +6,7 @@
 //! Foundation, so a crate one of them reviewed needs no exemption here; the
 //! exemptions stay the repository's own reviewed state.
 
+use crate::checks::workflow_home::home_repository;
 use crate::runner::{Cmd, Failure, Job, Outcome, Step, flag, tee_line};
 
 /// What this step declares: its inputs, its tools and its reports.
@@ -19,15 +20,12 @@ pub(crate) const STEPS: &[Step] = &[Step {
     run,
 }];
 
-/// Every import VET-001 requires: its name and the audits file it reads.
+/// The name of the organization's own import, whose audits file lives in the
+/// home repository.
+const OWN_IMPORT: &str = "orchestration-maestro";
+
+/// Every other import VET-001 requires: its name and the audits file it reads.
 const IMPORTS: &[(&str, &str)] = &[
-    (
-        "orchestration-maestro",
-        concat!(
-            "https://raw.githubusercontent.com/Orchestration-Maestro/rust-workflows/main/",
-            "supply-chain/audits.toml",
-        ),
-    ),
     (
         "mozilla",
         "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml",
@@ -88,10 +86,21 @@ fn run() -> Outcome {
         .tee(&report, false)
 }
 
+/// Every import VET-001 requires, the organization's first: its name and the
+/// audits file it reads.
+fn required_imports() -> Vec<(&'static str, String)> {
+    let own = format!(
+        "https://raw.githubusercontent.com/{}/main/supply-chain/audits.toml",
+        home_repository()
+    );
+    let others = IMPORTS.iter().map(|(name, url)| (*name, (*url).to_owned()));
+    [(OWN_IMPORT, own)].into_iter().chain(others).collect()
+}
+
 /// The required imports `imported` lacks, or names with another URL.
 fn missing_imports(imported: &str) -> Vec<&'static str> {
-    IMPORTS
-        .iter()
+    required_imports()
+        .into_iter()
         .filter(|(name, url)| {
             !imported.lines().any(|line| {
                 line.split_once('\t').is_some_and(|(key, urls)| {
@@ -99,17 +108,26 @@ fn missing_imports(imported: &str) -> Vec<&'static str> {
                 })
             })
         })
-        .map(|(name, _)| *name)
+        .map(|(name, _)| name)
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{IMPORTS, missing_imports};
+    use super::{missing_imports, required_imports};
 
     #[test]
     fn every_required_import_is_named_with_its_url() {
-        let all = IMPORTS
+        let imports = required_imports();
+        assert_eq!(
+            imports.first().map(|(name, url)| (*name, url.as_str())),
+            Some((
+                "orchestration-maestro",
+                "https://raw.githubusercontent.com/Orchestration-Maestro/rust-workflows/main/\
+                 supply-chain/audits.toml"
+            ))
+        );
+        let all = imports
             .iter()
             .map(|(name, url)| format!("{name}\t{url}"))
             .collect::<Vec<_>>()
@@ -117,6 +135,6 @@ mod tests {
         assert!(missing_imports(&all).is_empty());
         let moved = all.replace("mozilla/supply-chain", "mozilla/elsewhere");
         assert_eq!(missing_imports(&moved), ["mozilla"]);
-        assert_eq!(missing_imports("").len(), IMPORTS.len());
+        assert_eq!(missing_imports("").len(), imports.len());
     }
 }

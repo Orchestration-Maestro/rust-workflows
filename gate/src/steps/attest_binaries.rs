@@ -1,6 +1,7 @@
 //! `rust-gate attest-binaries <step>`: the steps around signing a payload
 //! this job verified itself, and the honest record of whether it was signed.
 
+use crate::checks::workflow_home::home_repository;
 use crate::runner::{Cmd, Failure, Outcome, Step, input, non_empty, output, path, summary};
 
 /// What each step declares: its inputs, its tools and its reports.
@@ -90,7 +91,10 @@ fn verify_recorded() -> Outcome {
     ))?
     .arg(&repository)
     .arg("--signer-workflow")
-    .arg("Orchestration-Maestro/rust-workflows/.github/workflows/attest-binaries.yml")
+    .arg(format!(
+        "{}/.github/workflows/attest-binaries.yml",
+        home_repository()
+    ))
     .args(["--format", "json"])
     .stdout_to(&result)?;
     non_empty(&result).map_err(|_| "Attestation verification produced no result")?;

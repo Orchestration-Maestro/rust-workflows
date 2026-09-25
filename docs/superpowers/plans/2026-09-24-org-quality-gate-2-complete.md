@@ -317,4 +317,8 @@ Rulings taken while executing, newest last.
     is the platform's, and takes an exception for one another tool owns. The
     repository becomes `maestro-rust-workflows` at a later cutover: `sync`
     reads and moves a pinned call under either name to the one constant
-    `HOME` renders, `rust-workflows` until the rename flips it.
+    `HOME` renders, `rust-workflows` until the rename flips it; the Dependabot
+    ignore, the attestation's signer workflow and the audits URL derive from
+    it too, so flipping `HOME` is the whole rename for the gate's code. The
+    prose that names today's repository moves at the cutover: `SECURITY.md`,
+    `docs/publishing.md`, the README, `docs/ci.md` and the tests' fixtures.

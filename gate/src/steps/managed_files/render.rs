@@ -9,6 +9,7 @@ use super::pin::Pin;
 use crate::checks::lint_policy::{clippy_config, with_lint_block};
 use crate::checks::nextest_profile::nextest_profile;
 use crate::checks::quality_config::QualityConfig;
+use crate::checks::workflow_home::{NAMES, ORGANIZATION};
 use std::fmt::Write as _;
 
 /// The line every managed file opens with.
@@ -188,15 +189,20 @@ fn typos(words: &[String]) -> String {
 
 /// Dependabot: the actions, and Cargo for a Rust repository, weekly with a
 /// week's cooldown and conventional titles; the reusable workflows are left
-/// to `rust-gate sync`.
+/// to `rust-gate sync`, under every name their repository answers to.
 fn dependabot(rust: bool) -> String {
     let mut text = format!(
         "{HEADER}version: 2\nupdates:\n  - package-ecosystem: github-actions\n{WEEKLY}    \
          # The organization merges only conventional titles: \"ci(deps): bump ...\".\n    \
          commit-message:\n      prefix: ci\n      include: scope\n    \
-         # rust-gate sync moves the organization's reusable workflows.\n    ignore:\n      \
-         - dependency-name: Orchestration-Maestro/rust-workflows*\n    groups:\n      \
-         actions:\n        patterns: [\"*\"]\n        update-types: [minor, patch]\n"
+         # rust-gate sync moves the organization's reusable workflows.\n    ignore:\n"
+    );
+    for name in NAMES {
+        let _ = writeln!(text, "      - dependency-name: {ORGANIZATION}/{name}*");
+    }
+    text.push_str(
+        "    groups:\n      actions:\n        patterns: [\"*\"]\n        update-types: \
+         [minor, patch]\n",
     );
     if rust {
         let _ = write!(
@@ -343,6 +349,11 @@ mod tests {
         for (path, text) in files.iter().filter(|(path, _)| path != "Cargo.toml") {
             assert!(text.starts_with(HEADER), "{path} opens without the header");
         }
+        let dependabot = &files[3].1;
+        assert!(dependabot.contains(
+            "    ignore:\n      - dependency-name: Orchestration-Maestro/rust-workflows*\n      \
+             - dependency-name: Orchestration-Maestro/maestro-rust-workflows*\n    groups:\n"
+        ));
     }
 
     #[test]

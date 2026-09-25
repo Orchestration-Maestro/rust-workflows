@@ -142,7 +142,7 @@ rule is checked.
 | SIZE-003 | Short lines | At most 100 columns, strings and comments included | no |
 | NAME-001 | Package names | Lowercase kebab-case; a publishable crate starts with `maestro-` | no |
 | NAME-002 | Test names | A test says what it proves in four words or more, with no `test_` prefix | no |
-| NAME-003 | Feature names | Lowercase kebab-case, naming what the feature adds, never `use-` or `with-` | no |
+| NAME-003 | Feature names | Lowercase kebab-case, naming what it adds: no `use-`/`with-`/`enable-`/`has-`/`feature-` prefix | no |
 | NAME-004 | Environment variable names | A `maestro-` package reads only `MAESTRO_` variables and the platform's | yes |
 | DOC-001 | Every file says why | Every Rust file opens with a `//!` comment | no |
 | LNT-001 | The organization's lints | Every crate denies the organization's lint list; `clippy.toml` is no looser | no |
@@ -311,7 +311,7 @@ and refuses each finding by its identifier, file and line:
 | NAME-001 | A package name that is not lowercase kebab-case, or a publishable one without the `maestro-` prefix |
 | NAME-002 | A test module named in fewer than two words, a test in fewer than four, a `test_` prefix or a `_works`, `_ok` or `_test` suffix |
 | NAME-003 | A feature a manifest declares that is not lowercase kebab-case, or that starts with `use-`, `with-`, `enable-`, `has-` or `feature-` (Rust API Guidelines C-FEATURE); a feature Cargo makes of an optional dependency takes the dependency's name and is not judged |
-| NAME-004 | In the code a `maestro-` package ships, test and bench targets and test items left out, an environment variable read by name through `env::var`, `env::var_os`, `env!` or `option_env!` that neither starts with `MAESTRO_` nor is the platform's: `CARGO_`, `RUST`, `GITHUB_`, `RUNNER_`, `XDG_` and `LC_` variables, `HOME`, `PATH`, `TMPDIR` and the other names the gate lists |
+| NAME-004 | In the code a `maestro-` package ships, test, bench and example targets and test items left out, an environment variable read by name through `env::var`, `env::var_os`, `env!` or `option_env!` that neither starts with `MAESTRO_` nor is the platform's: `CARGO_`, `RUST`, `GITHUB_`, `RUNNER_`, `XDG_`, `LC_` and `DEP_` variables, `HOME`, `PATH`, `TMPDIR` and the other names the gate lists |
 | DOC-001 | A file that does not open with a `//!` comment |
 | LIB-001 | A print macro in a library |
 | LIB-002 | A library-only package that depends on `anyhow`, `eyre` or `color-eyre` |

@@ -1,4 +1,5 @@
-//! NAME-004: in the code a `maestro-` package ships, every environment
+//! NAME-004: in the code a `maestro-` package ships, its test, bench and
+//! example targets and its test items left out, every environment
 //! variable read by name starts with `MAESTRO_`, or is one the platform, Cargo
 //! or the CI sets. A variable another tool owns takes an exception naming it.
 
@@ -12,7 +13,9 @@ use std::path::Path;
 const READERS: &[&str] = &["env::var(", "env::var_os(", "env!(", "option_env!("];
 
 /// The prefixes of the variables the platform, Cargo and the CI set.
-const PLATFORM_PREFIXES: &[&str] = &["CARGO_", "RUST", "GITHUB_", "RUNNER_", "XDG_", "LC_"];
+const PLATFORM_PREFIXES: &[&str] = &[
+    "CARGO_", "RUST", "GITHUB_", "RUNNER_", "XDG_", "LC_", "DEP_",
+];
 
 /// The variables the platform, the shell, Cargo's build scripts and the CI
 /// set under a name of their own.
@@ -45,10 +48,15 @@ const PLATFORM_NAMES: &[&str] = &[
     "DEBUG",
     "OPT_LEVEL",
     "NUM_JOBS",
+    "DOCS_RS",
+    "SOURCE_DATE_EPOCH",
+    "CC",
+    "CXX",
+    "AR",
 ];
 
-/// NAME-004 over the targets of `maestro-` packages, their test and bench
-/// targets and test items left out, each file once.
+/// NAME-004 over the targets of `maestro-` packages, their test, bench and
+/// example targets and test items left out, each file once.
 pub(super) fn findings(trees: &[Tree], workspace: &Path) -> Vec<Finding> {
     let mut seen = BTreeSet::new();
     let mut found = Vec::new();
@@ -57,7 +65,7 @@ pub(super) fn findings(trees: &[Tree], workspace: &Path) -> Vec<Finding> {
             && !tree
                 .kinds
                 .iter()
-                .any(|kind| kind == "test" || kind == "bench")
+                .any(|kind| matches!(kind.as_str(), "test" | "bench" | "example"))
     });
     for module in shipped.flat_map(|tree| &tree.modules) {
         if !seen.insert(&module.file) {
@@ -138,6 +146,7 @@ mod tests {
             "    let _ = env!(\"CARGO_PKG_VERSION\");\n",
             "    let _ = option_env!(\n        \"API_TOKEN\");\n",
             "    let _ = env::var(\"SystemRoot\");\n",
+            "    let _ = env::var(\"DEP_Z_INCLUDE\").or(env::var(\"CC\"));\n",
             "    let _ = env::var(name);\n",
             "    let _ = myenv::var(\"OTHER\");\n",
             "    let _ = \"env::var(\\\"QUOTED\\\")\";\n",
@@ -167,6 +176,8 @@ mod tests {
         let other = sample(&["lib"], &[("lib.rs", source)]);
         let mut test_target = sample(&["test"], &[("main.rs", source)]);
         test_target.package = "maestro-router".to_owned();
-        assert!(findings(&[other, test_target], Path::new("/w")).is_empty());
+        let mut example = sample(&["example"], &[("main.rs", source)]);
+        example.package = "maestro-router".to_owned();
+        assert!(findings(&[other, test_target, example], Path::new("/w")).is_empty());
     }
 }

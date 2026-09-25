@@ -3,18 +3,7 @@
 //! `RUST_WORKFLOWS_PIN`, and every other call to rust-workflows moved to it,
 //! under the name the repository answers to.
 
-/// The organization on GitHub.
-const ORGANIZATION: &str = "Orchestration-Maestro";
-
-/// The repository that holds every reusable workflow and action of the
-/// organization, as a rendered call names it. It flips to
-/// `maestro-rust-workflows` when the repository is renamed: GitHub Actions
-/// follows no rename, so every call must carry the new name.
-const HOME: &str = "rust-workflows";
-
-/// Every name a call to the home repository may carry: its name before the
-/// rename and after. A pinned call under either moves to [`HOME`].
-const NAMES: [&str; 2] = ["rust-workflows", "maestro-rust-workflows"];
+use crate::checks::workflow_home::{HOME, NAMES, ORGANIZATION};
 
 /// What every call to the repository named `name`, a workflow or an action,
 /// starts with.

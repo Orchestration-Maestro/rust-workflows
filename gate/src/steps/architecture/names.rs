@@ -46,10 +46,10 @@ pub(super) fn features(packages: &[Package], workspace: &Path) -> Vec<Finding> {
         let file = relative(workspace, &package.manifest);
         for feature in &package.features {
             let message = if !lowercase_kebab(feature) {
-                format!(
-                    "feature `{feature}` is not lowercase kebab-case; rename it `{}`",
-                    feature.to_ascii_lowercase().replace('_', "-")
-                )
+                let hint = kebab_suggestion(feature)
+                    .map(|name| format!("; rename it `{name}`"))
+                    .unwrap_or_default();
+                format!("feature `{feature}` is not lowercase kebab-case{hint}")
             } else if let Some(prefix) = FEATURE_PREFIXES
                 .iter()
                 .find(|prefix| feature.starts_with(*prefix))
@@ -133,6 +133,18 @@ fn kebab(name: &str) -> bool {
     lowercase_kebab(name) && !name.ends_with("-rs") && !name.ends_with("-rust")
 }
 
+/// `name` in lowercase with its underscores as hyphens and each run of
+/// hyphens as one, when that is lowercase kebab-case.
+fn kebab_suggestion(name: &str) -> Option<String> {
+    let hyphenated = name.to_ascii_lowercase().replace('_', "-");
+    let suggestion = hyphenated
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    lowercase_kebab(&suggestion).then_some(suggestion)
+}
+
 /// Whether a name is lowercase kebab-case: lowercase words and digits joined
 /// by single hyphens, a letter first.
 fn lowercase_kebab(name: &str) -> bool {
@@ -175,6 +187,8 @@ mod tests {
             "tls-2",
             "native_windows",
             "Serve",
+            "tls--native",
+            "gpu.cuda",
             "use-tls",
             "with-cache",
             "enable-metrics",
@@ -194,6 +208,9 @@ mod tests {
                  rename it `native-windows`",
                 "NAME-003 Cargo.toml: feature `Serve` is not lowercase kebab-case; rename it \
                  `serve`",
+                "NAME-003 Cargo.toml: feature `tls--native` is not lowercase kebab-case; rename \
+                 it `tls-native`",
+                "NAME-003 Cargo.toml: feature `gpu.cuda` is not lowercase kebab-case",
                 "NAME-003 Cargo.toml: feature `use-tls` starts with use-; name what it adds: \
                  `tls`",
                 "NAME-003 Cargo.toml: feature `with-cache` starts with with-; name what it \

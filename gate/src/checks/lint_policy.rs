@@ -287,6 +287,8 @@ mod tests {
         assert!(block.contains("clippy.pedantic = { level = \"deny\", priority = -1 }\n"));
         assert!(block.contains("clippy.unwrap_used = \"deny\"\n"));
         assert!(block.contains("rust.missing_docs = \"deny\"\n"));
+        assert!(block.contains("rust.nonstandard_style = { level = \"deny\", priority = -1 }\n"));
+        assert!(block.contains("clippy.same_name_method = \"deny\"\n"));
         assert!(block.contains("clippy.multiple_crate_versions = \"allow\"\n"));
         assert!(lint_block(false).contains("\n[lints]\n"));
     }
