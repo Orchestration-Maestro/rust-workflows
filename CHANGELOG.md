@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.1.0...v2.2.0) (2026-09-25)
+
+
+### Features
+
+* keep the gate's rules in one list it prints ([#44](https://github.com/Orchestration-Maestro/rust-workflows/issues/44)) ([ca71bbd](https://github.com/Orchestration-Maestro/rust-workflows/commit/ca71bbdda478dd38e8f75168a371fb0039bc54aa))
+* write each repository's rule map with rust-gate rules ([#41](https://github.com/Orchestration-Maestro/rust-workflows/issues/41)) ([377cbaa](https://github.com/Orchestration-Maestro/rust-workflows/commit/377cbaa5b8f854032ee25d4f28ff48594daa3681))
+
 ## [2.1.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v2.0.1...v2.1.0) (2026-09-24)
 
 
