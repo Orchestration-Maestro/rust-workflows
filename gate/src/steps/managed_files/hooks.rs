@@ -153,7 +153,7 @@ const TOOL_HOOKS: &[ToolHook] = &[
         id: "rumdl",
         name: "Markdown structure",
         tools: &["rumdl"],
-        entry: "rumdl check --no-cache --no-config --disable MD013,MD041 --config \
+        entry: "rumdl check --no-cache --disable MD013,MD041 --config \
                 'MD033.allowed-elements = [\"a\", \"br\", \"details\", \"h1\", \"img\", \"p\", \
                 \"picture\", \"source\", \"strong\", \"summary\"]'",
         files: "types: [markdown]",
