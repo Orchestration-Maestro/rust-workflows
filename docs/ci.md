@@ -267,7 +267,9 @@ every rust-workflows pin to `sync`. `rust-gate
 init` writes them for a repository with no caller yet, at the release
 `RUST_WORKFLOWS_PIN` names. What a repository may say goes in
 `maestro-quality.toml`: the words it means, `[typos] words = ["jaq"]`, and the
-inputs its caller passes, `[ci] platforms = "macos windows"`. The generated
+inputs its caller passes, `[ci] platforms = "macos windows linux-arm"`, where
+`macos` and `windows` are never left out
+([platform portability](#platform-portability)). The generated
 `deny.toml` holds DEP-001: one version of each crate, no wildcard requirement,
 crates.io alone, no yanked or unmaintained crate, and the reviewed licences; a
 duplicate the ecosystem forces is a DEP-001 exception whose `path` names the
@@ -802,6 +804,18 @@ materials and the scorecard stay Linux x86_64.
     with:
       platforms: macos windows linux-arm
 ```
+
+Every Rust repository of the organization tests Linux, macOS and Windows: the
+caller `rust-gate sync` renders always passes `platforms` with `macos` and
+`windows`. `maestro-quality.toml` may add a target, `[ci] platforms = "macos
+windows linux-arm"`, but never drop either; a value that does is refused with
+the fix:
+
+```text
+maestro-quality.toml: [ci] platforms `linux-arm` drops macos and windows, which every Rust repository tests: set it to `macos windows linux-arm`
+```
+
+A caller written by hand keeps the input's empty default.
 
 ### Public API compatibility
 
