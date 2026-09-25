@@ -278,6 +278,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   ├── ci/                                     # ci.yml, one module per gate it runs: what each step accepts, refuses, builds and reports
 │   │   ├── api_compatibility.rs                # ci.yml: an undeclared API break fails a pull request; what has no API is not applicable
 │   │   ├── architecture_rules.rs               # ci.yml: ARC-001 to ARC-007, each refused by name, and the exceptions maestro-quality.toml takes
+│   │   ├── central_uploads.rs                  # ci.yml: SARIF and Codecov uploads from the ruleset's run, on a merge group to the default branch
 │   │   ├── commit_hooks.rs                     # hooks, the local runs a hook makes, and hygiene.yml's first step
 │   │   ├── complexity_report.rs                # ci.yml: function and file sizes, reported and never held against the run
 │   │   ├── copilot_guide.rs                    # guide and guide --check: written, kept, refused when a file makes it stale

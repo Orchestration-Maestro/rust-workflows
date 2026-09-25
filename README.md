@@ -35,7 +35,11 @@ ruleset runs `ci.yml` on every pull request, and the same run uploads Clippy
 and secret-scan findings to the repository's Security tab and coverage and test
 results to Codecov; see [uploads](docs/ci.md#uploads-to-code-scanning-and-codecov).
 Codecov needs its GitHub App installed on the organization; the upload logs in
-through OIDC, so there is no Codecov token to store.
+through OIDC, so there is no Codecov token to store. Every merge goes through
+the repository's merge queue, and the run on the merge group's commit, the
+one the default branch moves to, files both on the default branch: that is
+the baseline each pull request compares against, with no push run and no
+per-repository workflow.
 
 A workflow may still call `ci.yml`, a publisher's does. The uploads are skipped
 then, but GitHub checks their scopes when the run starts, so the caller grants
