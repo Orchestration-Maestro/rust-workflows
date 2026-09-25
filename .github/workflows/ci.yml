@@ -149,6 +149,12 @@ jobs:
           # branch of a pull request's merge commit, or the previous commit of a
           # push or tag. A run no workflow called reads its settings there.
           fetch-depth: 2
+      # Before validate: a run no workflow called reads its settings from
+      # maestro-quality.toml through jaq.
+      - name: Install the settings reader
+        run: rust-gate install-tools
+        env:
+          TOOLS: jaq 01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu 5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454
       - name: Validate consumer inputs
         id: validate
         env:
@@ -191,7 +197,6 @@ jobs:
           # from source cost every caller minutes of compile time on every job,
           # multiplied by the compiler matrix. Each asset is pinned by checksum.
           TOOLS: |
-            jaq 01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu 5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454
             # prek runs the repository's commit hooks over every file; each hook
             # brings its own tool at the version the gate renders.
             prek j178/prek/releases/download/v0.5.3/prek-x86_64-unknown-linux-musl.tar.gz d4eae1f31c0817d0a9bfa532d4bb66df60a8b01f121def002021915e826c3d1f prek-x86_64-unknown-linux-musl/prek
