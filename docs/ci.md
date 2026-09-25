@@ -165,11 +165,12 @@ CLI from its GitHub release asset, verified by digest, and hands the action
 that binary.
 
 Organization rulesets start `ci.yml` on pull requests and merge groups, never
-on a push, so the default branch's baselines come from the merge queue. The
-organization's `merge_queue` rule sends every merge of a default branch
-through a merge group, squashed, and GitHub moves the branch to the group's
-commit only once every required check passed on it: the merge group's run
-tests the exact commit that lands. On a merge group both jobs file that run's
+on a push, so the default branch's baselines come from the merge queue. A
+`merge-queue` ruleset on each repository sends every merge of the default
+branch through a merge group, squashed; GitHub accepts its `merge_queue` rule
+in a repository ruleset only, never in an organization's. GitHub moves the
+branch to the group's commit only once every required check passed on it, so
+the merge group's run tests the exact commit that lands. On a merge group both jobs file that run's
 results on the default branch, the SARIF with `ref` set to
 `refs/heads/<default branch>` and `sha` to the group's commit, the Codecov
 reports with that branch and commit. Code scanning then compares each pull
@@ -178,9 +179,9 @@ change, default-branch trend and test analytics follow every merge. A pull
 request's run keeps its own ref and commit. No repository holds a file for
 this, no secret is stored and no app gains a permission.
 
-Without the `merge_queue` rule nothing uploads on the default branch: code
-scanning keeps comparing with the last analysis recorded there under the same
-job and categories, and Codecov's default-branch reports age.
+Without that ruleset nothing uploads on the default branch: code scanning keeps
+comparing with the last analysis recorded there under the same job and
+categories, and Codecov's default-branch reports age.
 
 ### On a merge group
 

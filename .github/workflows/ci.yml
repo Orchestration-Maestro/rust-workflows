@@ -434,8 +434,8 @@ jobs:
   # job id `upload` keeps the code scanning configuration the retired callers
   # recorded on each default branch, `.github/workflows/ci.yml:upload`.
   # A merge group's commit is the one the default branch moves to, the only
-  # branch the organization queues, so both uploads file it there: the
-  # baseline each pull request compares against.
+  # branch a repository's merge-queue ruleset queues, so both uploads file it
+  # there: the baseline each pull request compares against.
   upload:
     name: Upload Clippy and secret-scan SARIF
     needs:
