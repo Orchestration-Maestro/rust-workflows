@@ -10,6 +10,7 @@ mod binary_hardening;
 mod changed_coverage;
 mod commit_hooks;
 mod configure_cargo_registry;
+mod copilot_guide;
 mod declared_msrv;
 mod dependency_policy;
 mod feature_combinations;

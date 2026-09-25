@@ -188,6 +188,13 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   │   │   ├── sizes.rs                    # SIZE-002 and SIZE-003: lines of code per file and columns per line
 │   │   │   │   ├── sources.rs                  # DOC-001, LIB-001 and TST-001: module comments, library prints, waits in tests
 │   │   │   │   └── step.rs                     # The step: module trees, the rules, the exceptions and the report
+│   │   │   ├── copilot_guide/                  # rust-gate guide: a repository's Copilot guide, written from its tracked files
+│   │   │   │   ├── describe.rs                 # What a file is for, from what it says of itself
+│   │   │   │   ├── mod.rs                      # The step's door: its five modules and its declarations
+│   │   │   │   ├── render.rs                   # The guide: where to start, the tree, how to change and verify
+│   │   │   │   ├── step.rs                     # rust-gate guide and guide --check: written, or refused when stale
+│   │   │   │   ├── text.rs                     # Sentences, textwrap's wrapping, blocks, comments and key lines
+│   │   │   │   └── tree.rs                     # The annotated tree: kept, README-table and image explanations
 │   │   │   ├── hygiene/                        # rust-gate hygiene: the step and one module per group of rules over tracked files
 │   │   │   │   ├── comments.rs                 # HYG-001: work left for later names its issue
 │   │   │   │   ├── files.rs                    # HYG-002 to HYG-005: snapshots, large files, modes, case, symlinks, required files
@@ -261,6 +268,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── architecture_rules.rs               # ci.yml: ARC-001 to ARC-007, each refused by name, and the exceptions maestro-quality.toml takes
 │   │   ├── commit_hooks.rs                     # hooks, the local runs a hook makes, and hygiene.yml's first step
 │   │   ├── complexity_report.rs                # ci.yml: function and file sizes, reported and never held against the run
+│   │   ├── copilot_guide.rs                    # guide and guide --check: written, kept, refused when a file makes it stale
 │   │   ├── duplication_report.rs               # ci.yml: pairs reported, three functions of one shape refused unless excused
 │   │   ├── feature_combinations.rs             # ci.yml: real per-feature and combined compilation, plus replay coverage
 │   │   ├── input_validation.rs                 # unsafe-audit.yml and fuzz.yml: every malformed input refused before a toolchain is touched

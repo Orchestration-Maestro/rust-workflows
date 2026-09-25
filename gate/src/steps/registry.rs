@@ -49,6 +49,7 @@ const REGISTRY: &[&[Step]] = &[
     super::hygiene_workflow::STEPS,
     super::write_lints::STEPS,
     super::rule_map::STEPS,
+    super::copilot_guide::STEPS,
     super::local_runs::STEPS,
 ];
 
