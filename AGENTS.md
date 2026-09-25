@@ -167,7 +167,9 @@ Plain sentences, no em or en dashes, no bold-label lists. A version is a floor
   a write destination or authorization from successful dependency reads.
 - Never invent a commit SHA, an organisation variable, a secret or a licence
   policy. A gate change repins this repository's own gate action in a second
-  pull request; the procedure is in CONTRIBUTING.
+  pull request, and so does a change to a file the gate renders into every
+  other repository, the toolbelt (`mise.toml`, `mise.lock`,
+  `scripts/bootstrap.sh`) included; the procedure is in CONTRIBUTING.
 - Live publication, remote writes, credentials, Git operations and releases need
   explicit authorization in the request.
 - Local checks establish local behaviour. Nothing here exercises a hosted

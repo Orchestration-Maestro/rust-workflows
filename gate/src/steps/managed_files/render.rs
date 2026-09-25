@@ -5,8 +5,9 @@
 //! `maestro-quality.toml`.
 //!
 //! The home is not compared with its own sources: `.editorconfig`,
-//! `.gitattributes`, `.rumdl.toml`, `.taplo.toml`, `.yamlfmt.yml` and
-//! `rust-toolchain.toml`. Its CI runs the gate it pins, whose copies are
+//! `.gitattributes`, `.rumdl.toml`, `.taplo.toml`, `.yamlfmt.yml`,
+//! `rust-toolchain.toml` and the toolbelt, `mise.toml`, `mise.lock` and
+//! `scripts/bootstrap.sh`. Its CI runs the gate it pins, whose copies are
 //! older than the pull request that edits them, so comparing them would
 //! refuse every change to a source. What the gate writes from its data,
 //! `typos.toml`, the Clippy, nextest, rustfmt and cargo-deny settings and the
@@ -40,6 +41,18 @@ const RUMDL: &str = include_str!("../../../../.rumdl.toml");
 
 /// The organization's compiler.
 const TOOLCHAIN: &str = include_str!("../../../../rust-toolchain.toml");
+
+/// The toolbelt: every tool at the version CI pins.
+const MISE: &str = include_str!("../../../../mise.toml");
+
+/// The URL and checksum of every toolbelt download, as mise wrote them.
+const MISE_LOCK: &str = include_str!("../../../../mise.lock");
+
+/// What fetches mise, installs the toolbelt and wires the commit hooks.
+const BOOTSTRAP: &str = include_str!("../../../../scripts/bootstrap.sh");
+
+/// The one managed file that is a program, written executable.
+pub(super) const EXECUTABLE: &str = "scripts/bootstrap.sh";
 
 /// The files every repository holds as they are in the home, read in when
 /// the gate is built; the home holds their source and is not compared.
@@ -122,6 +135,7 @@ pub(super) fn managed_files(repository: &Repository) -> Result<Vec<(String, Stri
                 .iter()
                 .map(|(path, text)| (*path, (*text).to_owned())),
         );
+        files.extend(toolbelt());
         let pin = repository.pin.as_ref().ok_or(
             "no release to pin: .github/workflows/ci.yml names none; set RUST_WORKFLOWS_PIN to \
              `<commit> v<version>`",
@@ -155,6 +169,21 @@ pub(super) fn managed_files(repository: &Repository) -> Result<Vec<(String, Stri
         .collect();
     files.sort();
     Ok(files)
+}
+
+/// The home's toolbelt: `mise.toml` under the header, `mise.lock` byte for
+/// byte, since mise wrote it and `mise install --locked` reads it, and
+/// `scripts/bootstrap.sh` with the header after its shebang.
+fn toolbelt() -> [(&'static str, String); 3] {
+    let script = match BOOTSTRAP.split_once('\n') {
+        Some((shebang, rest)) => format!("{shebang}\n{HEADER}{rest}"),
+        None => BOOTSTRAP.to_owned(),
+    };
+    [
+        ("mise.lock", MISE_LOCK.to_owned()),
+        ("mise.toml", format!("{HEADER}{MISE}")),
+        (EXECUTABLE, script),
+    ]
 }
 
 /// `deny.toml`: DEP-001's policy and, as cargo-deny's skips, the duplicate
@@ -326,7 +355,7 @@ fn caller(pin: &Pin, inputs: &[(String, String)]) -> String {
 #[cfg(test)]
 mod tests {
     use super::super::pin::parse_pin;
-    use super::{HEADER, Repository, managed_files};
+    use super::{HEADER, MISE_LOCK, Repository, managed_files};
     use crate::checks::quality_config::QualityConfig;
 
     /// A Rust repository pinned at `2.0.0`, what `config` says.
@@ -359,14 +388,32 @@ mod tests {
                 "Cargo.toml",
                 "clippy.toml",
                 "deny.toml",
+                "mise.lock",
+                "mise.toml",
                 "rust-toolchain.toml",
                 "rustfmt.toml",
+                "scripts/bootstrap.sh",
                 "typos.toml",
             ]
         );
-        for (path, text) in files.iter().filter(|(path, _)| path != "Cargo.toml") {
+        let unheaded = ["Cargo.toml", "mise.lock", "scripts/bootstrap.sh"];
+        for (path, text) in files
+            .iter()
+            .filter(|(path, _)| !unheaded.contains(&path.as_str()))
+        {
             assert!(text.starts_with(HEADER), "{path} opens without the header");
         }
+        let text = |wanted: &str| {
+            files
+                .iter()
+                .find(|(path, _)| path == wanted)
+                .map(|(_, text)| text.as_str())
+                .unwrap()
+        };
+        assert_eq!(text("mise.lock"), MISE_LOCK);
+        assert!(
+            text("scripts/bootstrap.sh").starts_with(&format!("#!/usr/bin/env bash\n{HEADER}"))
+        );
         let dependabot = &files[3].1;
         assert!(dependabot.contains(
             "    ignore:\n      - dependency-name: Orchestration-Maestro/rust-workflows*\n      \
@@ -389,6 +436,32 @@ mod tests {
                 "clippy.toml",
                 "deny.toml",
                 "rustfmt.toml",
+                "typos.toml",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_repository_without_rust_holds_the_toolbelt_too() {
+        let mut other = repository(QualityConfig::default());
+        other.rust = false;
+        other.manifest = None;
+        let files = managed_files(&other).unwrap();
+        let paths: Vec<&str> = files.iter().map(|(path, _)| path.as_str()).collect();
+        assert_eq!(
+            paths,
+            [
+                ".editorconfig",
+                ".gitattributes",
+                ".github/dependabot.yml",
+                ".github/workflows/ci.yml",
+                ".pre-commit-config.yaml",
+                ".rumdl.toml",
+                ".taplo.toml",
+                ".yamlfmt.yml",
+                "mise.lock",
+                "mise.toml",
+                "scripts/bootstrap.sh",
                 "typos.toml",
             ]
         );

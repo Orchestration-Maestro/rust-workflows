@@ -170,6 +170,20 @@ squash merges and a pin must name a commit on it:
 Consumers pin a release, so cut one after the second merge: its `ci.yml` is the
 one that calls the new gate.
 
+The same holds for every file this repository is the source of for the
+others, the ones `render.rs` reads in with `include_str!`: `.editorconfig`,
+`.gitattributes`, `.rumdl.toml`, `.taplo.toml`, `.yamlfmt.yml`,
+`rust-toolchain.toml`, `mise.toml`, `mise.lock` and `scripts/bootstrap.sh`. The
+bot renders a release's managed files with the gate built at its tag, and every
+repository's CI checks them with the gate this repository pins, so the two
+must hold the same bytes. A change to one of them, the weekly tool moves
+included, therefore needs a repin pull request before the next release pull
+request can pass:
+`the_pinned_gate_embeds_the_managed_files_this_commit_holds` fails when
+`version.txt` names a version with no tag yet, which is the release pull
+request, and before that `just check` prints a `REPIN:` line naming what
+changed (`a_source_changed_since_the_pinned_gate_fails_only_the_release`).
+
 ## Strict coding standard
 
 1. Keep workflows thin and directly discoverable. Production runs in the consumer
@@ -255,4 +269,7 @@ one record, and a test holds every workflow install row to the asset it locked.
 new asset serves, and the Codecov CLI version. `tool-updates.yml` runs it every
 Monday and opens, or refreshes, one pull request on the same App; a person
 merges it, because a new scanner or test runner can change what the gate
-refuses. A move marked `(major)` needs its release notes read first.
+refuses. A move marked `(major)` needs its release notes read first. The
+toolbelt is a managed file of every other repository, so this is the one place
+a pin moves: the moves reach the others with the next release, after the repin
+pull request described in "The gate action and its pin".

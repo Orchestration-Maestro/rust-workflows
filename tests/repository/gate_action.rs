@@ -1,7 +1,7 @@
 //! The gate action: one pin at every call site, and a commit that ships it.
 
 use crate::harness::{
-    Fixture, action, helper_action, root, rust_files, succeeds, workflow, workflow_steps,
+    Fixture, action, helper_action, root, rust_files, succeeds, temp_dir, workflow, workflow_steps,
 };
 use std::collections::BTreeSet;
 use std::fs;
@@ -49,7 +49,9 @@ fn the_pinned_gate_embeds_the_managed_files_this_commit_holds() {
     // built at the release tag; every repository's CI checks them with the
     // gate action this commit pins. A managed file this repository is the
     // source of must read the same at the pinned commit, or the two renderings
-    // disagree and every sync pull request fails, as v2.5.0's did.
+    // disagree and every sync pull request fails, as v2.5.0's did. A change to
+    // a source, the weekly tool moves included, lands before its repin can, so
+    // it fails the release pull request alone and is named here until then.
     let (pins, _, _) = call_sites();
     let pin = pins.into_iter().next().unwrap();
     let render = fs::read_to_string(root().join("gate/src/steps/managed_files/render.rs")).unwrap();
@@ -58,23 +60,111 @@ fn the_pinned_gate_embeds_the_managed_files_this_commit_holds() {
         .skip(1)
         .filter_map(|rest| rest.split('"').next())
         .collect();
-    assert_eq!(sources.len(), 6, "{sources:?}");
-    for source in sources {
-        let pinned = Command::new("git")
-            .args(["show", &format!("{pin}:{source}")])
-            .current_dir(root())
+    assert_eq!(sources.len(), 9, "{sources:?}");
+    match pinned_gate_verdict(&root(), &pin, &sources) {
+        Ok(Some(note)) => println!("{note}"),
+        Ok(None) => {}
+        Err(refusal) => panic!("{refusal}"),
+    }
+}
+
+#[test]
+fn a_source_changed_since_the_pinned_gate_fails_only_the_release() {
+    let repository = temp_dir("pinned-gate");
+    let git = |arguments: &[&str]| {
+        let output = Command::new("git")
+            .args([
+                "-c",
+                "user.name=gate",
+                "-c",
+                "user.email=gate@example.invalid",
+            ])
+            .args(["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"])
+            .args(["-c", "core.hooksPath=/dev/null"])
+            .args(arguments)
+            .current_dir(&repository)
             .output()
             .unwrap();
-        assert!(
-            pinned.status.success(),
-            "pinned commit {pin} lacks {source}"
-        );
-        assert_eq!(
-            String::from_utf8(pinned.stdout).unwrap(),
-            fs::read_to_string(root().join(source)).unwrap(),
-            "{source} changed since the pinned gate {pin}: pin the gate action to a commit \
-             that holds it before any release"
-        );
+        succeeds(&output);
+        String::from_utf8(output.stdout).unwrap().trim().to_owned()
+    };
+    git(&["init", "-q"]);
+    fs::write(repository.join("version.txt"), "1.0.0\n").unwrap();
+    fs::write(repository.join(".editorconfig"), "root = true\n").unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "-m", "chore: the first release"]);
+    git(&["tag", "v1.0.0"]);
+    let pin = git(&["rev-parse", "HEAD"]);
+    let sources = [".editorconfig"];
+    assert_eq!(pinned_gate_verdict(&repository, &pin, &sources), Ok(None));
+    fs::write(repository.join(".editorconfig"), "root = false\n").unwrap();
+    assert_eq!(
+        pinned_gate_verdict(&repository, &pin, &sources),
+        Ok(Some(format!(
+            "REPIN: .editorconfig changed since the pinned gate {pin}: repin the gate before \
+             the release"
+        )))
+    );
+    fs::write(repository.join("version.txt"), "1.1.0\n").unwrap();
+    assert_eq!(
+        pinned_gate_verdict(&repository, &pin, &sources),
+        Err(format!(
+            ".editorconfig changed since the pinned gate {pin}: v1.1.0 is not tagged yet, so \
+             this is its release; pin the gate action to a commit that holds them first"
+        ))
+    );
+    fs::remove_dir_all(&repository).unwrap();
+}
+
+/// The `sources` of managed files in the repository at `root` that differ
+/// from their copy at the gate commit `pin`: nothing when none does, a note
+/// naming them while the version `version.txt` names is tagged, and a refusal
+/// once it is not, which is the release pull request.
+fn pinned_gate_verdict(root: &Path, pin: &str, sources: &[&str]) -> Result<Option<String>, String> {
+    let differing: Vec<&str> = sources
+        .iter()
+        .copied()
+        .filter(|source| {
+            let pinned = Command::new("git")
+                .args(["show", &format!("{pin}:{source}")])
+                .current_dir(root)
+                .output()
+                .unwrap();
+            !pinned.status.success()
+                || Some(String::from_utf8_lossy(&pinned.stdout).into_owned())
+                    != fs::read_to_string(root.join(source)).ok()
+        })
+        .collect();
+    if differing.is_empty() {
+        return Ok(None);
+    }
+    let changed = format!(
+        "{} changed since the pinned gate {pin}",
+        differing.join(", ")
+    );
+    let version = fs::read_to_string(root.join("version.txt")).unwrap();
+    let tag = format!("v{}", version.trim());
+    let tagged = Command::new("git")
+        .args([
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            &format!("refs/tags/{tag}"),
+        ])
+        .current_dir(root)
+        .output()
+        .unwrap()
+        .status
+        .success();
+    if tagged {
+        Ok(Some(format!(
+            "REPIN: {changed}: repin the gate before the release"
+        )))
+    } else {
+        Err(format!(
+            "{changed}: {tag} is not tagged yet, so this is its release; pin the gate action \
+             to a commit that holds them first"
+        ))
     }
 }
 

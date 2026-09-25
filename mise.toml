@@ -6,6 +6,10 @@
 # checksum-verified release, then hands over. Rust stays with rustup, provisioned
 # through the approved platform channel, never through mise.
 #
+# rust-gate sync writes this file, mise.lock and scripts/bootstrap.sh into every
+# repository of the organization. A pin moves in rust-workflows alone, through
+# its weekly tool-updates.yml, and reaches the others with its next release.
+#
 # Aliases give the Cargo plugins that live in a monorepo their command name, so
 # `mise ls` and the tool-version contract test read the same names ci.yml uses.
 

@@ -78,6 +78,8 @@ jobs:
           cat "$moves" > "$body"
           printf '\n%s %s\n' 'A move marked (major) can change what the gate' \
             'refuses: read its release notes before merging.' >> "$body"
+          printf '\n%s %s\n' 'Every repository holds this toolbelt as managed files:' \
+            'repin the gate after the merge, before the next release.' >> "$body"
           open="$(gh pr list --head "$BRANCH" --state open --json number)"
           if [[ "$open" == "[]" ]]; then
             gh pr create --base main --head "$BRANCH" --title "$TITLE" \

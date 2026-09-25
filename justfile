@@ -80,6 +80,10 @@ check:
     RUSTDOCFLAGS='-D warnings -D missing_docs' cargo doc --manifest-path gate/Cargo.toml \
       --no-deps --locked --offline --document-private-items
     cargo test --manifest-path tests/Cargo.toml --locked
+    # A managed file's source changed since the pinned gate fails the release
+    # pull request alone; before it, this prints the REPIN line naming it.
+    cargo test --manifest-path tests/Cargo.toml --locked --quiet -- --exact --nocapture \
+      repository::gate_action::the_pinned_gate_embeds_the_managed_files_this_commit_holds
     RUSTDOCFLAGS='-D warnings -D missing_docs' cargo doc --manifest-path tests/Cargo.toml \
       --no-deps --locked
     cargo deny --offline --config deny.toml --manifest-path tests/Cargo.toml \

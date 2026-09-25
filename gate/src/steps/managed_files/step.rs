@@ -5,7 +5,7 @@
 //! and, in a git repository, its Copilot guide.
 
 use super::pin::{Pin, caller_pin, parse_pin, repinned};
-use super::render::{Repository, managed_files};
+use super::render::{EXECUTABLE, Repository, managed_files};
 use crate::checks::quality_config::read_config;
 use crate::checks::workflow_home::is_workflow_home;
 use crate::runner::{Cmd, Failure, Job, Outcome, Step, input, optional, summary, write};
@@ -144,7 +144,28 @@ fn write_all(root: &Path, pin: Option<&str>) -> Outcome {
             fs::create_dir_all(parent).map_err(|error| format!("{path}: {error}"))?;
         }
         write(&file, text.as_bytes(), false)?;
+        if path == EXECUTABLE {
+            executable(&file)?;
+        }
     }
+    Ok(())
+}
+
+/// Let anybody run `file`, as a script's shebang expects.
+#[cfg(unix)]
+fn executable(file: &Path) -> Outcome {
+    use std::os::unix::fs::PermissionsExt as _;
+    let mut permissions = fs::metadata(file)
+        .map_err(|error| format!("{}: {error}", file.display()))?
+        .permissions();
+    permissions.set_mode(permissions.mode() | 0o111);
+    fs::set_permissions(file, permissions)
+        .map_err(|error| Failure::from(format!("{}: {error}", file.display())))
+}
+
+/// Nothing to do where modes are not Unix modes: Git records the bit.
+#[cfg(not(unix))]
+fn executable(_file: &Path) -> Outcome {
     Ok(())
 }
 

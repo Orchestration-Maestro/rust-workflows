@@ -270,7 +270,7 @@ generated SBOM output and local download markers are intentionally excluded.
 │   ├── Cargo.toml                              # Isolated workflow-contract test target
 │   └── LICENSE                                 # MIT notice included in the Cargo package
 ├── scripts/                                    # Provisioning that has to run before the toolbelt exists
-│   └── bootstrap.sh                            # Verified pinned Linux x64 toolbelt and hooks
+│   └── bootstrap.sh                            # Verified pinned Linux x64 toolbelt and hooks; rendered by rust-gate sync
 ├── supply-chain/                               # The audits the organization publishes for every repository to import
 │   └── audits.toml                             # cargo-vet audits recorded by the organization, VET-001's first import
 ├── tests/                                      # Workflow contract validation
@@ -369,8 +369,8 @@ generated SBOM output and local download markers are intentionally excluded.
 ├── deny.toml                                   # DEP-001 and the reviewed licences; rendered by rust-gate sync
 ├── justfile                                    # Development commands: setup and check
 ├── maestro-quality.toml                        # The layers this repository's crates declare, its reasoned exceptions and its words
-├── mise.lock                                   # Resolved URL and checksum of every toolbelt download
-├── mise.toml                                   # The toolbelt: each tool at the version CI pins
+├── mise.lock                                   # Resolved URL and checksum of every toolbelt download; rendered by rust-gate sync
+├── mise.toml                                   # The toolbelt: each tool at the version CI pins; rendered by rust-gate sync
 ├── rust-toolchain.toml                         # The one compiler pin: the gate, the tests and the action build with it
 ├── rustfmt.toml                                # The 2024 formatting style; rendered by rust-gate sync
 ├── typos.toml                                  # The words this repository means, from maestro-quality.toml; rendered by rust-gate sync

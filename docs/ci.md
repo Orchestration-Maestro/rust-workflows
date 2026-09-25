@@ -254,7 +254,7 @@ the fix, `rust-gate sync`. Each managed file opens with
 
 | Repository | Managed files |
 | --- | --- |
-| Every one | `.editorconfig`, `.gitattributes`, `.taplo.toml`, `.yamlfmt.yml`, `typos.toml`, and `.github/dependabot.yml` outside rust-workflows |
+| Every one | `.editorconfig`, `.gitattributes`, `.taplo.toml`, `.yamlfmt.yml`, `typos.toml`, and outside rust-workflows `.github/dependabot.yml` and the toolbelt: `mise.toml`, `mise.lock` and `scripts/bootstrap.sh` |
 | Rust, a root `Cargo.toml` or `rust-toolchain.toml` | `.config/nextest.toml` (TST-004, `retries = 0`), `clippy.toml`, `deny.toml` (DEP-001), `rust-toolchain.toml`, `rustfmt.toml`, the lint block of the root `Cargo.toml`, and the caller `.github/workflows/ci.yml` outside rust-workflows |
 
 Run in a repository's root, `rust-gate sync` writes them and `rust-gate
@@ -275,12 +275,27 @@ crate and version, `windows-sys@0.52`, rendered as one of cargo-deny's skips
 with its reason. The files every
 repository holds as they are here are rust-workflows' own, read in when the
 gate is built: `.editorconfig`, `.gitattributes`, `.rumdl.toml`,
-`.taplo.toml`, `.yamlfmt.yml` and `rust-toolchain.toml`. In rust-workflows
+`.taplo.toml`, `.yamlfmt.yml`, `rust-toolchain.toml` and the toolbelt. In rust-workflows
 itself neither `managed-files` nor `sync --check` compares them, since its CI
 runs the gate it pins, whose copies predate the pull request that edits them;
 what the gate writes from its data, `typos.toml`, the Clippy, nextest, rustfmt
 and cargo-deny settings and the manifest's lint block, is compared there as
 everywhere else.
+
+The toolbelt is how every repository runs, on a contributor's machine, the
+tools CI runs at the versions CI runs. `mise.toml` carries the header;
+`mise.lock` is rust-workflows' own byte for byte, since mise wrote it and
+`mise install --locked` reads it back; `scripts/bootstrap.sh` carries the
+header after its shebang and is written executable. The script fetches a
+checksum-verified mise, installs the Rust of `rust-toolchain.toml` when there
+is one, installs every pinned tool with `--locked`, then runs the justfile's
+`setup` recipe when it has one; without one, it links the toolbelt into
+`.tools/bin` and runs `prek install --prepare-hooks` itself. It writes
+`.tools/.gitignore`, so `.tools/` stays out of Git even where the repository's
+own `.gitignore` does not name it. A repository never moves a pin of its own:
+rust-workflows' weekly `tool-updates.yml` moves them, a release ships them, and
+the sync pull request brings them, so a repository needs no `tool-updates.yml`,
+`update-tools` recipe or hand-written toolbelt of its own.
 
 ### Commit hooks
 
