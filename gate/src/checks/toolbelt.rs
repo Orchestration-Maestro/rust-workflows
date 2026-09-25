@@ -216,10 +216,12 @@ fn declared_gaps(toml: &str, kind: &str, platform: &str) -> Vec<(String, String)
         .collect()
 }
 
-/// The version `toml` pins `tool` at: `tool = "1.0.0"` or
-/// `tool = { version = "1.0.0", ... }`.
+/// The version the `[tools]` table of `toml` pins `tool` at: `tool =
+/// "1.0.0"` or `tool = { version = "1.0.0", ... }`. The `[tool_alias]` table
+/// above it names the same tool after its backend, never a version.
 fn pinned_version(toml: &str, tool: &str) -> Result<String, Failure> {
     toml.lines()
+        .skip_while(|line| line.trim() != "[tools]")
         .find_map(|line| line.strip_prefix(&format!("{tool} = ")))
         .map(|pin| pin.strip_prefix("{ version = ").unwrap_or(pin))
         .and_then(|quoted| quoted.strip_prefix('"')?.split('"').next())
@@ -410,6 +412,9 @@ mod tests {
     #[test]
     fn a_gap_line_names_its_tools_platforms_and_reason() {
         let toml = concat!(
+            "[tool_alias]\n",
+            "cargo-vet = \"github:mozilla/cargo-vet\"\n",
+            "[tools]\n",
             "# source: cargo-vet | linux-arm64 macos-x64 | no build\n",
             "cargo-vet = { version = \"0.10.0\", os = [\"linux/x64\"] }\n",
             "# skip: gungraun-runner | windows-x64 | Valgrind\n",
@@ -433,7 +438,11 @@ mod tests {
         // Every source build the home's pins declare names a pinned version.
         for platform in &PLATFORMS {
             for (tool, _) in declared_gaps(MISE_TOML, "source", platform.name) {
-                assert!(pinned_version(MISE_TOML, &tool).is_ok(), "{tool}");
+                let version = pinned_version(MISE_TOML, &tool).unwrap();
+                assert!(
+                    version.split('.').all(|part| part.parse::<u32>().is_ok()),
+                    "{tool} = {version}"
+                );
             }
         }
     }

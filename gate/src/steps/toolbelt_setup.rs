@@ -22,7 +22,20 @@ pub(crate) const STEPS: &[Step] = &[Step {
         "SystemRoot",
         "XDG_CACHE_HOME",
     ],
-    tools: &["cargo install", "curl", "mise", "prek", "tar"],
+    // On Windows, mise's download directory is made private through
+    // PowerShell, as every private directory there is.
+    tools: if cfg!(windows) {
+        &[
+            "cargo install",
+            "curl",
+            "mise",
+            "powershell.exe",
+            "prek",
+            "tar",
+        ]
+    } else {
+        &["cargo install", "curl", "mise", "prek", "tar"]
+    },
     reports: &[],
     run,
 }];
