@@ -1,5 +1,6 @@
-//! The step `rules`: it writes each page of the rule map that differs from
-//! the rendering, and says how many rows are not mapped yet.
+//! The steps: `rules` writes each page of the rule map that differs from the
+//! rendering, and `rules --check` refuses a stale page or a row not mapped
+//! yet, which the daily drift check reports.
 
 use super::render::{UNMAPPED, pages};
 use crate::runner::{Cmd, Failure, Outcome, Step, write};
@@ -8,15 +9,26 @@ use std::fs;
 use std::path::Path;
 
 /// What these steps declare: their inputs, their tools and their reports.
-pub(crate) const STEPS: &[Step] = &[Step {
-    workflow: "local",
-    id: "rules",
-    summary: "The rule map written from the golden rules this release carries",
-    inputs: &[],
-    tools: &["git"],
-    reports: &[],
-    run,
-}];
+pub(crate) const STEPS: &[Step] = &[
+    Step {
+        workflow: "local",
+        id: "rules",
+        summary: "The rule map written from the golden rules this release carries",
+        inputs: &[],
+        tools: &["git"],
+        reports: &[],
+        run,
+    },
+    Step {
+        workflow: "local",
+        id: "rules --check",
+        summary: "The rule map compared with the golden rules this release carries",
+        inputs: &[],
+        tools: &["git"],
+        reports: &[],
+        run: check,
+    },
+];
 
 /// The three pages rendered for the repository here.
 type Rendered = [(&'static str, String); 3];
@@ -36,6 +48,34 @@ fn run() -> Outcome {
     }
     println!("rules: {} rows not mapped yet", unmapped(&rendered));
     Ok(())
+}
+
+/// Run `rules --check`: refuse a stale page or a row not mapped yet.
+fn check() -> Outcome {
+    let rendered = rendered()?;
+    let stale: Vec<&str> = rendered
+        .iter()
+        .filter(|(path, text)| fs::read_to_string(path).ok().as_ref() != Some(text))
+        .map(|(path, _)| *path)
+        .collect();
+    refusal(&stale, unmapped(&rendered)).map_or(Ok(()), |message| Err(Failure::from(message)))
+}
+
+/// The refusal for `stale` pages and `unmapped` rows, with the fix; None
+/// when the rule map is current and complete.
+fn refusal(stale: &[&str], unmapped: usize) -> Option<String> {
+    if stale.is_empty() && unmapped == 0 {
+        return None;
+    }
+    let stale = if stale.is_empty() {
+        "none".to_owned()
+    } else {
+        stale.join(", ")
+    };
+    Some(format!(
+        "rules --check: stale {stale}; {unmapped} rows not mapped yet; run rust-gate rules, \
+         then map every row"
+    ))
 }
 
 /// The three pages of the repository here, rendered.
@@ -82,7 +122,7 @@ fn unmapped(rendered: &Rendered) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{name_of, unmapped};
+    use super::{name_of, refusal, unmapped};
 
     #[test]
     fn the_repository_name_is_the_last_part_of_its_remote() {
@@ -99,6 +139,21 @@ mod tests {
             ".github"
         );
         assert_eq!(name_of(""), "");
+    }
+
+    #[test]
+    fn a_stale_page_or_an_unmapped_row_is_refused_with_the_fix() {
+        assert_eq!(refusal(&[], 0), None);
+        assert_eq!(
+            refusal(&["docs/standards/security.md"], 0).unwrap(),
+            "rules --check: stale docs/standards/security.md; 0 rows not mapped yet; run \
+             rust-gate rules, then map every row"
+        );
+        assert_eq!(
+            refusal(&[], 3).unwrap(),
+            "rules --check: stale none; 3 rows not mapped yet; run rust-gate rules, then map \
+             every row"
+        );
     }
 
     #[test]
