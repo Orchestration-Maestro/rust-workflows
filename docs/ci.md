@@ -338,6 +338,13 @@ the organization holds everywhere gets its default; any other rule arrives as
 "Not mapped yet". `rust-gate rules --check` refuses a stale page or a row not
 mapped yet.
 
+`rust-gate guide`, run at the root of a repository, writes its Copilot guide,
+`.github/copilot-instructions.md`: where to start, every tracked file with what
+it is for, and how to change and verify. An explanation the guide already gives
+is kept, so a person can improve any of them; a new file is explained by its
+README table row, an image's alternative text, or what the file says of itself.
+`rust-gate guide --check` refuses a stale guide.
+
 `architecture.txt` lists every finding, then every finding an exception
 excuses, with its reason, then the files over 300 lines. `maestro-quality.toml`,
 at the root of the repository, declares layers, tightens the limits and takes

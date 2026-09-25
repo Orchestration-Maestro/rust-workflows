@@ -50,6 +50,7 @@ const REGISTRY: &[&[Step]] = &[
     super::write_lints::STEPS,
     super::gate_rules::STEPS,
     super::rule_map::STEPS,
+    super::copilot_guide::STEPS,
     super::local_runs::STEPS,
 ];
 

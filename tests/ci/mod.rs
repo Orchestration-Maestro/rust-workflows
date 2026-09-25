@@ -5,6 +5,7 @@ mod api_compatibility;
 mod architecture_rules;
 mod commit_hooks;
 mod complexity_report;
+mod copilot_guide;
 mod duplication_report;
 mod feature_combinations;
 mod input_validation;
