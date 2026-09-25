@@ -336,3 +336,14 @@ Rulings taken while executing, newest last.
     template to `PULL_REQUEST_TEMPLATE.md`; its `.gitattributes`, a managed
     file the pinned gate renders, keeps the old `export-ignore` line, which
     follows at the next repin.
+29. The organization's `commits-are-conventional` ruleset is a commit message
+    metadata rule, which GitHub enforces only on its Enterprise plan: on Team
+    it never refused a title, and a squash merge makes the pull request's
+    title the commit release-please reads. The `branch-names` ruleset holds
+    the prefixes a branch may open with, but `fnmatch` cannot hold the case of
+    what follows. PRL-003 refuses a title the `conventional-commit-header`
+    hook would refuse, and PRL-004 a head branch outside `<type>/<name>` in
+    lowercase kebab-case and the bots' branches. `ci.yml`'s `pull-request`
+    step runs both, and `hygiene.yml` runs them as
+    `rust-gate hygiene pull-request-names`, so a repository without Rust is
+    held too. Neither takes an exception.

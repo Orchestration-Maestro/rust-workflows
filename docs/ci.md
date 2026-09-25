@@ -165,6 +165,8 @@ rule is checked.
 | COV-002 | Covered changes | A pull request's new lines covered: 95 % for `feat` and `fix`, 90 % otherwise | no |
 | PRL-001 | Features come with tests | A `feat` or `fix` that changes product code touches a test | no |
 | PRL-002 | Reviewable size | A pull request past 400 changed lines is reported | no |
+| PRL-003 | Conventional titles | A pull request title is a Conventional Commits header, as the commit hook reads one | no |
+| PRL-004 | Conventional branches | A head branch is `<type>/<name>` in lowercase kebab-case, or a bot's | no |
 | DEP-001 | One version, reviewed licences | One version per crate, crates.io only, no yanked or unmaintained crate | yes |
 | VET-001 | Audited dependencies | Every dependency has a cargo-vet audit, from six imported audit sets | no |
 | PRF-001 | Performance budget | A declared benchmark rises by 5 % of its instructions at most | yes |
@@ -293,7 +295,7 @@ Clippy and the gate's rules, which CI runs as steps of their own; the output is
 `hooks.txt`. mise asks GitHub's API for each hook's release, so the step hands
 it the job's read-only token as `MISE_GITHUB_TOKEN`: an anonymous runner shares
 its rate limit with every other job on its address. A repository without Rust calls `hygiene.yml` instead of `ci.yml`:
-the secret scan, `hygiene`, `managed-files` and `hooks`, under the check
+the secret scan, `hygiene`, `pull-request-names`, `managed-files` and `hooks`, under the check
 `hygiene / Required hygiene`.
 
 ### Pull request rules
@@ -305,6 +307,20 @@ Measured on a pull request only, against its base branch, the merge commit's fir
 | COV-002 | New lines that never run, past what the pull request may leave: a `feat` or `fix` title covers 95 % of its coverable new lines, any other 90 %, and `max(1, floor((100 - target) % of n))` of the `n` may stay uncovered, so a three-line change is not failed by one line |
 | PRL-001 | A `feat` or `fix` pull request that changes product Rust code, outside a `tests`, `benches` or `examples` directory, and touches no test: no file under a `tests` directory and no new line inside a `#[cfg(test)]` item |
 | PRL-002 | Nothing: past 400 changed lines, lockfiles, snapshots and generated files left out, the pull request is reported in the summary |
+| PRL-003 | A title that is not a Conventional Commits header as the `conventional-commit-header` hook reads one: a type among `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore` and `revert`, an optional lowercase scope and `!`, then a colon, a space and a subject opening in lowercase within 71 bytes, as the hook counts them. A squash merge makes the title the commit release-please reads. GitHub's Revert button writes `Revert "<header>"`, which passes when the header does, and a title on a `dependabot/*` branch is not held to the length, since Dependabot never shortens one |
+| PRL-004 | A head branch other than `<type>/<name>`, the same types, each segment after it lowercase kebab-case with a single `-`, `.` or `_` between letters and digits; the bots' `maestro/sync`, `release-please--*`, `dependabot/*`, `gh-readonly-queue/*` and `copilot/*`, and the `revert-<number>-<branch>` of GitHub's Revert button, pass |
+
+PRL-003 and PRL-004 hold every repository: `hygiene.yml` runs them too, as
+`rust-gate hygiene pull-request-names`. The organization's commit-message
+ruleset is a metadata rule GitHub enforces only on its Enterprise plan, and a
+branch ruleset matches names with `fnmatch`, which cannot hold their case; these
+two rules are what refuses them.
+
+Each runs after the other checks of its job, so a name never hides what they
+say, and each finding says how to fix it. Neither runs again when a title
+changes, and a rerun reads the title its run started with: fix the title, then
+push a commit or close and reopen the pull request. A branch cannot be renamed
+under an open pull request: open the pull request again from a branch so named.
 
 ### Performance budget
 
@@ -681,7 +697,7 @@ earlier failure. The scorecard identifies controls that never ran.
 | `managed-files.txt` | Every managed file whose bytes differ from the gate's rendering, one per line | always |
 | `hooks.txt` | What the commit hooks printed over every file | always, skipping the home of the workflows |
 | `changed-coverage.txt` | The coverable new lines, the uncovered ones by file and line, and the allowance | pull requests |
-| `pull-request.txt` | The changed lines counted, and the PRL-001 and PRL-002 findings | pull requests |
+| `pull-request.txt` | The changed lines counted, and the PRL-001 to PRL-004 findings | pull requests |
 | `performance.txt` | Each declared benchmark's counts, the base's then the pull request's, and the excused ones | `[performance] benches`, pull requests |
 | `architecture.txt` | Every source-rule finding with its rule, file and line, each finding an exception excuses with its reason, then the files over 300 lines | always |
 | `coverage.lcov` | Line coverage in LCOV format | always |

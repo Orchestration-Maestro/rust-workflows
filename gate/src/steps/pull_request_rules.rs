@@ -4,9 +4,14 @@
 //! file under a `tests` directory and no line inside a `cfg(test)` item,
 //! which makes a failing test first a fact the gate can check. PRL-002 reports
 //! a pull request over 400 changed lines, lockfiles, snapshots and generated
-//! files left out, and refuses nothing.
+//! files left out, and refuses nothing. PRL-003 refuses a title that is not a
+//! conventional header and PRL-004 a head branch outside `<type>/<name>` and
+//! the bots' branches; `hygiene.yml` holds a repository without Rust to the
+//! same two.
 
-use crate::checks::pull_request::{added_lines, pull_request_diff, title_type, touched_lines};
+use crate::checks::pull_request::{
+    added_lines, name_findings, pull_request_diff, title_type, touched_lines,
+};
 use crate::checks::rust_code::{blanked, items, line_at};
 use crate::runner::{Failure, Job, Outcome, Step, input, optional, output, summary, write};
 use std::collections::BTreeMap;
@@ -19,7 +24,12 @@ pub(crate) const STEPS: &[Step] = &[Step {
     workflow: "ci",
     id: "pull-request",
     summary: "Pull request rules PRL",
-    inputs: &["GITHUB_BASE_REF", "GITHUB_WORKSPACE", "PULL_REQUEST_TITLE"],
+    inputs: &[
+        "GITHUB_BASE_REF",
+        "GITHUB_HEAD_REF",
+        "GITHUB_WORKSPACE",
+        "PULL_REQUEST_TITLE",
+    ],
     tools: &["git"],
     reports: &["pull-request.txt"],
     run,
@@ -70,15 +80,26 @@ fn run() -> Outcome {
             product.join(", ")
         );
     }
+    let names = name_findings(&title, &optional("GITHUB_HEAD_REF")?);
+    for finding in &names {
+        let _ = writeln!(text, "{finding}");
+    }
     write(&report, text.as_bytes(), false)?;
     summary(&format!("## Pull request rules\n\n{text}"))?;
+    let mut refusals = names;
     if untested {
-        return Err(Failure::from(format!(
-            "pull-request: a {kind} pull request changes product code and touches no test \
-             (PRL-001); pull-request.txt names the files"
-        )));
+        refusals.push(format!(
+            "a {kind} pull request changes product code and touches no test (PRL-001); \
+             pull-request.txt names the files"
+        ));
     }
-    Ok(())
+    if refusals.is_empty() {
+        return Ok(());
+    }
+    Err(Failure::from(format!(
+        "pull-request: {}",
+        refusals.join("; ")
+    )))
 }
 
 /// The changed lines that count toward PRL-002: every file's but lockfiles,
