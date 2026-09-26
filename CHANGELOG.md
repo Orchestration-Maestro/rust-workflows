@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.3.0](https://github.com/Orchestration-Maestro/maestro-rust-workflows/compare/v4.2.0...v4.3.0) (2026-09-26)
+
+
+### Features
+
+* call this repository by its new name ([#80](https://github.com/Orchestration-Maestro/maestro-rust-workflows/issues/80)) ([c6036ec](https://github.com/Orchestration-Maestro/maestro-rust-workflows/commit/c6036ecaaf0a9c37c18386d67665c70e3fa588ee))
+
 ## [4.2.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v4.1.0...v4.2.0) (2026-09-26)
 
 
