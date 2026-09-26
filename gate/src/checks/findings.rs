@@ -6,6 +6,7 @@
 use super::quality_config::Exception;
 use crate::runner::{Failure, Outcome, summary, write};
 use std::fmt::{self, Write as _};
+use std::fs;
 use std::path::Path;
 
 /// One rule broken at one place.
@@ -98,12 +99,25 @@ pub(crate) fn publish_findings(
     )))
 }
 
-/// `file` relative to `workspace`, the way a finding names it.
+/// `file` relative to `workspace`, the way a finding and
+/// `maestro-quality.toml` name it: its components joined by `/` on every
+/// platform. Both are compared as their real paths first, so a checkout
+/// reached through a symbolic link, or named `\\?\` on Windows on one side
+/// only, is the same checkout; a file outside it keeps its own name.
 pub(crate) fn relative(workspace: &Path, file: &Path) -> String {
-    file.strip_prefix(workspace)
-        .unwrap_or(file)
-        .display()
-        .to_string()
+    let real = |path: &Path| fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let (real_file, real_workspace) = (real(file), real(workspace));
+    let inside = real_file
+        .strip_prefix(&real_workspace)
+        .or_else(|_| file.strip_prefix(workspace));
+    match inside {
+        Ok(rest) => rest
+            .components()
+            .map(|part| part.as_os_str().to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/"),
+        Err(_) => file.display().to_string(),
+    }
 }
 
 /// What the exceptions leave: the findings none excuses; each excused one
@@ -155,7 +169,22 @@ pub(crate) fn excuse<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::{Exception, Finding, excuse};
+    use super::{Exception, Finding, excuse, relative};
+    use std::path::Path;
+
+    #[test]
+    fn a_file_is_named_by_its_components_under_the_workspace() {
+        let workspace = Path::new("/nonexistent/w");
+        assert_eq!(
+            relative(workspace, &workspace.join("gate/src/main.rs")),
+            "gate/src/main.rs"
+        );
+        assert_eq!(relative(workspace, workspace), "");
+        assert_eq!(
+            relative(workspace, Path::new("/elsewhere/a.rs")),
+            "/elsewhere/a.rs"
+        );
+    }
 
     /// An exception of `rule` for `item` at `path`.
     fn exception(rule: &str, path: &str, item: &str) -> Exception {
