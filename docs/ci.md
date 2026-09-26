@@ -1104,17 +1104,21 @@ Publishers omit this override and use the committed consumer pin.
 4. Release build and release-mode tests, verified packages of the members that
    may be published, per-member CycloneDX 1.5 JSON SBOMs, and release artifact
    staging. cargo-cyclonedx lacks `--locked`: a before/after lockfile comparison
-   rejects resolution changes. `cargo package --locked` takes one `--package`
-   for each member whose `publish` is unset or names a registry and leaves out
-   every `publish = false` member, so a private workspace whose members depend
-   on each other still builds. With no member to publish, nothing is packaged
+   rejects resolution changes. Packaging first removes every `.crate` archive
+   an earlier run left in `$CARGO_TARGET_DIR/package`, restored from the cache
+   or kept by a local run, so the payload holds only what this run packaged.
+   `cargo package --locked` then takes one `--package` for each member whose
+   `publish` is unset, `true` or names a registry, and leaves out every
+   `publish = false` member, so a private workspace whose members depend on
+   each other still builds. With no member to publish, nothing is packaged
    and the step prints a `SKIPPED` line; the release tests, the build and the
-   SBOMs still run. A publishable member that depends on a `publish = false`
-   one still fails: Cargo looks that dependency up on crates.io, and the member
-   could not be published either. With a compiler older than 1.90, packaging
-   alone runs on Cargo 1.90.0: older Cargo looks a member's dependency on
-   another member up on crates.io, so a workspace whose members depend on each
-   other could not package.
+   SBOMs still run. A publishable member with a normal or build dependency on
+   a `publish = false` member still fails: Cargo looks that dependency up in
+   the registry it packages for, and the member could not be published
+   either. A dev-dependency without a `version` is dropped from the package.
+   With a compiler older than 1.90, packaging alone runs on Cargo 1.90.0:
+   older Cargo looks a member's dependency on another member up on crates.io,
+   so a workspace whose members depend on each other could not package.
 5. Dependency sources and versions: `cargo deny check bans sources` against the
    consumer's `deny.toml`, or against the generated default policy without one.
 6. `Required Rust CI` runs with `always()` and fails on failure, cancellation or

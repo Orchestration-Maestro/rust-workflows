@@ -48,7 +48,9 @@ esac"#
 
 #[test]
 fn a_lockfile_that_drifts_during_sbom_generation_fails_the_build() {
-    let fixture = Fixture::new();
+    let mut fixture = Fixture::new();
+    let target = fixture.root.join("target");
+    fixture.set("CARGO_TARGET_DIR", &target.display().to_string());
     fixture.stub(
         "cargo",
         r#"[[ "$1" == cyclonedx ]] && echo drift >> Cargo.lock; exit 0"#,

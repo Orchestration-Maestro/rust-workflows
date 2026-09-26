@@ -30,3 +30,4 @@ mod source_rules;
 mod supply_chain;
 mod toolbelt_setup;
 mod workspace_boundary;
+mod workspace_packaging;

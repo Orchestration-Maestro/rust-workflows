@@ -312,7 +312,8 @@ generated SBOM output and local download markers are intentionally excluded.
 │   │   ├── source_rules.rs                     # ci.yml: SIZE, NAME, DOC, LIB, TST and WSP, each refused by name, and the limits a repository tightens
 │   │   ├── supply_chain.rs                     # ci.yml: dependency policy, direct crates.io reads and the scanners
 │   │   ├── toolbelt_setup.rs                   # rust-gate setup: the locked toolbelt linked and its PATH printed, a bad mise digest refused
-│   │   └── workspace_boundary.rs               # ci.yml: a workspace whose manifests or sources reach outside the checkout is refused before any lint
+│   │   ├── workspace_boundary.rs               # ci.yml: a workspace whose manifests or sources reach outside the checkout is refused before any lint
+│   │   └── workspace_packaging.rs              # ci.yml: the build packages only members that may be published, earlier archives removed
 │   ├── gate/                                   # The gate and the tests as structures: layers, no import cycle, the step registry, what holds every step and refusal
 │   │   ├── layer_boundaries.rs                 # This crate's own step shape, the checks door, seam unit tests and no whole-harness import
 │   │   ├── mod.rs                              # The repository modules, listed and nothing else
