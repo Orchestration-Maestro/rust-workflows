@@ -147,11 +147,16 @@ fn run() -> Outcome {
         .run()?;
     // An undocumented public item is a maintenance defect, not a style
     // preference: the next reader has no statement of intent to check the
-    // implementation against. Broken intra-doc links fail here too.
-    Cmd::new("cargo doc --workspace --no-deps --locked")
-        .env("RUSTDOCFLAGS", "-D warnings -D missing_docs")
-        .cwd(project)
-        .run()?;
+    // implementation against. Broken intra-doc links fail here too. The
+    // second build documents the private items under the same flags: the
+    // first never reads their docs, and only it refuses a public doc that
+    // links to a private item, so neither build replaces the other.
+    for build in ["", " --document-private-items"] {
+        Cmd::new(&format!("cargo doc --workspace --no-deps --locked{build}"))
+            .env("RUSTDOCFLAGS", "-D warnings -D missing_docs")
+            .cwd(project)
+            .run()?;
+    }
     Ok(())
 }
 

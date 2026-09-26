@@ -415,7 +415,8 @@ Every repository's `.pre-commit-config.yaml` is a managed file, so the hooks a
 commit runs are the organization's: prek's own checks (merge markers, YAML,
 TOML and JSON syntax, final newlines, trailing whitespace, line endings, files
 over 500 KB, case conflicts, shebangs), then typos, gitleaks over the staged
-change, yamlfmt, taplo, actionlint, zizmor, shellcheck, shfmt, rumdl, lychee
+change, `just --fmt --check` over a root justfile under any name just accepts,
+yamlfmt, taplo, actionlint, zizmor, shellcheck, shfmt, rumdl, lychee
 offline and editorconfig-checker, each run from the PATH at the version
 rust-workflows' `mise.toml` pins; the commit message rules; and
 `rust-gate hygiene --local`, the gate built by Cargo from the release the
@@ -434,6 +435,13 @@ as `MISE_GITHUB_TOKEN`: an anonymous runner shares its rate limit with every
 other job on its address. A repository without Rust calls `hygiene.yml` instead
 of `ci.yml`: the secret scan, `hygiene`, `pull-request-names`, `managed-files`
 and `hooks`, under the check `hygiene / Required hygiene`.
+
+Just's formatter is a hook rather than a step of its own. Like yamlfmt, taplo
+and shfmt, it formats a file a repository may hold with or without Rust, so as
+a hook it runs on a commit, in `hygiene.yml`, and through the `hooks` step in
+`ci.yml` and `rust-gate ci --local`, with no step to declare. It watches the
+root alone: `just --fmt` formats the justfile just finds there, not a module
+beside it.
 
 ### The tools on your machine
 
@@ -1080,7 +1088,11 @@ Publishers omit this override and use the committed consumer pin.
 ## Mandatory checks
 
 1. `cargo metadata --locked`, rustfmt, Clippy for all workspace targets with
-   `-D warnings`, unit/integration tests and explicit doc tests.
+   `-D warnings`, unit/integration tests and explicit doc tests, then rustdoc
+   twice under `-D warnings -D missing_docs`: the public build, which alone
+   refuses a public doc linking to a private item, and a build with
+   `--document-private-items`, which refuses a broken intra-doc link or bad doc
+   on a private item the first never reads.
 2. `cargo llvm-cov --workspace --locked` emits nonempty LCOV and enforces the line
    threshold. Stable coverage does not include doc-test coverage; doc tests run
    separately. No implicit `--all-features` is used.

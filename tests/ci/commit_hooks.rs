@@ -41,6 +41,44 @@ fn the_hooks_step_runs_prek_over_every_file_and_skips_what_ci_runs_itself() {
 }
 
 #[test]
+fn a_root_justfile_of_any_casing_is_held_to_just_s_own_format() {
+    // The rendered hooks run just's formatter over the root justfile, under
+    // any name just itself accepts, so the hooks step refuses one CI would
+    // otherwise never read. A repository without one skips the hook.
+    let fixture = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
+    let project = fixture.root.join("project");
+    succeeds(&fixture.run_body(&format!(
+        "cd project && git init -q && RUST_WORKFLOWS_PIN='{} v2.0.0' rust-gate init",
+        "a".repeat(40)
+    )));
+    let hook = |justfile: Option<(&str, &str)>| {
+        succeeds(&fixture.run_body("cd project && rm -f Justfile .JUSTFILE"));
+        if let Some((name, text)) = justfile {
+            fs::write(project.join(name), text).unwrap();
+        }
+        succeeds(&fixture.run_body("cd project && git add -A"));
+        tool("prek")
+            .args(["run", "just-format", "--all-files"])
+            .current_dir(&project)
+            .output()
+            .unwrap()
+    };
+    for name in ["Justfile", ".JUSTFILE"] {
+        let misformatted = hook(Some((name, "probe:\n  echo probe\n")));
+        assert!(!misformatted.status.success(), "{name}");
+        let said = String::from_utf8_lossy(&misformatted.stdout);
+        assert!(
+            said.contains("formatted justfile differs from original"),
+            "{name}: {said}"
+        );
+        succeeds(&hook(Some((name, "probe:\n    echo probe\n"))));
+    }
+    let none = hook(None);
+    succeeds(&none);
+    assert!(String::from_utf8_lossy(&none.stdout).contains("Skipped"));
+}
+
+#[test]
 fn a_step_runs_locally_the_way_a_commit_hook_runs_it() {
     let fixture = Fixture::with_sources(&[("src/lib.rs", "//! A crate.\n")]);
     let project = fixture.root.join("project");
