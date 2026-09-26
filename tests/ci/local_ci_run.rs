@@ -317,7 +317,7 @@ fn a_repository_without_a_default_branch_or_of_the_workflows_is_refused() {
     .unwrap();
     refused(
         &run_locally(&fixture, "rust-gate ci --local"),
-        "ci --local: rust-workflows runs its checks in just check, not through ci.yml",
+        "ci --local: maestro-rust-workflows runs its checks in just check, not through ci.yml",
     );
     assert!(steps(&fixture).is_empty());
 }

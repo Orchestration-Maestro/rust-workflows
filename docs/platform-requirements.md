@@ -1,7 +1,7 @@
 # Platform requirements
 
 Enable unprivileged CI and publisher dry-runs first. The provider repository is
-public at `Orchestration-Maestro/rust-workflows`, like every repository of the
+public at `Orchestration-Maestro/maestro-rust-workflows`, like every repository of the
 organization, which a ruleset keeps public. Public crates.io publication is a
 separate, explicitly selected operation.
 

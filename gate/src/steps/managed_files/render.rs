@@ -240,7 +240,7 @@ mod tests {
             .find(|(path, _)| path == ".pre-commit-config.yaml")
             .map(|(_, text)| text.as_str())
             .unwrap();
-        assert!(hooks.contains("/rust-workflows:v2.0.0:rust-gate\"\n"));
+        assert!(hooks.contains("/maestro-rust-workflows:v2.0.0:rust-gate\"\n"));
         let mut unpinned = repository(QualityConfig::default());
         unpinned.version = None;
         assert!(

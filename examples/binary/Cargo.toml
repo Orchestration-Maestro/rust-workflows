@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.85"
 description = "Rust workflow consumer example with one crates.io dependency"
 license = "MIT"
-repository = "https://github.com/Orchestration-Maestro/rust-workflows"
+repository = "https://github.com/Orchestration-Maestro/maestro-rust-workflows"
 keywords = ["ci", "example"]
 categories = ["development-tools"]
 

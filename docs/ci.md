@@ -346,7 +346,7 @@ organization's configuration at run time.
 
 | Repository | Managed files |
 | --- | --- |
-| Every one | `.editorconfig`, `.gitattributes`, `typos.toml`, and outside rust-workflows `.github/dependabot.yml` and `.pre-commit-config.yaml` |
+| Every one | `.editorconfig`, `.gitattributes`, `typos.toml`, and outside maestro-rust-workflows `.github/dependabot.yml` and `.pre-commit-config.yaml` |
 | Rust, a root `Cargo.toml` or `rust-toolchain.toml` | `rust-toolchain.toml` and the lint block of the root `Cargo.toml` |
 
 Each stays for a reader outside the gate: editors and editorconfig-checker
@@ -383,13 +383,13 @@ Run in a repository's root, `rust-gate sync` writes them and `rust-gate
 sync --check` compares them, at the release the repository declares, the first
 found: `RUST_WORKFLOWS_PIN='<commit> v<version>'`, which moves it; the retired
 caller while it is there; the commit every other workflow that calls
-rust-workflows pins, in `.github/workflows/` or the organization's workflow
+maestro-rust-workflows pins, in `.github/workflows/` or the organization's workflow
 templates, which must all pin the same one; or the version its commit hooks
 install. Workflows that pin different releases are refused, with the fix: set
-`RUST_WORKFLOWS_PIN` and run `sync`. Every call to rust-workflows moves to the
+`RUST_WORKFLOWS_PIN` and run `sync`. Every call to maestro-rust-workflows moves to the
 declared release and counts as managed: a release job pinned apart from the
 check would ship with a gate the check never ran, and Dependabot leaves every
-rust-workflows pin to `sync`. `rust-gate init` writes them for a repository
+maestro-rust-workflows pin to `sync`. `rust-gate init` writes them for a repository
 that declares no release yet, at the release `RUST_WORKFLOWS_PIN` names. What
 a repository may say goes in `maestro-quality.toml`: the words it means,
 `[typos] words = ["jaq"]`, and the inputs a ruleset run takes instead of a
@@ -401,12 +401,12 @@ crates.io alone, no yanked or unmaintained crate, and the reviewed licences; a
 duplicate the ecosystem forces is a DEP-001 exception whose `path` names the
 crate and version, `windows-sys@0.52`, rendered as one of cargo-deny's skips
 with its reason. The files every
-repository holds as they are here are rust-workflows' own, read in when the
+repository holds as they are here are maestro-rust-workflows' own, read in when the
 gate is built: `.editorconfig`, `.gitattributes` and `rust-toolchain.toml`. In
-rust-workflows itself neither `managed-files` nor `sync --check` compares
+maestro-rust-workflows itself neither `managed-files` nor `sync --check` compares
 them, since each would only be compared with itself; what the gate writes from
 its data, `typos.toml` and the manifest's lint block, is compared there as
-everywhere else. rust-workflows keeps its own copies of the files other
+everywhere else. maestro-rust-workflows keeps its own copies of the files other
 repositories delete, without the header, for its own `just check`.
 
 ### Commit hooks
@@ -418,7 +418,7 @@ over 500 KB, case conflicts, shebangs), then typos, gitleaks over the staged
 change, `just --fmt --check` over a root justfile under any name just accepts,
 yamlfmt, taplo, actionlint, zizmor, shellcheck, shfmt, rumdl, lychee
 offline and editorconfig-checker, each run from the PATH at the version
-rust-workflows' `mise.toml` pins; the commit message rules; and
+maestro-rust-workflows' `mise.toml` pins; the commit message rules; and
 `rust-gate hygiene --local`, the gate built by Cargo from the release the
 repository declares. Each tool takes the organization's options on its command line,
 as the table above lists. A Rust repository adds `cargo fmt`, `rust-gate
@@ -449,12 +449,12 @@ One command gives a developer exactly the tools CI runs, at the versions it
 runs, in any repository of the organization:
 
 ```bash
-cargo install --locked --git https://github.com/Orchestration-Maestro/rust-workflows \
+cargo install --locked --git https://github.com/Orchestration-Maestro/maestro-rust-workflows \
   --tag v<version> rust-gate
 rust-gate setup
 ```
 
-The gate carries rust-workflows' `mise.toml` and `mise.lock`, read in when it
+The gate carries maestro-rust-workflows' `mise.toml` and `mise.lock`, read in when it
 is built. `rust-gate setup` fetches mise itself and refuses it unless its
 SHA-256 is the pinned one, then has mise install every tool under `--locked`
 into `~/.cache/maestro/tools/<version>` (`$XDG_CACHE_HOME` when set,
@@ -480,7 +480,7 @@ A repository keeps no tool pins of its own: `managed-files` and `rust-gate
 sync --check` refuse a `mise.toml`, `mise.lock`, `.mise.toml`,
 `.tool-versions`, a `scripts/bootstrap.sh` that fetches mise, and a
 `.github/workflows/tool-updates.yml`, naming `rust-gate setup` as what replaces
-them. Only rust-workflows keeps them, as the source of the pins.
+them. Only maestro-rust-workflows keeps them, as the source of the pins.
 
 ### Run CI before you push
 
@@ -535,7 +535,7 @@ quality step
 Each run checks out a fresh clone, as a runner does, so a build a mutant of the
 last run left is never taken for this run's sources.
 
-rust-workflows has no Cargo package at its root and no `ci.yml` run of its
+maestro-rust-workflows has no Cargo package at its root and no `ci.yml` run of its
 own; its pre-push hook runs `just check`.
 
 ### Pull request rules
@@ -847,8 +847,8 @@ the hardening step checks that the section is present rather than assuming it.
 `dependency-audit` is on by default (VET-001): the `vet` step runs
 `cargo vet --locked` over the committed `supply-chain/` ledger, after checking
 that its `config.toml` imports the organization's audits, published in
-rust-workflows' `supply-chain/audits.toml` (under its name before or after the
-rename to `maestro-rust-workflows`), and those of Mozilla, Google, the
+maestro-rust-workflows' `supply-chain/audits.toml` (under its former name
+`rust-workflows` too), and those of Mozilla, Google, the
 Bytecode Alliance, ISRG and the Zcash Foundation, each at the URL cargo-vet's
 registry gives it. A crate one of them reviewed needs no exemption; the
 exemptions stay the repository's own reviewed state. `cargo vet init`, the six

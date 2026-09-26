@@ -74,7 +74,7 @@ fn init_writes_every_managed_file_and_the_check_finds_them_equal() {
     assert!(!fixture.root.join("project/.github/workflows").exists());
     assert!(
         managed(&fixture, ".pre-commit-config.yaml")
-            .contains("/rust-workflows:v2.0.0:rust-gate\"\n")
+            .contains("/maestro-rust-workflows:v2.0.0:rust-gate\"\n")
     );
     succeeds(&in_project(&fixture, "rust-gate sync --check"));
     refused(
@@ -227,7 +227,7 @@ fn the_retired_caller_goes_and_the_release_workflows_keep_one_pin() {
     fixture.set("GITHUB_WORKSPACE", &project.display().to_string());
     let call = |letter: char, version: &str| {
         format!(
-            "    uses: Orchestration-Maestro/rust-workflows/.github/workflows/{}.yml@{}  # \
+            "    uses: Orchestration-Maestro/maestro-rust-workflows/.github/workflows/{}.yml@{}  # \
              v{version}\n",
             if letter == 'a' {
                 "ci"
@@ -279,7 +279,7 @@ fn the_retired_caller_goes_and_the_release_workflows_keep_one_pin() {
     refused(
         &in_project(&fixture, "rust-gate sync"),
         &format!(
-            "the workflows pin different releases of rust-workflows \
+            "the workflows pin different releases of maestro-rust-workflows \
              (.github/workflows/nightly.yml pins v2.0.0 at {}, .github/workflows/release.yml \
              pins v2.1.0 at {}); set RUST_WORKFLOWS_PIN to `<commit> v<version>`, the release \
              to keep, and run rust-gate sync",

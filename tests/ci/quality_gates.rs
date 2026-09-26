@@ -322,11 +322,11 @@ fn unused_dependencies_and_recorded_audits_fail_the_run_when_their_tool_does() {
             .unwrap()
             .contains("audited")
     );
-    // The organization's audits count under the home's name after its rename.
+    // The organization's audits count under the home's former name too.
     let config = fixture.root.join("project/supply-chain/config.toml");
     let renamed = fs::read_to_string(&config)
         .unwrap()
-        .replace("/rust-workflows/", "/maestro-rust-workflows/");
+        .replace("/maestro-rust-workflows/", "/rust-workflows/");
     fs::write(&config, renamed).unwrap();
     succeeds(&fixture.run("ci", "vet"));
 }

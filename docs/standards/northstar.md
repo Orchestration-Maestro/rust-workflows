@@ -1,9 +1,9 @@
-# Northstar for `rust-workflows`
+# Northstar for `maestro-rust-workflows`
 
 > Automate the guardrails to deliver faster, with higher quality, and more
 > securely.
 
-`rust-workflows` steers by the organization's
+`maestro-rust-workflows` steers by the organization's
 [Northstar](https://github.com/Orchestration-Maestro/.github/blob/864d85597a833864cd8506c3925830503b3c2163/golden-rules/northstar.md):
 one KPI per pillar, each with its measurement. Unmeasured is written `not
 measured`, never estimated; a value read by hand carries the date it was read.

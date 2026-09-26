@@ -1,8 +1,8 @@
 //! The home of the reusable workflows: the repository whose
-//! `.github/workflows/ci.yml` declares `workflow_call`, rust-workflows itself.
+//! `.github/workflows/ci.yml` declares `workflow_call`, this repository itself.
 //! Its `ci.yml`, its Dependabot settings and its hooks are its own, and its
 //! hooks run in `just check` on its pinned toolbelt. Its name on GitHub is
-//! one constant, [`HOME`], so the rename to `maestro-rust-workflows` flips
+//! one constant, [`HOME`], which the rename from `rust-workflows` flipped for
 //! every call, pin and hook URL the gate writes at once. What the gate reads
 //! accepts either name in [`NAMES`], and what a run can tell it, such as the
 //! signer of an attestation, it takes from the run.
@@ -14,10 +14,10 @@ use std::path::Path;
 pub(crate) const ORGANIZATION: &str = "Orchestration-Maestro";
 
 /// The repository that holds every reusable workflow and action of the
-/// organization, as the gate names it. It flips to `maestro-rust-workflows`
-/// when the repository is renamed: GitHub Actions follows no rename, so every
-/// call must carry the new name.
-pub(crate) const HOME: &str = "rust-workflows";
+/// organization, as the gate names it: `maestro-rust-workflows` since its
+/// rename. GitHub Actions follows no rename, so every call must carry the new
+/// name.
+pub(crate) const HOME: &str = "maestro-rust-workflows";
 
 /// Every name the home repository answers to: its name before the rename and
 /// after. A pinned call under either moves to [`HOME`], and Dependabot leaves
@@ -40,7 +40,7 @@ mod tests {
     #[test]
     fn the_home_is_one_of_the_names_it_answers_to() {
         assert!(NAMES.contains(&HOME));
-        assert_eq!(HOME, "rust-workflows");
+        assert_eq!(HOME, "maestro-rust-workflows");
     }
 
     #[test]

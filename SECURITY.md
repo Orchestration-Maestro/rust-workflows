@@ -59,7 +59,7 @@ GitHub attestation API.
 ```bash
 gh attestation verify payload.tar.gz \
   --repo <owner>/<repo> \
-  --signer-workflow Orchestration-Maestro/rust-workflows/.github/workflows/attest-binaries.yml
+  --signer-workflow Orchestration-Maestro/maestro-rust-workflows/.github/workflows/attest-binaries.yml
 ```
 
 Check the reported subject digest against the digest in `SHA256SUMS`. A successful
