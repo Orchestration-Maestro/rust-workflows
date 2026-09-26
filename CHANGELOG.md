@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.2.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v4.1.0...v4.2.0) (2026-09-26)
+
+
+### Features
+
+* check private docs and justfiles centrally ([#77](https://github.com/Orchestration-Maestro/rust-workflows/issues/77)) ([9fa5246](https://github.com/Orchestration-Maestro/rust-workflows/commit/9fa524663dc85f4ffea0c9ea88d5c30d478ffd4d))
+* find this repository by its run, not its name ([#78](https://github.com/Orchestration-Maestro/rust-workflows/issues/78)) ([b6a3ceb](https://github.com/Orchestration-Maestro/rust-workflows/commit/b6a3ceb3da0927c711f023e711f881b1555b9c67))
+
 ## [4.1.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v4.0.0...v4.1.0) (2026-09-26)
 
 
