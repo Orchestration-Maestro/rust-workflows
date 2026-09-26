@@ -148,7 +148,7 @@ fn ci_entry_jobs_accept_fork_pull_requests() {
             "ci",
             "checks",
             "${{ github.event_name != 'pull_request_target' && (inputs.artifact-key != '' || \
-             github.repository != 'Orchestration-Maestro/rust-workflows') }}",
+             github.repository_id != '1382744803') }}",
         ),
         (
             "ci-internal",
@@ -161,6 +161,34 @@ fn ci_entry_jobs_accept_fork_pull_requests() {
             workflow(name)["on"]["workflow_call"]["secrets"].is_null(),
             "{name} must take no secret to run fork pull requests"
         );
+    }
+}
+
+#[test]
+fn workflows_find_this_repository_by_its_id_not_its_name() {
+    // A rename changes github.repository in this repository's own runs, and
+    // a job that compares it with a name would start running here. Its id,
+    // 1382744803, is what the organization's rulesets name too, and survives.
+    for (name, job) in [("ci", "checks"), ("ci", "gate"), ("hygiene", "hygiene")] {
+        let condition = workflow(name)["jobs"][job]["if"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(
+            condition.contains("github.repository_id != '1382744803'"),
+            "{name}/{job}: {condition}"
+        );
+    }
+    for entry in fs::read_dir(root().join(".github/workflows")).unwrap() {
+        let path = entry.unwrap().path();
+        let text = fs::read_to_string(&path).unwrap();
+        for comparison in ["github.repository != '", "github.repository == '"] {
+            assert!(
+                !text.contains(comparison),
+                "{}: {comparison}",
+                path.display()
+            );
+        }
     }
 }
 

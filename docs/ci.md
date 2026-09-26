@@ -839,7 +839,8 @@ the hardening step checks that the section is present rather than assuming it.
 `dependency-audit` is on by default (VET-001): the `vet` step runs
 `cargo vet --locked` over the committed `supply-chain/` ledger, after checking
 that its `config.toml` imports the organization's audits, published in
-rust-workflows' `supply-chain/audits.toml`, and those of Mozilla, Google, the
+rust-workflows' `supply-chain/audits.toml` (under its name before or after the
+rename to `maestro-rust-workflows`), and those of Mozilla, Google, the
 Bytecode Alliance, ISRG and the Zcash Foundation, each at the URL cargo-vet's
 registry gives it. A crate one of them reviewed needs no exemption; the
 exemptions stay the repository's own reviewed state. `cargo vet init`, the six

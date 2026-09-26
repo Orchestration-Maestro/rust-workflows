@@ -3,7 +3,9 @@
 //! Its `ci.yml`, its Dependabot settings and its hooks are its own, and its
 //! hooks run in `just check` on its pinned toolbelt. Its name on GitHub is
 //! one constant, [`HOME`], so the rename to `maestro-rust-workflows` flips
-//! every call, pin, signer and URL the gate writes at once.
+//! every call, pin and hook URL the gate writes at once. What the gate reads
+//! accepts either name in [`NAMES`], and what a run can tell it, such as the
+//! signer of an attestation, it takes from the run.
 
 use std::fs;
 use std::path::Path;
@@ -22,11 +24,6 @@ pub(crate) const HOME: &str = "rust-workflows";
 /// both alone.
 pub(crate) const NAMES: [&str; 2] = ["rust-workflows", "maestro-rust-workflows"];
 
-/// The home repository as `owner/name`.
-pub(crate) fn home_repository() -> String {
-    format!("{ORGANIZATION}/{HOME}")
-}
-
 /// Whether the repository at `root` is the home of the reusable workflows.
 pub(crate) fn is_workflow_home(root: &Path) -> bool {
     fs::read_to_string(root.join(".github/workflows/ci.yml"))
@@ -35,7 +32,7 @@ pub(crate) fn is_workflow_home(root: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{HOME, NAMES, home_repository, is_workflow_home};
+    use super::{HOME, NAMES, is_workflow_home};
     use std::env;
     use std::fs;
     use std::process;
@@ -43,7 +40,7 @@ mod tests {
     #[test]
     fn the_home_is_one_of_the_names_it_answers_to() {
         assert!(NAMES.contains(&HOME));
-        assert_eq!(home_repository(), "Orchestration-Maestro/rust-workflows");
+        assert_eq!(HOME, "rust-workflows");
     }
 
     #[test]

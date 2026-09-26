@@ -145,8 +145,11 @@ regulatory retention or all-runs archive is claimed.
 `attest-binaries.yml` records a Sigstore-signed SLSA build provenance statement
 for `payload.tar.gz`, then verifies it in the same job with `gh attestation
 verify`, pinning the expected signer workflow and checking the verified subject
-digest against the payload the job hashed itself. A signature nothing checks is
-not a control, so a broken or unattached attestation fails the run.
+digest against the payload the job hashed itself. The signer is
+`attest-binaries.yml` in the repository the run names as
+`job.workflow_repository`, so it follows that repository through a rename. A
+signature nothing checks is not a control, so a broken or unattached
+attestation fails the run.
 
 It is a separate callable workflow rather than a job inside publication. GitHub
 validates the scopes of every job in a called workflow at startup, including jobs

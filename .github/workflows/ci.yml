@@ -118,7 +118,8 @@ jobs:
     # Forks run too: CI takes no secret and a read-only token, and the
     # organization holds external contributors' runs for approval. Inside
     # this repository, only a caller runs it: its root holds no Cargo package.
-    if: ${{ github.event_name != 'pull_request_target' && (inputs.artifact-key != '' || github.repository != 'Orchestration-Maestro/rust-workflows') }}
+    # The repository is found by its id, which a rename leaves alone.
+    if: ${{ github.event_name != 'pull_request_target' && (inputs.artifact-key != '' || github.repository_id != '1382744803') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -536,7 +537,7 @@ jobs:
     needs:
       - checks
       - portability
-    if: ${{ always() && (inputs.artifact-key != '' || github.repository != 'Orchestration-Maestro/rust-workflows') }}
+    if: ${{ always() && (inputs.artifact-key != '' || github.repository_id != '1382744803') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}

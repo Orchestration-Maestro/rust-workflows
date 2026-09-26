@@ -121,6 +121,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_ENTERPRISE_TOKEN: ${{ github.token }}
           EXPECTED_DIGEST: ${{ steps.verify.outputs.payload-digest }}
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
         run: rust-gate attest-binaries verify-recorded
       - name: Record the attestation outcome
         id: outcome

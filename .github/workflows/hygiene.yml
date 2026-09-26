@@ -20,8 +20,9 @@ jobs:
   # hygiene-required ruleset requires, "hygiene / Required hygiene".
   hygiene:
     name: Required hygiene
-    # This repository holds itself to ci-internal.yml, not to this file.
-    if: ${{ github.repository != 'Orchestration-Maestro/rust-workflows' }}
+    # This repository holds itself to ci-internal.yml, not to this file. It
+    # is found by its id, which a rename leaves alone.
+    if: ${{ github.repository_id != '1382744803' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
