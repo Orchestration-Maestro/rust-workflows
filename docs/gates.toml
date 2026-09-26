@@ -16,10 +16,11 @@ proofs = [
 [[gate]]
 name = "Strict rustdoc"
 kind = "always"
-fails = "A public item without documentation, or a broken intra-doc link"
+fails = "A public item without documentation, or a broken intra-doc link or other rustdoc warning in any item, private ones included"
 standard = "North Star, Maintainability"
 proofs = [
   "strict_rustdoc_fails_the_run_when_cargo_doc_does",
+  "a_broken_private_doc_fails_the_second_strict_rustdoc_build",
   "example_gate_replays_ci_step_bodies_against_every_fixture",
 ]
 
@@ -246,10 +247,11 @@ proofs = [
 [[gate]]
 name = "Commit hooks"
 kind = "always"
-fails = "A commit hook that fails over every file"
+fails = "A commit hook that fails over every file, a root justfile out of `just --fmt` among them"
 standard = "The universal set, UNI"
 proofs = [
   "the_hooks_step_runs_prek_over_every_file_and_skips_what_ci_runs_itself",
+  "a_root_justfile_of_any_casing_is_held_to_just_s_own_format",
   "a_step_runs_locally_the_way_a_commit_hook_runs_it",
   "every_step_of_the_ci_job_runs_locally_or_says_why_not",
   "every_rendered_hook_runs_a_pinned_version_and_this_repository_runs_them_all",

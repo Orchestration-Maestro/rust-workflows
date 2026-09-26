@@ -73,6 +73,14 @@ const TOOL_HOOKS: &[ToolHook] = &[
         whole: true,
     },
     ToolHook {
+        id: "just-format",
+        name: "Just formatting",
+        entry: "just --unstable --fmt --check",
+        files: "files: '(?i)^\\.?justfile$'",
+        exclude: "",
+        whole: true,
+    },
+    ToolHook {
         id: "yamlfmt",
         name: "YAML formatting",
         entry: "yamlfmt -no_global_conf -lint -formatter indent=2,include_document_start=false,\

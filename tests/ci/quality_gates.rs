@@ -147,6 +147,40 @@ exit 0"#,
 }
 
 #[test]
+fn a_broken_private_doc_fails_the_second_strict_rustdoc_build() {
+    // The public build leaves private items out, so a broken intra-doc link
+    // or a bad doc on one never reaches rustdoc. A second build documents
+    // them under the same flags, and its failure is the step's.
+    let mut fixture = Fixture::new();
+    fixture.set("GITHUB_WORKSPACE", &fixture.root.display().to_string());
+    fixture.set("METADATA", &workspace_metadata(&fixture));
+    fixture.stub(
+        "cargo",
+        r#"[[ "$1" == metadata ]] && printf '%s' "$METADATA"
+[[ "$1" == nextest ]] && printf '<testsuites tests="1"/>\n' > "$REPORTS/tests.xml"
+[[ "$1" == clippy ]] && printf '{"reason":"build-finished","success":true}\n'
+[[ "$1" == doc ]] && printf 'RUSTDOCFLAGS=%s %s\n' "$RUSTDOCFLAGS" "$*" >> "$CALLS"
+[[ "$*" == *--document-private-items* ]] && exit 9
+exit 0"#,
+    );
+    assert_eq!(fixture.run("ci", "quality").status.code(), Some(9));
+    let calls = fixture.calls();
+    let builds: Vec<&str> = calls
+        .lines()
+        .filter(|line| line.starts_with("RUSTDOCFLAGS="))
+        .collect();
+    assert_eq!(
+        builds,
+        [
+            "RUSTDOCFLAGS=-D warnings -D missing_docs doc --workspace --no-deps --locked",
+            "RUSTDOCFLAGS=-D warnings -D missing_docs doc --workspace --no-deps --locked \
+             --document-private-items",
+        ],
+        "{calls}"
+    );
+}
+
+#[test]
 fn line_coverage_below_the_threshold_fails_the_run() {
     // The threshold is handed to cargo-llvm-cov as --fail-under-lines, so a
     // shortfall is the tool's own non-zero exit and the step's. A run that
@@ -316,5 +350,12 @@ exit 0"#,
             "RUSTDOCFLAGS='-D warnings -D missing_docs' cargo doc --workspace --no-deps --locked"
         ),
         "rustdoc must run strictly: {trace}"
+    );
+    assert!(
+        trace.contains(
+            "RUSTDOCFLAGS='-D warnings -D missing_docs' cargo doc --workspace --no-deps --locked \
+             --document-private-items"
+        ),
+        "private items must be documented strictly too: {trace}"
     );
 }

@@ -153,6 +153,9 @@ fn every_step_of_the_ci_job_runs_locally_or_says_why_not() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     let ran: Vec<String> = steps(&fixture).into_iter().map(|(id, _)| id).collect();
     assert_eq!(ran, announced_steps(&stdout));
+    // Just's formatter runs among the hooks and the private documentation in
+    // the quality step, so a local run holds a repository to both.
+    assert!(ran.iter().any(|id| id == "hooks") && ran.iter().any(|id| id == "quality"));
     for id in workflow("ci")["jobs"].as_object().unwrap().keys() {
         if id != "checks" {
             assert!(stdout.contains(&format!("job {id}: ")), "{id}: {stdout}");
