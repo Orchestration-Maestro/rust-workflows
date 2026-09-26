@@ -197,3 +197,23 @@ fn the_scorecard_receives_application_results_from_the_executed_steps() {
         assert_eq!(card["env"][key], value, "{key}");
     }
 }
+
+#[test]
+fn the_scorecard_reports_an_early_failure_before_the_reports_directory_exists() {
+    // The tools step creates the reports directory; when a step before it
+    // fails, the scorecard still runs and must name that step, not fail on a
+    // directory nobody created.
+    let mut fixture = Fixture::new();
+    for key in SCORECARD_OUTCOMES {
+        fixture.set(key, "skipped");
+    }
+    fixture.set("OUT_QUALITY", "failure");
+    fs::remove_dir(fixture.root.join("reports")).unwrap();
+    succeeds(&fixture.run("ci", "scorecard"));
+    let card = fs::read_to_string(fixture.root.join("reports/scorecard.md")).unwrap();
+    assert!(
+        card.lines()
+            .any(|line| line.contains("formatting, clippy") && line.contains("failed")),
+        "{card}"
+    );
+}

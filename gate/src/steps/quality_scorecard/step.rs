@@ -60,6 +60,10 @@ pub(crate) const STEPS: &[Step] = &[Step {
 /// Markdown for the log and the summary, and as the badge.
 fn run() -> Outcome {
     let job = Job::current()?;
+    // The tools step creates the reports directory; a step failing before it
+    // must still be the one the scorecard names.
+    fs::create_dir_all(&job.reports)
+        .map_err(|error| format!("cannot create {}: {error}", job.reports.display()))?;
     // A failed coverage gate leaves no report; that is a missing value, not
     // an error to swallow, so the absence is handled rather than silenced.
     let coverage = fs::read_to_string(job.earlier("coverage.lcov"))
