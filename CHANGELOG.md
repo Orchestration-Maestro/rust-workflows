@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.1.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v4.0.0...v4.1.0) (2026-09-26)
+
+
+### Features
+
+* run the ci locally before a push ([#75](https://github.com/Orchestration-Maestro/rust-workflows/issues/75)) ([21124d2](https://github.com/Orchestration-Maestro/rust-workflows/commit/21124d28f8be1d94a1f1d73c9c6880334d4d9e1c))
+
+
+### Bug Fixes
+
+* judge a checkout reached through a symbolic link as itself ([#73](https://github.com/Orchestration-Maestro/rust-workflows/issues/73)) ([0f825f1](https://github.com/Orchestration-Maestro/rust-workflows/commit/0f825f1ec4776b1178142341e7fc357ac9939448))
+* name the failed step when the scorecard runs before reports exist ([#71](https://github.com/Orchestration-Maestro/rust-workflows/issues/71)) ([4713066](https://github.com/Orchestration-Maestro/rust-workflows/commit/4713066bf75666da499492bb16460beae295fdae))
+* retry a tool download for two minutes before it fails ([#72](https://github.com/Orchestration-Maestro/rust-workflows/issues/72)) ([48604c5](https://github.com/Orchestration-Maestro/rust-workflows/commit/48604c5a6e7677ed878302295fafff4b41960c0f))
+
 ## [4.0.0](https://github.com/Orchestration-Maestro/rust-workflows/compare/v3.0.1...v4.0.0) (2026-09-25)
 
 
