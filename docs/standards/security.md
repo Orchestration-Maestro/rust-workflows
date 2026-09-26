@@ -1,6 +1,6 @@
-# Security rules in `rust-workflows`
+# Security rules in `maestro-rust-workflows`
 
-`rust-workflows` follows the organization's [security
+`maestro-rust-workflows` follows the organization's [security
 rules](https://github.com/Orchestration-Maestro/.github/blob/864d85597a833864cd8506c3925830503b3c2163/golden-rules/security.md).
 This page is its rule map (C-001): for every rule, what holds it here, or why it
 does not apply. A row may name a stricter local rule; none weakens one.

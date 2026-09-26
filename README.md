@@ -23,9 +23,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Orchestration-Maestro/rust-workflows/actions/workflows/ci-internal.yml"><img src="https://github.com/Orchestration-Maestro/rust-workflows/actions/workflows/ci-internal.yml/badge.svg?branch=main" alt="Repository quality on main" /></a>
-  <a href="https://scorecard.dev/viewer/?uri=github.com/Orchestration-Maestro/rust-workflows"><img src="https://api.scorecard.dev/projects/github.com/Orchestration-Maestro/rust-workflows/badge" alt="OpenSSF Scorecard" /></a>
-  <a href="https://codecov.io/gh/Orchestration-Maestro/rust-workflows"><img src="https://codecov.io/gh/Orchestration-Maestro/rust-workflows/graph/badge.svg" alt="Codecov coverage of the example fixtures" /></a>
+  <a href="https://github.com/Orchestration-Maestro/maestro-rust-workflows/actions/workflows/ci-internal.yml"><img src="https://github.com/Orchestration-Maestro/maestro-rust-workflows/actions/workflows/ci-internal.yml/badge.svg?branch=main" alt="Repository quality on main" /></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/Orchestration-Maestro/maestro-rust-workflows"><img src="https://api.scorecard.dev/projects/github.com/Orchestration-Maestro/maestro-rust-workflows/badge" alt="OpenSSF Scorecard" /></a>
+  <a href="https://codecov.io/gh/Orchestration-Maestro/maestro-rust-workflows"><img src="https://codecov.io/gh/Orchestration-Maestro/maestro-rust-workflows/graph/badge.svg" alt="Codecov coverage of the example fixtures" /></a>
 </p>
 
 ## ⚡ Quick start
@@ -53,7 +53,7 @@ permissions:
   contents: read
 jobs:
   rust:
-    uses: Orchestration-Maestro/rust-workflows/.github/workflows/ci.yml@<reviewed-sha>
+    uses: Orchestration-Maestro/maestro-rust-workflows/.github/workflows/ci.yml@<reviewed-sha>
     permissions:
       contents: read
       security-events: write  # ci.yml's SARIF upload, skipped when called
@@ -70,7 +70,7 @@ setup, enabled by organization administrators rather than by this workflow; see
 [platform requirements](docs/platform-requirements.md#administrator-owned-setup).
 
 Replace `<reviewed-sha>` with the commit of the latest
-[release](https://github.com/Orchestration-Maestro/rust-workflows/releases) and
+[release](https://github.com/Orchestration-Maestro/maestro-rust-workflows/releases) and
 keep its tag as a comment, `@<sha>  # v1.0.0`: Dependabot then proposes each new
 release as a pull request. The organization's Rust CI template is pinned this way.
 
@@ -83,7 +83,7 @@ On your machine, one command installs exactly the tools CI runs, at the
 versions it runs, on Linux, macOS or Windows:
 
 ```bash
-cargo install --locked --git https://github.com/Orchestration-Maestro/rust-workflows \
+cargo install --locked --git https://github.com/Orchestration-Maestro/maestro-rust-workflows \
   --tag v<version> rust-gate
 rust-gate setup
 ```
@@ -454,7 +454,7 @@ workflow files live in the consumer. Checkout always retrieves the consumer SHA.
 
 Any exact stable version from the MSRV up is accepted; the five pins below are
 the set this repository proves. This complete caller runs a project against all
-five and belongs inside the rust-workflows repository. For an external consumer,
+five and belongs inside the maestro-rust-workflows repository. For an external consumer,
 replace `uses` with the actual reviewed remote workflow SHA, as described above,
 and set `working-directory` to the consumer project.
 

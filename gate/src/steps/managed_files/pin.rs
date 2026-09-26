@@ -135,7 +135,7 @@ mod tests {
     /// The `uses:` value that calls `workflow` at `pin`, as sync writes it.
     fn reference(pin: &Pin, workflow: &str) -> String {
         format!(
-            "Orchestration-Maestro/rust-workflows/.github/workflows/{workflow}@{}  # v{}",
+            "Orchestration-Maestro/maestro-rust-workflows/.github/workflows/{workflow}@{}  # v{}",
             pin.commit, pin.version
         )
     }
@@ -163,7 +163,7 @@ mod tests {
     }
 
     #[test]
-    fn a_call_under_the_new_name_moves_to_the_rendered_name() {
+    fn a_call_under_either_name_moves_to_the_rendered_name() {
         let pin = Pin {
             commit: "b".repeat(40),
             version: "2.5.0".to_owned(),
@@ -179,8 +179,8 @@ mod tests {
         assert_eq!(
             repinned(&text, &pin),
             format!(
-                "    uses: {}\n    uses: Orchestration-Maestro/rust-workflows/.github/actions/\
-                 gate@{commit}  # v2.5.0\n    uses: Orchestration-Maestro/\
+                "    uses: {}\n    uses: Orchestration-Maestro/maestro-rust-workflows/.github/\
+                 actions/gate@{commit}  # v2.5.0\n    uses: Orchestration-Maestro/\
                  maestro-rust-workflows/.github/workflows/ci.yml@main\n",
                 reference(&pin, "ci.yml")
             )

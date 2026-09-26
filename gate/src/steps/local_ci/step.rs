@@ -126,7 +126,7 @@ fn run_job(keep_going: bool) -> Outcome {
     let root = PathBuf::from(repository_root(&environment)?);
     if is_workflow_home(&root) {
         return Err(Failure::from(
-            "ci --local: rust-workflows runs its checks in just check, not through ci.yml",
+            "ci --local: maestro-rust-workflows runs its checks in just check, not through ci.yml",
         ));
     }
     let state = local_ci_directory(&root)?;

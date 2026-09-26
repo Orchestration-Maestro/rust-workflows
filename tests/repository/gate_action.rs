@@ -60,7 +60,7 @@ fn every_job_builds_the_gate_from_the_workflows_own_commit() {
         assert!(
             !step["uses"]
                 .as_str()
-                .is_some_and(|uses| uses.contains("/rust-workflows/.github/actions/")),
+                .is_some_and(|uses| uses.contains("rust-workflows/.github/actions/")),
             "{name}/{id} pins the gate instead of building it from its own commit"
         );
     }

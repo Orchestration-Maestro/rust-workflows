@@ -189,7 +189,7 @@ provenance predicate, not a second, independent SBOM predicate verification.
 The caller grants `contents: read`, `id-token: write` and `attestations: write`
 on that job alone. A consumer verifies a published artifact with
 `gh attestation verify <file> --repo <org>/<repo>
---signer-workflow Orchestration-Maestro/rust-workflows/.github/workflows/attest-binaries.yml`.
+--signer-workflow Orchestration-Maestro/maestro-rust-workflows/.github/workflows/attest-binaries.yml`.
 The consumer is the repository holding the attestation, not the reusable signer.
 
 ## Runnable dry-run examples

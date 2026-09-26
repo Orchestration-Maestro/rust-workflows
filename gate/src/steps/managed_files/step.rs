@@ -303,8 +303,8 @@ fn declared_pin(root: &Path, pin: Option<&str>) -> Result<Option<Pin>, Failure> 
         .map(|(path, pin)| format!("{path} pins v{} at {}", pin.version, pin.commit))
         .collect();
     Err(Failure::from(format!(
-        "the workflows pin different releases of rust-workflows ({}); set RUST_WORKFLOWS_PIN to \
-         `<commit> v<version>`, the release to keep, and run rust-gate sync",
+        "the workflows pin different releases of maestro-rust-workflows ({}); set \
+         RUST_WORKFLOWS_PIN to `<commit> v<version>`, the release to keep, and run rust-gate sync",
         listed.join(", ")
     )))
 }
@@ -452,7 +452,7 @@ mod tests {
         assert_eq!(
             refusal.message.unwrap_or_default(),
             format!(
-                "the workflows pin different releases of rust-workflows \
+                "the workflows pin different releases of maestro-rust-workflows \
                  (.github/workflows/nightly.yml pins v2.0.0 at {}, .github/workflows/release.yml \
                  pins v2.1.0 at {}); set RUST_WORKFLOWS_PIN to `<commit> v<version>`, the \
                  release to keep, and run rust-gate sync",
@@ -489,7 +489,8 @@ mod tests {
         found.sort();
         let new = old
             .replace(&"a".repeat(40), &"b".repeat(40))
-            .replace("1.2.1", "2.1.0");
+            .replace("1.2.1", "2.1.0")
+            .replace("/rust-workflows/", "/maestro-rust-workflows/");
         assert_eq!(
             found,
             [

@@ -5,16 +5,16 @@
 blank_issues_enabled: false
 contact_links:
   - name: Report a vulnerability
-    url: https://github.com/Orchestration-Maestro/rust-workflows/security/policy
+    url: https://github.com/Orchestration-Maestro/maestro-rust-workflows/security/policy
     about: >-
       Report privately, never as a public issue. This covers exposed credentials
       and any weakness in the publication, permission or supply-chain boundaries.
   - name: Ask a question or get help
-    url: https://github.com/Orchestration-Maestro/rust-workflows/blob/main/SUPPORT.md
+    url: https://github.com/Orchestration-Maestro/maestro-rust-workflows/blob/main/SUPPORT.md
     about: >-
       Usage questions, adoption help and which workflow fits a given repository.
   - name: Read the workflow contracts
-    url: https://github.com/Orchestration-Maestro/rust-workflows/blob/main/docs/ci.md
+    url: https://github.com/Orchestration-Maestro/maestro-rust-workflows/blob/main/docs/ci.md
     about: >-
       Every input, every produced report and every quality gate, before opening a
       request for behaviour that already exists.

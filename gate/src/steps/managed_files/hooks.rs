@@ -286,7 +286,7 @@ mod tests {
              system\n        entry: actionlint\n"
         ));
         assert!(!rust.contains("language: mise"));
-        assert!(rust.contains("rust-workflows:v2.0.0:rust-gate\"\n"));
+        assert!(rust.contains("/maestro-rust-workflows:v2.0.0:rust-gate\"\n"));
         let other = commit_hooks("# h\n", false, "2.0.0");
         assert_eq!(rust.matches("language: rust\n").count(), 5);
         assert_eq!(other.matches("language: rust\n").count(), 3);

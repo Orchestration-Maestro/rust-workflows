@@ -101,7 +101,10 @@ impl Fixture {
             // production but needs it here, or the fixture fails for a reason the
             // workflow does not have.
             ("GITHUB_REF_TYPE", "branch"),
-            ("GITHUB_REPOSITORY", "Orchestration-Maestro/rust-workflows"),
+            (
+                "GITHUB_REPOSITORY",
+                "Orchestration-Maestro/maestro-rust-workflows",
+            ),
             ("GITHUB_SERVER_URL", "https://github.com"),
             ("DRY_RUN", "true"),
             ("EVENT", "pull_request"),
