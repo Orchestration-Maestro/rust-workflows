@@ -1101,12 +1101,24 @@ Publishers omit this override and use the committed consumer pin.
    Pinned Gitleaks scans an archive of the entire current source revision (not
    Git history), uses built-in rules without consumer allowlists, and redacts
    100% of detected secret values. Findings **and scanner execution errors fail**.
-4. Release build and release-mode tests, verified `cargo package --workspace`,
-   per-member CycloneDX 1.5 JSON SBOMs, and release artifact staging. cargo-cyclonedx
-   lacks `--locked`: a before/after lockfile comparison rejects resolution changes.
-   With a compiler older than 1.90, packaging alone runs on Cargo 1.90.0: older
-   Cargo looks a member's dependency on another member up on crates.io, so a
-   workspace whose members depend on each other could not package.
+4. Release build and release-mode tests, verified packages of the members that
+   may be published, per-member CycloneDX 1.5 JSON SBOMs, and release artifact
+   staging. cargo-cyclonedx lacks `--locked`: a before/after lockfile comparison
+   rejects resolution changes. Packaging first removes every `.crate` archive
+   an earlier run left in `$CARGO_TARGET_DIR/package`, restored from the cache
+   or kept by a local run, so the payload holds only what this run packaged.
+   `cargo package --locked` then takes one `--package` for each member whose
+   `publish` is unset, `true` or names a registry, and leaves out every
+   `publish = false` member, so a private workspace whose members depend on
+   each other still builds. With no member to publish, nothing is packaged
+   and the step prints a `SKIPPED` line; the release tests, the build and the
+   SBOMs still run. A publishable member with a normal or build dependency on
+   a `publish = false` member still fails: Cargo looks that dependency up in
+   the registry it packages for, and the member could not be published
+   either. A dev-dependency without a `version` is dropped from the package.
+   With a compiler older than 1.90, packaging alone runs on Cargo 1.90.0:
+   older Cargo looks a member's dependency on another member up on crates.io,
+   so a workspace whose members depend on each other could not package.
 5. Dependency sources and versions: `cargo deny check bans sources` against the
    consumer's `deny.toml`, or against the generated default policy without one.
 6. `Required Rust CI` runs with `always()` and fails on failure, cancellation or
@@ -1131,7 +1143,8 @@ rather than overwrite immutable artifacts.
 
 Each release artifact contains exactly `payload.tar.gz`, `provenance.json` and
 `SHA256SUMS`. The payload includes compiled release binaries, verified `.crate`
-packages and each workspace member's `<package>.cdx.json`. Provenance records
+packages of the members that may be published and each workspace member's
+`<package>.cdx.json`. Provenance records
 revision, target, binary names and SBOM names. Binary names must be safe and unique
 across the workspace. Consumers must supply meaningful integration tests for
 release binaries; the examples test their actual process output.

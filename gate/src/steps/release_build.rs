@@ -1,13 +1,17 @@
 //! `rust-gate build`: release tests, the auditable release build whose bytes
-//! ship, verified packages and the per-member `CycloneDX` documents, with any
-//! lockfile change during SBOM generation refused.
+//! ship, verified packages of the members that may be published and the
+//! per-member `CycloneDX` documents, with any lockfile change during SBOM
+//! generation refused.
 
+use crate::checks::manifests::{cargo_packages, read_cargo_metadata};
 use crate::checks::rust_versions::parse;
-use crate::runner::{Cmd, Job, Outcome, Step, input};
+use crate::runner::{Cmd, Job, Outcome, Step, input, path};
 use std::fs;
+use std::path::Path;
 
-/// The oldest Cargo whose `package --workspace` takes a member's dependency on
-/// another member from the workspace, where older ones look it up on crates.io.
+/// The oldest Cargo whose `package` takes a member's dependency on another
+/// member it packages from the workspace, where older ones look it up on
+/// crates.io.
 const WORKSPACE_PACKAGER: &str = "1.90.0";
 
 /// What this step declares: its inputs, its tools and its reports.
@@ -15,12 +19,14 @@ pub(crate) const STEPS: &[Step] = &[Step {
     workflow: "ci",
     id: "build",
     summary: "Release build, verified packages and SBOMs",
-    inputs: &["RUSTUP_TOOLCHAIN"],
+    inputs: &["CARGO_TARGET_DIR", "RUSTUP_TOOLCHAIN"],
     tools: &[
         "cargo auditable",
         "cargo cyclonedx",
+        "cargo metadata",
         "cargo package",
         "cargo test",
+        "jaq",
         "rustup",
     ],
     reports: &[],
@@ -48,18 +54,7 @@ fn run() -> Outcome {
     Cmd::new("cargo auditable build --workspace --release --locked --message-format json")
         .cwd(project)
         .stdout_to(&temp.join("build.jsonl"))?;
-    // The binaries above keep the selected compiler; only packaging moves to a
-    // Cargo that can package members depending on each other.
-    let mut package = Cmd::new("cargo package --workspace --locked").cwd(project);
-    let selected = parse(&input("RUSTUP_TOOLCHAIN")?, false);
-    if selected.is_some_and(|version| Some(version) < parse(WORKSPACE_PACKAGER, false)) {
-        Cmd::new("rustup toolchain install")
-            .arg(WORKSPACE_PACKAGER)
-            .args(["--profile", "minimal"])
-            .run()?;
-        package = package.env("RUSTUP_TOOLCHAIN", WORKSPACE_PACKAGER);
-    }
-    package.run()?;
+    package_publishable(&job)?;
     let lockfile = project.join("Cargo.lock");
     let checked = fs::read(&lockfile).map_err(|error| format!("Cargo.lock: {error}"))?;
     fs::write(temp.join("checked.lock"), &checked)
@@ -74,6 +69,66 @@ fn run() -> Outcome {
         return Err(
             "Cargo.lock changed while the SBOM was generated; commit a resolved lockfile".into(),
         );
+    }
+    Ok(())
+}
+
+/// Package and verify every member that may be published, whose `publish` is
+/// not `false`, once every archive an earlier run left is removed. Cargo
+/// takes a member's dependency on another member from the members it packages
+/// only when that one may be published, and otherwise looks it up in the
+/// registry it packages for, so a member with a normal or build dependency on
+/// a `publish = false` one cannot package. Leaving those members out lets a
+/// private workspace build; a publishable member with such a dependency still
+/// fails, as it could not be published either. A workspace with no member to
+/// publish packages nothing, and says so.
+fn package_publishable(job: &Job) -> Outcome {
+    remove_earlier_archives(&path("CARGO_TARGET_DIR")?)?;
+    let metadata = read_cargo_metadata(&job.project, &job.temp)?;
+    let members: Vec<String> = cargo_packages(&metadata)?
+        .into_iter()
+        .filter(|member| member.publishable)
+        .map(|member| member.name)
+        .collect();
+    if members.is_empty() {
+        println!("SKIPPED: no workspace member may be published, so none is packaged");
+        return Ok(());
+    }
+    let mut package = Cmd::new("cargo package --locked").cwd(&job.project);
+    for member in &members {
+        package = package.arg("--package").arg(member);
+    }
+    // The binaries keep the selected compiler; only packaging moves to a
+    // Cargo that can package members depending on each other.
+    let selected = parse(&input("RUSTUP_TOOLCHAIN")?, false);
+    if selected.is_some_and(|version| Some(version) < parse(WORKSPACE_PACKAGER, false)) {
+        Cmd::new("rustup toolchain install")
+            .arg(WORKSPACE_PACKAGER)
+            .args(["--profile", "minimal"])
+            .run()?;
+        package = package.env("RUSTUP_TOOLCHAIN", WORKSPACE_PACKAGER);
+    }
+    package.run()
+}
+
+/// Remove every archive in the package directory under `target`, the ones
+/// staging copies. One an earlier run left, restored from CI's cache or kept
+/// by a local run, would otherwise ship with the payload although this run
+/// did not package it: a `publish = false` member's, or an older version's.
+fn remove_earlier_archives(target: &Path) -> Outcome {
+    let Ok(entries) = fs::read_dir(target.join("package")) else {
+        return Ok(());
+    };
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("cannot read the packages: {error}"))?;
+        let archive = entry.path();
+        if archive
+            .extension()
+            .is_some_and(|extension| extension == "crate")
+        {
+            fs::remove_file(&archive)
+                .map_err(|error| format!("cannot remove {}: {error}", archive.display()))?;
+        }
     }
     Ok(())
 }

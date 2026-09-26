@@ -40,7 +40,8 @@ repository's own releases are source only.
 
 A release run attaches `payload.tar.gz`, `provenance.json`, `SHA256SUMS` and, with
 `publish-evidence.yml`, `evidence.tar.gz`. The payload contains the built binaries,
-each crate's `.crate` package and the bills of materials.
+the `.crate` package of each member that may be published, and the bills of
+materials.
 
 ### 1. Checksums
 

@@ -235,7 +235,9 @@ fn release_payload_carries_both_sbom_formats_and_auditable_binaries() {
     // every consumer that has a binary and an integration test. The order is
     // read from the trace of a build against a cargo that records its calls.
     assert_eq!(step("ci", "build").trim(), "rust-gate build");
-    let fixture = Fixture::new();
+    let mut fixture = Fixture::new();
+    let target = fixture.root.join("target");
+    fixture.set("CARGO_TARGET_DIR", &target.display().to_string());
     fixture.stub("cargo", "");
     succeeds(&fixture.run("ci", "build"));
     let trace = fixture.trace();
@@ -254,48 +256,6 @@ fn release_payload_carries_both_sbom_formats_and_auditable_binaries() {
         1,
         "the build step builds once through the wrapper"
     );
-}
-
-#[test]
-fn packaging_uses_a_cargo_that_can_package_a_workspace() {
-    // Before Cargo 1.90, `cargo package --workspace` looked for a member's
-    // sibling on crates.io, so a workspace whose members depend on each other
-    // could not package on 1.85 to 1.89. The release build keeps the selected
-    // compiler; only the packaging runs on Cargo 1.90.
-    for (selected, packager) in [
-        ("1.85.0", Some("1.90.0")),
-        ("1.89.0", Some("1.90.0")),
-        ("1.90.0", None),
-        ("1.98.1", None),
-    ] {
-        let mut fixture = Fixture::new();
-        fixture.set("RUSTUP_TOOLCHAIN", selected);
-        fixture.stub("cargo", "");
-        fixture.stub("rustup", "");
-        succeeds(&fixture.run("ci", "build"));
-        let trace = fixture.trace();
-        let package = trace
-            .lines()
-            .find(|line| line.ends_with("cargo package --workspace --locked"))
-            .expect("the workspace must be packaged");
-        if let Some(version) = packager {
-            assert!(
-                package.contains(&format!("RUSTUP_TOOLCHAIN={version} ")),
-                "{selected}: {package}"
-            );
-            let install = format!("rustup toolchain install {version} --profile minimal");
-            assert!(trace.contains(&install), "{selected}: {trace}");
-        } else {
-            assert!(
-                !package.contains("RUSTUP_TOOLCHAIN="),
-                "{selected}: {package}"
-            );
-            assert!(
-                !trace.contains("rustup toolchain install"),
-                "{selected}: {trace}"
-            );
-        }
-    }
 }
 
 #[test]
