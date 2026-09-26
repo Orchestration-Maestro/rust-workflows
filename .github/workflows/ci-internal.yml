@@ -2,6 +2,10 @@ name: Repository quality
 
 "on":
   pull_request:
+  # The merge queue waits for the two checks this repository requires,
+  # Required repository quality and Required consumer tests, on the group's
+  # commit.
+  merge_group:
   push:
     branches: [main]
   workflow_dispatch:
