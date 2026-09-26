@@ -2,8 +2,9 @@ name: Toolbelt platforms
 
 # The toolbelt `rust-gate setup` installs, proven on every platform it is
 # pinned for: the gate built from this commit, the toolbelt installed from
-# nothing, the second run from its cache, and a consumer's rendered commit
-# hooks run on it, as CI's hooks step runs them. The hosted runners cover each
+# nothing, the second run from its cache, a consumer's rendered commit hooks
+# run on it, as CI's hooks step runs them, and CI's checks run on it before a
+# push, as `rust-gate ci --local` runs them. The hosted runners cover each
 # platform mise.lock locks, the tools built from source included.
 
 "on":
@@ -37,7 +38,7 @@ jobs:
           - runner: windows-2025
             built: ~/AppData/Local/maestro/tools/*/source
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
     # On Windows the default shell is PowerShell; every body here is Bash.
@@ -71,9 +72,9 @@ jobs:
       - name: A consumer's rendered hooks over every file
         env:
           REVISION: ${{ github.sha }}
-          # The hooks CI's hooks step skips: the formatter, Clippy and the
-          # gate's own, which install the release a consumer pins.
-          SKIP: rustfmt,clippy,rust-gate-architecture,rust-gate-hygiene,rust-gate-rules,rust-gate-guide
+          # The hooks CI's hooks step skips: the formatter, the pre-push run of
+          # CI and the gate's own, which install the release a consumer pins.
+          SKIP: rustfmt,rust-gate-ci,rust-gate-architecture,rust-gate-hygiene,rust-gate-rules,rust-gate-guide
         run: |
           set -euo pipefail
           version="$(tr -d '\r\n' < version.txt)"
@@ -90,3 +91,42 @@ jobs:
           cargo generate-lockfile --offline
           git add -A
           prek run --all-files --show-diff-on-failure --color never
+      # The library example as a consumer: its default branch passes every
+      # step of CI's checks this platform runs, and a branch whose test fails
+      # stops at the step CI stops at.
+      - name: CI's checks over a consumer, before a push
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          version="$(tr -d '\r\n' < version.txt)"
+          work="$RUNNER_TEMP/local-ci"
+          consumer="$work/consumer"
+          mkdir -p "$work"
+          cp -R examples/library "$consumer"
+          git init -q --bare "$work/origin.git"
+          cd "$consumer"
+          git init -q -b main
+          git config user.name probe
+          git config user.email probe@localhost
+          printf '# Agents\n' > AGENTS.md
+          RUST_WORKFLOWS_PIN="$REVISION v$version" rust-gate init
+          git add -A
+          git commit -q -m 'chore: start from the library example'
+          printf '\nA consumer the toolbelt workflow checks.\n' >> README.md
+          git commit -q -am 'docs: say what the consumer is for'
+          git remote add origin "$work/origin.git"
+          git push -q origin main
+          git remote set-head origin main
+          rust-gate ci --local
+          git checkout -q -b fix/break-a-test
+          sed -i.bak 's/^        assert_eq!(checked_sum(20, 22), Some(42));$/        assert_eq!(checked_sum(20, 22), Some(43));/' src/lib.rs
+          rm src/lib.rs.bak
+          git commit -q -am 'fix: break a test'
+          if rust-gate ci --local > "$work/broken.log" 2>&1; then
+            cat "$work/broken.log"
+            echo 'the failing test passed every local check' >&2
+            exit 1
+          fi
+          cat "$work/broken.log"
+          grep -q '^ci --local: one step failed: Formatting, Clippy and tests' "$work/broken.log"

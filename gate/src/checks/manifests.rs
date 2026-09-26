@@ -3,6 +3,7 @@
 //! dependencies, the workspace they form, and, read from each manifest
 //! through jaq, what a member inherits from its workspace.
 
+use super::cargo_metadata::tsv_fields;
 use crate::runner::{Cmd, Failure};
 use std::path::{Path, PathBuf};
 
@@ -150,7 +151,7 @@ fn list(field: &str) -> Vec<String> {
 
 /// One line of the packages listing.
 fn parse_package(line: &str) -> Result<Package, Failure> {
-    let fields: Vec<&str> = line.split('\t').collect();
+    let fields = tsv_fields(line);
     let [
         name,
         publishable,
@@ -160,7 +161,7 @@ fn parse_package(line: &str) -> Result<Package, Failure> {
         kinds,
         plain_tests,
         features,
-    ] = fields[..]
+    ] = fields.as_slice()
     else {
         return Err(format!("cargo metadata listed a package the gate cannot read: {line}").into());
     };
@@ -182,9 +183,11 @@ fn parse_package(line: &str) -> Result<Package, Failure> {
 
 /// The workspace line: its root, then its member count.
 fn parse_workspace(line: &str) -> Result<Workspace, Failure> {
-    let parsed = line
-        .split_once('\t')
-        .and_then(|(root, members)| Some((root, members.parse().ok()?)));
+    let fields = tsv_fields(line);
+    let parsed = match fields.as_slice() {
+        [root, members] => members.parse().ok().map(|members: usize| (root, members)),
+        _ => None,
+    };
     let Some((root, members)) = parsed else {
         return Err(format!("cargo metadata gave a workspace the gate cannot read: {line}").into());
     };
@@ -196,8 +199,8 @@ fn parse_workspace(line: &str) -> Result<Workspace, Failure> {
 
 /// One member's inheritance line.
 fn parse_inheritance(line: &str) -> Result<Inheritance, Failure> {
-    let fields: Vec<&str> = line.split('\t').collect();
-    let [lints, edition, rust_version, license, local] = fields[..] else {
+    let fields = tsv_fields(line);
+    let [lints, edition, rust_version, license, local] = fields.as_slice() else {
         return Err(format!("a member manifest the gate cannot read: {line}").into());
     };
     let missing = [lints, edition, rust_version, license]

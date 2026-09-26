@@ -70,7 +70,7 @@ fn the_commit_message_hooks_are_installed_with_the_pre_commit_shim() {
     let hooks = root().join(".pre-commit-config.yaml");
     assert_eq!(
         query(&hooks, ".default_install_hook_types | join(\",\")"),
-        "pre-commit,commit-msg"
+        "pre-commit,commit-msg,pre-push"
     );
     let ids = query(
         &hooks,
@@ -79,6 +79,20 @@ fn the_commit_message_hooks_are_installed_with_the_pre_commit_shim() {
     assert_eq!(
         ids.lines().collect::<Vec<_>>(),
         ["conventional-commit-header", "eighty-columns"]
+    );
+}
+
+#[test]
+fn the_home_runs_its_whole_gate_before_a_push() {
+    // Where another repository runs `rust-gate ci --local` before a push,
+    // this one runs what its own CI runs: `just check`.
+    let hooks = root().join(".pre-commit-config.yaml");
+    assert_eq!(
+        query(
+            &hooks,
+            ".repos[].hooks[] | select((.stages // []) | contains([\"pre-push\"])) | .entry",
+        ),
+        "just check"
     );
 }
 

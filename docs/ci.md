@@ -359,7 +359,7 @@ block; GitHub reads `dependabot.yml`, and prek reads
 | Tool | The organization's configuration, at run time |
 | --- | --- |
 | rustfmt | `--config style_edition=2024`, in `quality` and the `rustfmt` hook |
-| Clippy | `CLIPPY_CONF_DIR`, a directory the gate writes the thresholds to, in `quality`, `complexity` and `rust-gate clippy --local`, the pre-push hook; a `clippy.toml` the repository writes itself is Clippy's instead, no looser (LNT-001) |
+| Clippy | `CLIPPY_CONF_DIR`, a directory the gate writes the thresholds to, in `quality`, `complexity` and `rust-gate clippy --local`; a `clippy.toml` the repository writes itself is Clippy's instead, no looser (LNT-001) |
 | cargo-deny | `--config`, DEP-001 rendered under the runner's temporary directory, in `licenses` |
 | nextest | `--config-file`, TST-004's profile, `retries = 0`, in `quality` |
 | taplo | `--no-auto-config --option array_auto_collapse=false`, and the hook leaves `supply-chain/` to cargo-vet |
@@ -421,14 +421,14 @@ rust-workflows' `mise.toml` pins; the commit message rules; and
 `rust-gate hygiene --local`, the gate built by Cargo from the release the
 repository declares. Each tool takes the organization's options on its command line,
 as the table above lists. A Rust repository adds `cargo fmt`, `rust-gate
-architecture --local` and, before a push, `rust-gate clippy --local`, Clippy
-with the organization's lints and thresholds. A developer needs rustup and the
-toolbelt of [the tools on your machine](#the-tools-on-your-machine), nothing
-else.
+architecture --local` and, before a push, `rust-gate ci --local`, every step of
+this workflow's checks ([run CI before you push](#run-ci-before-you-push)). A
+developer needs rustup and the toolbelt of
+[the tools on your machine](#the-tools-on-your-machine), nothing else.
 
 The `hooks` step installs that same toolbelt, then runs the same hooks over
-every file on it, skipping the formatter, Clippy and the gate's rules, which CI
-runs as steps of their own; the output is `hooks.txt`. mise asks GitHub's API
+every file on it, skipping the formatter, the gate's rules and the pre-push run
+of CI, which CI runs as steps of their own; the output is `hooks.txt`. mise asks GitHub's API
 for each release's attestations, so the step hands it the job's read-only token
 as `MISE_GITHUB_TOKEN`: an anonymous runner shares its rate limit with every
 other job on its address. A repository without Rust calls `hygiene.yml` instead
@@ -465,13 +465,70 @@ line above its pin declares. gungraun-runner is the one tool left out: it
 drives Valgrind, which runs on Linux alone, so on macOS and Windows `setup`
 names it and the [performance budget](#performance-budget) runs in Linux CI.
 `toolbelt-platforms.yml` runs `setup` from nothing on each of those platforms,
-then a consumer's rendered hooks through the `hooks` step.
+then a consumer's rendered hooks through the `hooks` step, then
+[CI before a push](#run-ci-before-you-push) over the library example.
 
 A repository keeps no tool pins of its own: `managed-files` and `rust-gate
 sync --check` refuse a `mise.toml`, `mise.lock`, `.mise.toml`,
 `.tool-versions`, a `scripts/bootstrap.sh` that fetches mise, and a
 `.github/workflows/tool-updates.yml`, naming `rust-gate setup` as what replaces
 them. Only rust-workflows keeps them, as the source of the pins.
+
+### Run CI before you push
+
+`rust-gate ci --local` runs the `checks` job of this workflow on your machine,
+step by step and in its order, so CI confirms what a push already passed
+rather than discovering it. A Rust repository's pre-push hook runs it, and so
+can you, from anywhere in the repository:
+
+```bash
+rust-gate ci --local               # ends at the first failing step, as CI does
+rust-gate ci --local --keep-going  # runs every step whatever failed before it
+```
+
+It checks what a push sends: the commits, never an uncommitted change. On a
+branch it checks what the pull request's run checks, a merge whose tree is the
+branch's last commit and whose first parent is where the branch left the
+default branch `origin/HEAD` names. The settings therefore come from that
+base's `maestro-quality.toml`, changed-line coverage and mutation testing see
+the branch's whole change, and the pull request rules read the branch's name
+and, as the title, the subject of its first commit; set `PULL_REQUEST_TITLE` to
+the title you will give the pull request. On the default branch it runs as a
+push.
+
+Each step is the `rust-gate` command CI runs, from the gate the hook pins, with
+the tools of [the tools on your machine](#the-tools-on-your-machine) at the
+pins CI installs, in the environment a runner gives it: nothing of your shell
+but what finds your user, your toolchains and your network, plus
+`LICENSE_ALLOWLIST` when you set it, the organization's variable a run is
+handed. A `RUSTFLAGS` or a `CARGO_TARGET_DIR` of yours never reaches a step.
+The clone, the job's temporary directory and what CI's cache keeps between
+runs, the Cargo registry and the build directory, live beside the toolbelt in
+`~/.cache/maestro/ci/<repository>-<digest>`, outside the repository, so a
+second run rebuilds only what changed.
+
+The first failing step ends the run, as it ends the job, and the scorecard
+still says what ran. The run ends with every step, how it ended and how long it
+took. A step only GitHub can run says `not applied locally` and why: the gate's
+checkout and build, the tool installations, whose tools the toolbelt already
+holds, the artifact uploads, and the portability, upload and required-status
+jobs. On macOS and Windows `hardening` is not applied, since it reads the ELF
+binaries a Linux build writes, and the build targets the machine's own
+platform; `performance` runs only with Valgrind on the PATH. Every other step
+runs the same on Linux, macOS and Windows, with no tool the toolbelt does not
+hold: the gate computes each digest itself and gives every tar the arguments
+GNU and BSD tar read alike. A test runs the command against the job and fails
+when a step of `ci.yml` is neither run nor declared not applied
+(`every_step_of_the_ci_job_runs_locally_or_says_why_not`), and
+`toolbelt-platforms.yml` runs it on a runner of each of the five platforms,
+the library example's default branch passing and a failing test stopped at the
+quality step
+(`every_platform_runs_ci_s_checks_before_a_push_and_stops_a_broken_change`).
+Each run checks out a fresh clone, as a runner does, so a build a mutant of the
+last run left is never taken for this run's sources.
+
+rust-workflows has no Cargo package at its root and no `ci.yml` run of its
+own; its pre-push hook runs `just check`.
 
 ### Pull request rules
 

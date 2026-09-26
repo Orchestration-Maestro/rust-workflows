@@ -2,10 +2,10 @@
 //! `.pre-commit-config.yaml`: prek's own checks, each tool from the PATH, where
 //! `rust-gate setup` puts the toolbelt the home's `mise.toml` pins, the
 //! commit message rules, and for Rust the formatter, the gate's source rules at
-//! the pinned release and Clippy before a push. Each tool takes the
-//! organization's configuration on its command line, from the hook, rather
-//! than from a file in the repository; Clippy takes it through
-//! `rust-gate clippy --local`, since no option carries it. At the same release, the gate
+//! the pinned release and, before a push, every step of CI's checks through
+//! `rust-gate ci --local`, so CI confirms rather than discovers. Each tool
+//! takes the organization's configuration on its command line, from the hook,
+//! rather than from a file in the repository. At the same release, the gate
 //! keeps the rule map and the Copilot guide current: a hook rewrites either when
 //! it is stale, so the next commit carries it. A developer needs rustup and
 //! the toolbelt `rust-gate setup` installs, nothing else.
@@ -223,8 +223,8 @@ pub(super) fn commit_hooks(header: &str, rust: bool, version: &str) -> String {
         text.push_str(&rustfmt_hook());
         let _ = write!(
             text,
-            "      - id: clippy\n        name: Clippy with the organization's lints\n        \
-             entry: rust-gate clippy --local\n        types: [rust]\n        stages: \
+            "      - id: rust-gate-ci\n        name: The checks CI runs, before a push\n        \
+             entry: rust-gate ci --local\n        always_run: true\n        stages: \
              [pre-push]\n{gate}"
         );
         let _ = write!(
@@ -289,8 +289,19 @@ mod tests {
                 "        entry: {entry}\n        always_run: true\n"
             )));
         }
-        assert!(rust.contains("        stages: [pre-push]\n"));
         assert!(!other.contains("id: rustfmt") && !other.contains("id: rust-gate-architecture"));
         assert!(other.contains("id: rust-gate-hygiene"));
+    }
+
+    #[test]
+    fn a_rust_repository_runs_ci_s_checks_before_a_push() {
+        let rust = commit_hooks("# h\n", true, "2.0.0");
+        assert!(rust.contains(
+            "      - id: rust-gate-ci\n        name: The checks CI runs, before a push\n        \
+             entry: rust-gate ci --local\n        always_run: true\n        stages: [pre-push]\n"
+        ));
+        assert_eq!(rust.matches("stages: [pre-push]").count(), 1);
+        assert!(!rust.contains("clippy --local"));
+        assert!(!commit_hooks("# h\n", false, "2.0.0").contains("id: rust-gate-ci"));
     }
 }

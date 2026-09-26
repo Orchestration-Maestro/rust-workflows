@@ -11,6 +11,7 @@ mod duplication_report;
 mod feature_combinations;
 mod input_validation;
 mod install_tools;
+mod local_ci_run;
 mod managed_files;
 mod organization_lints;
 mod performance_budget;

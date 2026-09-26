@@ -22,6 +22,7 @@ mod hygiene_workflow;
 mod install_toolchain;
 mod install_tools;
 mod line_coverage;
+mod local_ci;
 mod local_runs;
 mod managed_files;
 mod mutation_testing;

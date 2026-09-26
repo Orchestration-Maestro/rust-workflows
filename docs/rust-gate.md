@@ -20,11 +20,13 @@ Bash, and leaves each workflow step one line long.
 
 1. Standard library only. `cargo build --offline` must work: the gate is built
    before job-local Cargo state is configured, and a dependency would be a second
-   supply chain to review. JSON is delegated to the pinned `jaq`, digests to
-   `sha256sum`, exactly as the step bodies did. The one digest the gate
-   computes itself is mise's, in `rust-gate setup` and the `hooks` step: that
-   download is verified on macOS and Windows too, where `sha256sum` does not
-   exist, and before any tool that could verify it is installed.
+   supply chain to review. JSON is delegated to the pinned `jaq`, and digests
+   to `sha256sum` in the steps that run on Linux alone: `install-tools`,
+   `verify-payload` and `hardening`. The gate computes the others itself:
+   mise's, in `rust-gate setup` and the `hooks` step, verified before any tool
+   that could verify it is installed, and the artifact name's in `validate`
+   and the payload's checksums in `stage`, which `rust-gate ci --local` runs on
+   macOS and Windows too, where `sha256sum` does not exist.
 2. Behaviour ported verbatim: same inputs, same reports, same messages, same
    refusals. The contract tests execute step bodies as black boxes, so a
    ported step passes the same tests as the Bash it replaces; that is the

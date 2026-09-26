@@ -3,8 +3,9 @@
 //! the same dependency set in SPDX, the verified packages, one tarball, its
 //! provenance and the checksums of both.
 
-use crate::checks::cargo_metadata::EXECUTABLES;
+use crate::checks::cargo_metadata::{EXECUTABLES, tsv_fields};
 use crate::checks::checkout_paths::{canonical, strictly_inside};
+use crate::checks::digests::sha256_hex;
 use crate::checks::simple_names::simple;
 use crate::runner::{Cmd, Failure, Job, Outcome, Step, input, path, write};
 use std::fmt::Write as _;
@@ -17,7 +18,7 @@ pub(crate) const STEPS: &[Step] = &[Step {
     id: "stage",
     summary: "Stage immutable release payload",
     inputs: &["CARGO_TARGET_DIR", "GITHUB_SHA", "GITHUB_WORKSPACE"],
-    tools: &["cargo sbom", "cyclonedx", "jaq", "sha256sum", "tar"],
+    tools: &["cargo sbom", "cyclonedx", "jaq", "tar"],
     reports: &["*.spdx.json", "payload.cdx.json"],
     run,
 }];
@@ -89,14 +90,14 @@ impl Payload<'_> {
             .arg(self.job.temp.join("build.jsonl"))
             .capture()?;
         for (name, source) in named_rows(&executables, "Invalid binary name")? {
-            let source = canonical(Path::new(source))?;
-            let destination = self.directory.join(name);
+            let source = canonical(Path::new(&source))?;
+            let destination = self.directory.join(&name);
             if !strictly_inside(&source, target) || destination.exists() {
                 return Err("Invalid or duplicate binary output".into());
             }
             fs::copy(&source, &destination)
                 .map_err(|error| format!("cannot copy {name}: {error}"))?;
-            binaries.push(name.to_owned());
+            binaries.push(name);
         }
         Ok(binaries)
     }
@@ -110,7 +111,7 @@ impl Payload<'_> {
             .arg(self.job.temp.join("metadata.json"))
             .capture()?;
         for (name, manifest) in named_rows(&table, "Invalid workspace package name")? {
-            let manifest = canonical(Path::new(manifest))?;
+            let manifest = canonical(Path::new(&manifest))?;
             if !strictly_inside(&manifest, root) {
                 return Err("Workspace member escapes checkout".into());
             }
@@ -122,14 +123,14 @@ impl Payload<'_> {
                 return Err("SBOM path escapes checkout".into());
             }
             Cmd::new("jaq -e --arg name")
-                .arg(name)
+                .arg(&name)
                 .arg(MEMBER_SBOM)
                 .arg(&source)
                 .capture()
                 .map_err(|_| "Invalid CycloneDX JSON envelope or component metadata")?;
             fs::copy(&source, self.directory.join(format!("{name}.cdx.json")))
                 .map_err(|error| format!("cannot copy the SBOM of {name}: {error}"))?;
-            members.push(name.to_owned());
+            members.push(name);
         }
         some_member(&members)?;
         Ok(members)
@@ -230,11 +231,12 @@ impl Payload<'_> {
     /// The tarball, its provenance and the checksums of both, from the lists of
     /// what went into it.
     fn seal(&self, release: &Path, binaries: &[String], members: &[String]) -> Outcome {
-        Cmd::new("tar -czf")
-            .arg(release.join("payload.tar.gz"))
-            .arg("-C")
+        // The archive is named relative to the release directory: a GNU tar
+        // on Windows reads `C:\...` as a remote host.
+        Cmd::new("tar -czf payload.tar.gz -C")
             .arg(&self.directory)
             .arg(".")
+            .cwd(release)
             .run()?;
         let binaries_list = self.job.temp.join("binaries");
         let sboms_list = self.job.temp.join("sboms");
@@ -258,23 +260,30 @@ impl Payload<'_> {
          sboms: ($sboms | split(\"\\n\") | map(select(length > 0)) | sort)}",
             )
             .stdout_to(&release.join("provenance.json"))?;
-        Cmd::new("sha256sum payload.tar.gz provenance.json")
-            .cwd(release)
-            .stdout_to(&release.join("SHA256SUMS"))
+        // The checksums in sha256sum's own format, computed here so that no
+        // platform needs a sha256sum of its own.
+        let mut sums = String::new();
+        for name in ["payload.tar.gz", "provenance.json"] {
+            let bytes = fs::read(release.join(name))
+                .map_err(|error| format!("cannot read {name}: {error}"))?;
+            let _ = writeln!(sums, "{}  {name}", sha256_hex(&bytes));
+        }
+        write(&release.join("SHA256SUMS"), sums.as_bytes(), false)
     }
 }
 
 /// The rows of a jaq table, `<name>\t<path>` per line, with every name held to
 /// the one simple-name rule; `invalid` is the refusal for a name that is not
 /// one, which differs between a binary and a workspace package.
-fn named_rows<'a>(
-    table: &'a str,
-    invalid: &'static str,
-) -> Result<Vec<(&'a str, &'a str)>, Failure> {
+fn named_rows(table: &str, invalid: &'static str) -> Result<Vec<(String, String)>, Failure> {
     let mut rows = Vec::new();
     for line in table.lines() {
-        let (name, value) = line.split_once('\t').unwrap_or((line, ""));
-        if !simple(name, "_", "_-") {
+        let mut fields = tsv_fields(line).into_iter();
+        let (name, value) = (
+            fields.next().unwrap_or_default(),
+            fields.next().unwrap_or_default(),
+        );
+        if !simple(&name, "_", "_-") {
             return Err(invalid.into());
         }
         rows.push((name, value));

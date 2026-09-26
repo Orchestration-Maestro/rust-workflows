@@ -3,6 +3,7 @@
 //! declarations reach from its root, with the items, paths and re-exports of
 //! each.
 
+use super::cargo_metadata::tsv_fields;
 use super::manifests::LIBRARY_KINDS;
 use super::rust_code::{Item, blanked, items, without_tests};
 use super::rust_paths::{NamedPath, paths, use_leaves};
@@ -150,9 +151,8 @@ pub(crate) fn module_trees(metadata: &Path) -> Result<Vec<Tree>, Failure> {
 
 /// The tree of the target one line of the listing names.
 fn target_tree(line: &str) -> Result<Tree, Failure> {
-    let mut fields = line.splitn(3, '\t');
-    let (Some(package), Some(kinds), Some(root)) = (fields.next(), fields.next(), fields.next())
-    else {
+    let fields = tsv_fields(line);
+    let [package, kinds, root] = fields.as_slice() else {
         return Err(format!("cargo metadata listed a target the gate cannot read: {line}").into());
     };
     Ok(Tree {

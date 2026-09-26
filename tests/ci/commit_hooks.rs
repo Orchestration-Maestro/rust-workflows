@@ -26,7 +26,7 @@ fn the_hooks_step_runs_prek_over_every_file_and_skips_what_ci_runs_itself() {
     assert!(
         fixture.calls().contains(
             "run --all-files --show-diff-on-failure --color never \
-             SKIP=rustfmt,clippy,rust-gate-architecture,rust-gate-hygiene,rust-gate-rules,\
+             SKIP=rustfmt,rust-gate-ci,rust-gate-architecture,rust-gate-hygiene,rust-gate-rules,\
              rust-gate-guide"
         ),
         "{}",

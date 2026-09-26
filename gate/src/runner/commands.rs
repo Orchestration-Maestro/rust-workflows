@@ -70,6 +70,13 @@ impl Cmd {
         self
     }
 
+    /// Start from an empty environment, as a fresh runner does: only the
+    /// variables set afterwards reach the tool.
+    pub(crate) fn env_clear(mut self) -> Self {
+        self.command.env_clear();
+        self
+    }
+
     /// Feed `bytes` on stdin, the right side of a pipe or a `< file`.
     pub(crate) fn stdin_bytes(mut self, bytes: &[u8]) -> Self {
         self.stdin = Some(bytes.to_vec());

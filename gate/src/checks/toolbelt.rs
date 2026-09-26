@@ -152,6 +152,34 @@ pub(crate) fn install_toolbelt() -> Result<Toolbelt, Failure> {
     Ok(Toolbelt { bin, skipped })
 }
 
+/// Where `rust-gate ci --local` keeps what one repository's runs share:
+/// `maestro/ci` beside the toolbelts, one directory per repository, named
+/// after `root` and the start of its path's digest. Outside the repository,
+/// so Cargo finds neither its manifests nor its configuration above the
+/// checkout a run makes there.
+pub(crate) fn local_ci_directory(root: &Path) -> Result<PathBuf, Failure> {
+    let tools = toolbelt_cache(
+        consts::OS,
+        &optional("XDG_CACHE_HOME")?,
+        &optional("HOME")?,
+        &optional("LOCALAPPDATA")?,
+    )?;
+    Ok(tools.with_file_name("ci").join(repository_key(root)))
+}
+
+/// The name of `root`'s directory under `maestro/ci`: its last component and
+/// twelve digits of the digest of its whole path, so two clones never share.
+fn repository_key(root: &Path) -> String {
+    let name = root
+        .file_name()
+        .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
+    let digest: String = sha256_hex(root.display().to_string().as_bytes())
+        .chars()
+        .take(12)
+        .collect();
+    format!("{name}-{digest}")
+}
+
 /// `directory` ahead of the PATH this process was given.
 pub(crate) fn toolbelt_path(directory: &Path) -> Result<OsString, Failure> {
     let inherited = optional("PATH")?;
@@ -364,8 +392,8 @@ mod tests {
     #[cfg(unix)]
     use super::link_toolbelt;
     use super::{
-        MISE_LOCK, MISE_TOML, PLATFORMS, declared_gaps, pinned_version, toolbelt_cache,
-        toolbelt_platform, toolbelt_version,
+        MISE_LOCK, MISE_TOML, PLATFORMS, declared_gaps, pinned_version, repository_key,
+        toolbelt_cache, toolbelt_platform, toolbelt_version,
     };
     use std::path::Path;
     #[cfg(unix)]
@@ -412,6 +440,16 @@ mod tests {
              path, where the toolbelt is cached"
         );
         assert!(!toolbelt_version().is_empty() && !toolbelt_version().contains('\n'));
+    }
+
+    #[test]
+    fn each_clone_keeps_its_local_runs_apart() {
+        let first = repository_key(Path::new("/work/core"));
+        let second = repository_key(Path::new("/other/core"));
+        assert!(first.starts_with("core-") && second.starts_with("core-"));
+        assert_eq!(first.len(), "core-".len() + 12);
+        assert_ne!(first, second);
+        assert_eq!(first, repository_key(Path::new("/work/core")));
     }
 
     #[test]

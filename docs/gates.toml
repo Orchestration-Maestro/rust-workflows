@@ -251,6 +251,7 @@ standard = "The universal set, UNI"
 proofs = [
   "the_hooks_step_runs_prek_over_every_file_and_skips_what_ci_runs_itself",
   "a_step_runs_locally_the_way_a_commit_hook_runs_it",
+  "every_step_of_the_ci_job_runs_locally_or_says_why_not",
   "every_rendered_hook_runs_a_pinned_version_and_this_repository_runs_them_all",
   "the_rendered_hooks_run_in_a_fresh_clone_on_the_toolbelt_setup_installs",
 ]
