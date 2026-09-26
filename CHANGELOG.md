@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.3.1](https://github.com/Orchestration-Maestro/maestro-rust-workflows/compare/v4.3.0...v4.3.1) (2026-09-26)
+
+
+### Bug Fixes
+
+* package only the members that may be published ([#82](https://github.com/Orchestration-Maestro/maestro-rust-workflows/issues/82)) ([e980b30](https://github.com/Orchestration-Maestro/maestro-rust-workflows/commit/e980b30c1e5f6aceabafe9373ac5b6f7b3cf5a52))
+
 ## [4.3.0](https://github.com/Orchestration-Maestro/maestro-rust-workflows/compare/v4.2.0...v4.3.0) (2026-09-26)
 
 
