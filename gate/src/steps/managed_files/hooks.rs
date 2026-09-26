@@ -11,6 +11,7 @@
 //! the toolbelt `rust-gate setup` installs, nothing else.
 
 use crate::checks::organization_config::RUSTFMT_OPTIONS;
+use crate::checks::workflow_home::{HOME, ORGANIZATION};
 use std::fmt::Write as _;
 
 /// The jaq the gate reads TOML and JSON through, built by Cargo.
@@ -219,11 +220,13 @@ pub(super) fn commit_hooks(header: &str, rust: bool, version: &str) -> String {
         concat!(
             "        language: rust\n",
             "        additional_dependencies:\n",
-            "          - \"cli:https://github.com/Orchestration-Maestro/",
-            "rust-workflows:v{version}:rust-gate\"\n",
+            "          - \"cli:https://github.com/{organization}/",
+            "{home}:v{version}:rust-gate\"\n",
             "          - \"{jaq}\"\n",
             "        pass_filenames: false\n",
         ),
+        organization = ORGANIZATION,
+        home = HOME,
         version = version,
         jaq = JAQ,
     );

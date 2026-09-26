@@ -1,7 +1,6 @@
 //! `rust-gate attest-binaries <step>`: the steps around signing a payload
 //! this job verified itself, and the honest record of whether it was signed.
 
-use crate::checks::workflow_home::home_repository;
 use crate::runner::{Cmd, Failure, Outcome, Step, input, non_empty, output, path, summary};
 
 /// What each step declares: its inputs, its tools and its reports.
@@ -28,7 +27,12 @@ pub(crate) const STEPS: &[Step] = &[
         workflow: "attest-binaries",
         id: "verify-recorded",
         summary: "Verify the recorded attestation",
-        inputs: &["EXPECTED_DIGEST", "GITHUB_REPOSITORY", "GITHUB_SERVER_URL"],
+        inputs: &[
+            "EXPECTED_DIGEST",
+            "GITHUB_REPOSITORY",
+            "GITHUB_SERVER_URL",
+            "WORKFLOW_REPOSITORY",
+        ],
         tools: &["gh", "jaq"],
         reports: &[],
         run: verify_recorded,
@@ -82,7 +86,9 @@ fn payload_sbom() -> Outcome {
 
 /// A signature nobody checks proves nothing. Verifying here means a broken
 /// or unattached attestation fails the release instead of being discovered
-/// by whoever consumes the artifact months later.
+/// by whoever consumes the artifact months later. The signer is this very
+/// workflow, in the repository the run found it in, `job.workflow_repository`,
+/// so the signer it expects follows that repository through a rename.
 fn verify_recorded() -> Outcome {
     let repository = input("GITHUB_REPOSITORY")?;
     let result = path("RUNNER_TEMP")?.join("attestation.json");
@@ -93,7 +99,7 @@ fn verify_recorded() -> Outcome {
     .arg("--signer-workflow")
     .arg(format!(
         "{}/.github/workflows/attest-binaries.yml",
-        home_repository()
+        input("WORKFLOW_REPOSITORY")?
     ))
     .args(["--format", "json"])
     .stdout_to(&result)?;

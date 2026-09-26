@@ -1,6 +1,6 @@
 //! attest-binaries.yml, the recorded attestation: verified through `gh` for
-//! this repository's signing workflow, and refused unless it covers the
-//! payload digest this job computed.
+//! the signing workflow of the repository this run found it in, whatever its
+//! name, and refused unless it covers the payload digest this job computed.
 
 use crate::harness::{Fixture, refused, succeeds, workflow};
 
@@ -16,6 +16,10 @@ const ATTESTATION: &str = concat!(
 fn attested(digest: &str) -> Fixture {
     let mut fixture = Fixture::new();
     fixture.set("GITHUB_REPOSITORY", "example/consumer");
+    fixture.set(
+        "WORKFLOW_REPOSITORY",
+        "Orchestration-Maestro/rust-workflows",
+    );
     fixture.set("EXPECTED_DIGEST", &"a".repeat(64));
     fixture.stub("gh", &ATTESTATION.replace("DIGEST", digest));
     fixture
@@ -34,6 +38,35 @@ fn the_recorded_attestation_is_verified_for_the_signing_workflow_of_this_reposit
              --format json"
         ),
         "{trace}"
+    );
+}
+
+#[test]
+fn a_renamed_repository_is_the_signer_its_run_names() {
+    let mut fixture = attested(&"a".repeat(64));
+    fixture.set(
+        "WORKFLOW_REPOSITORY",
+        "Orchestration-Maestro/maestro-rust-workflows",
+    );
+    succeeds(&fixture.run_body("rust-gate attest-binaries verify-recorded"));
+    let trace = fixture.trace();
+    assert!(
+        trace.contains(
+            "--signer-workflow \
+             Orchestration-Maestro/maestro-rust-workflows/.github/workflows/attest-binaries.yml \
+             --format json"
+        ),
+        "{trace}"
+    );
+    let data = workflow("attest-binaries");
+    let steps = data["jobs"]["attest"]["steps"].as_array().unwrap();
+    let step = steps
+        .iter()
+        .find(|step| step["id"] == "verify-recorded")
+        .unwrap();
+    assert_eq!(
+        step["env"]["WORKFLOW_REPOSITORY"],
+        "${{ job.workflow_repository }}"
     );
 }
 
