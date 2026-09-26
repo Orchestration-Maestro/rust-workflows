@@ -1103,9 +1103,11 @@ refused. Two commands serve more than one workflow.
 
 ### `rust-gate install-tools`
 
-Downloads release assets from the fixed official GitHub origin, verifies each digest before
-anything is extracted, and installs the executables under the runner's
-temporary directory, on the PATH of every later step. `ci.yml` installs `jaq`
+Downloads release assets from the fixed official GitHub origin, retrying a
+failed download seven times, one second apart and doubling, two minutes in all,
+verifies each digest before anything is extracted, and installs the
+executables under the runner's temporary directory, on the PATH of every later
+step. `ci.yml` installs `jaq`
 before `validate`, which reads a ruleset run's settings through it, then its
 mandatory toolbelt in one step and each optional gate's tool in its own step,
 conditional on that gate (`a_job_installs_every_pinned_tool_before_a_step_invokes_it`);

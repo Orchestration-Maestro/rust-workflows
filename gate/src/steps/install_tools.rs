@@ -65,10 +65,12 @@ fn run() -> Outcome {
         }
         let file_name = asset.rsplit('/').next().unwrap_or(asset);
         let archive = downloads.join(file_name);
-        // A reset connection is transient; retrying every error also retries
-        // a missing asset, which only delays the same refusal.
+        // A reset connection or a run of server errors is transient: seven
+        // retries, one second apart and doubling, wait two minutes in all.
+        // Retrying every error also retries a missing asset, which only
+        // delays the same refusal.
         Cmd::new(
-            "curl --retry 4 --retry-all-errors --fail --silent --show-error --location --output",
+            "curl --retry 7 --retry-all-errors --fail --silent --show-error --location --output",
         )
         .arg(&archive)
         .arg(format!("{RELEASES}/{asset}"))

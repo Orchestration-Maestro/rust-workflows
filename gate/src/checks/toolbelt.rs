@@ -253,7 +253,9 @@ fn fetched_mise(root: &Path, platform: &Platform) -> Result<PathBuf, Failure> {
 fn unpacked_mise(downloads: &Path, platform: &Platform) -> Result<PathBuf, Failure> {
     let name = format!("mise-v{MISE_VERSION}-{}", platform.archive);
     let archive = downloads.join(&name);
-    Cmd::new("curl --retry 4 --retry-all-errors --fail --silent --show-error --location --output")
+    // Seven retries, one second apart and doubling: two minutes of server
+    // errors before the download fails, as `install-tools` waits.
+    Cmd::new("curl --retry 7 --retry-all-errors --fail --silent --show-error --location --output")
         .arg(&archive)
         .arg(format!(
             "https://github.com/jdx/mise/releases/download/v{MISE_VERSION}/{name}"
@@ -287,7 +289,9 @@ fn unpacked_mise(downloads: &Path, platform: &Platform) -> Result<PathBuf, Failu
 /// `mise` run in `store` on the gate's configuration alone: its own data,
 /// cache, state and global configuration, the store's `mise.toml` trusted,
 /// and no configuration read above `root`, so a repository's own pins and
-/// the user's never reach the toolbelt.
+/// the user's never reach the toolbelt. Each download retries a server
+/// error eight times, its waits growing, where mise's own three give up in
+/// seconds.
 fn mise_isolated(mise: Cmd, root: &Path, store: &Path, path: &OsString) -> Cmd {
     mise.cwd(store)
         .env("PATH", path)
@@ -302,6 +306,7 @@ fn mise_isolated(mise: Cmd, root: &Path, store: &Path, path: &OsString) -> Cmd {
         .env("MISE_TRUSTED_CONFIG_PATHS", store)
         .env("MISE_CEILING_PATHS", root)
         .env("MISE_YES", "1")
+        .env("MISE_HTTP_RETRIES", "8")
 }
 
 /// Empty `bin`, then link into it every executable of `directories`, the

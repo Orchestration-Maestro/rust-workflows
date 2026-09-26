@@ -103,8 +103,9 @@ fn tool_installation_verifies_every_download_and_fetches_nothing_unasked() {
 #[test]
 fn a_dropped_connection_is_retried_before_a_download_fails() {
     // A connection GitHub's release storage reset once failed a whole run
-    // (curl exit 35). curl retries only timeouts and server errors unless it
-    // is told to retry every error.
+    // (curl exit 35), and five HTTP 500 in a row another. curl retries only
+    // timeouts and server errors unless it is told to retry every error, and
+    // seven retries, one second apart and doubling, wait two minutes.
     let mut fixture = Fixture::new();
     prepare(&fixture, true);
     fixture.set("TOOLS", TABLE);
@@ -115,7 +116,7 @@ fn a_dropped_connection_is_retried_before_a_download_fails() {
         .lines()
         .filter(|line| line.contains("releases/download/"))
     {
-        assert!(call.contains("--retry 4 --retry-all-errors "), "{call}");
+        assert!(call.contains("--retry 7 --retry-all-errors "), "{call}");
     }
 }
 
